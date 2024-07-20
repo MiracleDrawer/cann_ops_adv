@@ -9,21 +9,19 @@
  */
 
 /*!
- * \file ts_fa_tc_aclnn_level2_redline.cpp
+ * \file ts_aclnn_fa_tc_level2_redline.cpp
  * \brief FlashAttentionScore / FlashAttentionScoreGrad ACLNN 测试用例.
  */
 
-#include "ts_fa.h"
+#include "ts_aclnn_fa.h"
 
-class Ts_Fa_Ascend910B2_Aclnn_Level2_Redline : public Ts_Fa_Aclnn_WithParam_Ascend910B2 {};
-
-TEST_P(Ts_Fa_Ascend910B2_Aclnn_Level2_Redline, Tc_Redline)
+TEST_P(Ts_Aclnn_Fa_WithParam_Ascend910B2, Tc_Level2_Redline)
 {
-//    ASSERT_TRUE(case_->Init());
-//    ASSERT_TRUE(case_->Run());
+    ASSERT_TRUE(case_->Init());
+    ASSERT_TRUE(case_->Run());
 }
 
-const auto Tc_Fa_Aclnn_Level2_Redline_Case = ::testing::Values(
+const auto Tc_Level2_Redline_Cases = ::testing::Values(
 
     AclnnFaCase("Test_000", true,                                        /* CaseName,Enable */
                 "",                                                      /* DebugInfo */
@@ -70,4 +68,4 @@ const auto Tc_Fa_Aclnn_Level2_Redline_Case = ::testing::Values(
 
 );
 
-INSTANTIATE_TEST_SUITE_P(Fa, Ts_Fa_Ascend910B2_Aclnn_Level2_Redline, Tc_Fa_Aclnn_Level2_Redline_Case);
+INSTANTIATE_TEST_SUITE_P(Fa, Ts_Aclnn_Fa_WithParam_Ascend910B2, Tc_Level2_Redline_Cases);

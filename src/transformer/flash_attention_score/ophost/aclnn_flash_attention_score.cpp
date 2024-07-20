@@ -39,6 +39,9 @@ static const int64_t HEAD_DIM_MAX = 512;
 static const int64_t PSE_TYPE_V1 = 1; // add and mul
 static const int64_t PSE_INNER_MUL_ADD = 2;
 static const int64_t PSE_INNER_MUL_ADD_SQRT = 3;
+static const int64_t HEAD_DIM_72 = 72;
+static const int64_t HEAD_DIM_88 = 88;
+static const int64_t SEQ_LEN_1024 = 1024;
 
 struct AxesInfo {
     int64_t b;
@@ -230,6 +233,17 @@ void SetShapeInfoForSbh(int64_t alignedH1Size, FaShapeInfo &shapeInfo)
     }
 }
 
+bool IsNeedPad(const FaShapeInfo &shapeInfo)
+{
+    if ((shapeInfo.axes.d == HEAD_DIM_72 || shapeInfo.axes.d == HEAD_DIM_88) && shapeInfo.axes.s1 < SEQ_LEN_1024 &&
+         shapeInfo.axes.s2 < SEQ_LEN_1024 && shapeInfo.inputLayout != InputLayout::BNSD &&
+         shapeInfo.inputLayout != InputLayout::TND && shapeInfo.axes.n1 == shapeInfo.axes.n2 &&
+         shapeInfo.needTranspose == false) {
+        return false;
+    }
+    return true;
+}
+
 aclnnStatus InputDtypeCheck(const aclTensor *query, const aclTensor *key, const aclTensor *value,
                             const aclTensor *realShiftOptional, int64_t pseTypeOptional)
 {
@@ -305,6 +319,15 @@ aclnnStatus AnalysisInput(const aclTensor *query, const aclTensor *key, char *in
         SetShapeInfoForBshBsnd(alignedH1Size, shapeInfo);
     } else if (shapeInfo.inputLayout == InputLayout::SBH) {
         SetShapeInfoForSbh(alignedH1Size, shapeInfo);
+    }
+
+    if (!IsNeedPad(shapeInfo)) {
+        shapeInfo.needPad = false;
+        shapeInfo.padNum = 0;
+        shapeInfo.needReshape = false;
+        if (shapeInfo.inputLayout == InputLayout::BSH) {
+            shapeInfo.l0InputLayoutStr = "BSH";
+        }
     }
 
     OP_LOGD("Analysis input success. The analysis result: [needReshape]: %d, [needPad]: %d, [padNum]: %lu,"

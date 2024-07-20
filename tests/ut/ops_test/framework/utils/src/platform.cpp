@@ -13,9 +13,8 @@
  * \brief 提供平台相关接口的打桩及辅助功能.
  */
 
-#include <dlfcn.h>
-#include <map>
 #include "tests/utils/platform.h"
+#include <map>
 #include "tests/utils/log.h"
 
 namespace {
@@ -274,6 +273,45 @@ Platform &Platform::SetSocVersion(const SocVersion &socVersion)
                 },
             };
             break;
+        case SocVersion::Ascend310P3:
+            socSpec.spec = {
+                {
+                    "version",
+                    {
+                        {"Short_SoC_version", std::string("Ascend310P")},
+                        {"SoC_version", std::string("Ascend310P3")},
+                    },
+                },
+                {
+                    "SoCInfo",
+                    {
+                        {"core_type_list", std::string("CubeCore,VectorCore")},
+                        {"ai_core_cnt", std::uint32_t(8)},
+                        {"cube_core_cnt", std::uint32_t(8)},
+                        {"vector_core_cnt", std::uint32_t(7)},
+                    },
+                },
+                {
+                    "LocalMemSize",
+                    {
+                        {"0", std::uint64_t(65536)},    /* L0_A */
+                        {"1", std::uint64_t(65536)},    /* L0_B */
+                        {"2", std::uint64_t(262144)},   /* L0_C */
+                        {"3", std::uint64_t(1048576)},  /* L1 */
+                        {"4", std::uint64_t(16777216)}, /* L2 */
+                        {"5", std::uint64_t(262144)},   /* UB */
+                        {"6", std::uint64_t(0)},        /* HBM */
+                    },
+                },
+                {
+                    "LocalMemBw",
+                    {
+                        {"4", std::uint64_t(110)}, /* L2 */
+                        {"6", std::uint64_t(32)},  /* HBM */
+                    },
+                },
+            };
+            break;
         default:
             break;
     }
@@ -292,13 +330,9 @@ int64_t Platform::GetBlockDim() const
     return blockDim;
 }
 
-void *Platform::LoadSo(const char *absPath)
+void *Platform::LoadSo(const char *absPath, int mode)
 {
-    if (absPath == nullptr) {
-        LOG_ERR("File nullptr.");
-        return nullptr;
-    }
-    auto soHdl = dlopen(absPath, RTLD_NOW | RTLD_GLOBAL);
+    auto soHdl = dlopen(absPath, mode);
     if (soHdl == nullptr) {
         LOG_ERR("Can't dlopen %s, %s", absPath, dlerror());
         return nullptr;
@@ -317,43 +351,45 @@ bool Platform::UnLoadSo(void *hdl)
 
 void *Platform::LoadSoSym(void *hdl, const char *name)
 {
-    if (hdl == nullptr) {
-        LOG_ERR("handle nullptr");
-        return nullptr;
-    }
     return dlsym(hdl, name);
 }
 
-bool Platform::LoadTilingSo(const char *relPath)
+bool Platform::LoadOpTilingSo()
 {
-    std::string absPath = exeAbsPath_ + relPath;
+    std::string absPath = exeAbsPath_ + "libUTest_OpTiling.so";
     tilingSoHdl_ = this->LoadSo(absPath.c_str());
     return tilingSoHdl_ != nullptr;
 }
 
-bool Platform::UnLoadTilingSo()
+bool Platform::UnLoadOpTilingSo()
 {
-    auto rst = this->UnLoadSo(this->tilingSoHdl_);
-    this->tilingSoHdl_ = nullptr;
+    auto rst = true;
+    if (tilingSoHdl_ != nullptr) {
+        rst = this->UnLoadSo(tilingSoHdl_);
+        tilingSoHdl_ = nullptr;
+    }
     return rst;
 }
 
-void *Platform::LoadTilingSoSym(const char *name)
+void *Platform::LoadOpTilingSoSym(const char *name)
 {
     return this->LoadSoSym(tilingSoHdl_, name);
 }
 
-bool Platform::LoadProtoSo(const char *relPath)
+bool Platform::LoadOpProtoSo()
 {
-    std::string absPath = exeAbsPath_ + relPath;
+    std::string absPath = exeAbsPath_ + "libUTest_OpProto.so";
     protoSoHdl_ = this->LoadSo(absPath.c_str());
     return protoSoHdl_ != nullptr;
 }
 
-bool Platform::UnLoadProtoSo()
+bool Platform::UnLoadOpProtoSo()
 {
-    auto rst = this->UnLoadSo(this->protoSoHdl_);
-    this->protoSoHdl_ = nullptr;
+    auto rst = true;
+    if (protoSoHdl_ != nullptr) {
+        rst = this->UnLoadSo(protoSoHdl_);
+        protoSoHdl_ = nullptr;
+    }
     return rst;
 }
 

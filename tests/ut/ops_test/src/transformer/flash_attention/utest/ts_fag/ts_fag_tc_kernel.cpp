@@ -27,7 +27,7 @@ const auto Tc_Fag_Kernel_Case = ::testing::Values(
 
     FagCase("Fag_Kernel_Case_000", true,                            /* CaseName, Enable */
             "",                                                     /* DebugInfo */
-            OpInfo(ControlInfo(true, false),                        /* RunTiling, RunKernel */
+            OpInfo(ControlInfo(true, FaRunKernelCtrlFlag),          /* RunTiling, RunKernel */
                    ExpectInfo(true,                                 /* ExpectSuccess */
                               ExpectInfo::kInvalidTilingKey,        /* ExpectTilingKey */
                               ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
@@ -45,7 +45,7 @@ const auto Tc_Fag_Kernel_Case = ::testing::Values(
             ),
     FagCase("Fag_Kernel_Case_001", true,                            /* CaseName, Enable */
             "",                                                     /* DebugInfo */
-            OpInfo(ControlInfo(true, false),                        /* RunTiling, RunKernel */
+            OpInfo(ControlInfo(true, FaRunKernelCtrlFlag),          /* RunTiling, RunKernel */
                    ExpectInfo(true,                                 /* ExpectSuccess */
                               ExpectInfo::kInvalidTilingKey,        /* ExpectTilingKey */
                               ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */

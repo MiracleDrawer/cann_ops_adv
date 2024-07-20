@@ -1444,6 +1444,9 @@ FlashAttentionScoreGradS1s2Bn2gs1s2<T1, T2, IS_ATTEN_MASK, IS_PSE, IS_DROP, MM_O
     LocalTensor<uint8_t> vecInDropBuffer =
         ubBuffer.GetWithOffset<uint8_t>(8 * 1024 / sizeof(uint8_t), ubBufferOffset + U8Begin);
     if constexpr (IS_DROP == ENABLE) {
+        if constexpr (IsSameType<T1, float>::value) {
+            pipe_barrier(PIPE_ALL);
+        }
         DropOutCopy(vecInDropBuffer, curS1Idx, s2VBegin);
     }
 
@@ -1666,10 +1669,11 @@ FlashAttentionScoreGradS1s2Bn2gs1s2<T1, T2, IS_ATTEN_MASK, IS_PSE, IS_DROP, MM_O
     if constexpr (IS_DROP == ENABLE) {
         int64_t s2VBegin = preS2CvBegin + curS2Idx * s2VecSize;
         DropOutCopy(vecInDropBuffer, curS1Idx, s2VBegin);
+        if constexpr (IsSameType<T1, float>::value) {
+            pipe_barrier(PIPE_ALL);
+        }
     }
-    if constexpr (IsSameType<T1, float>::value) {
-        pipe_barrier(PIPE_ALL);
-    }
+
     LocalTensor<T2> vecClc1Buffer = ubBuffer.GetWithOffset<T2>(32 * 1024 / sizeof(T2), ubBufferOffset + T1Begin);
     if constexpr (MM_OUT_FORMAT == CubeFormat::ND) {
         if (s2VecLoop == 1) {

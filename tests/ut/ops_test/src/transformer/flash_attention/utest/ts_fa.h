@@ -19,6 +19,15 @@
 #include "fa_case.h"
 #include "aclnn_fa_case.h"
 
+#ifdef TESTS_UT_OPS_TEST_CI_PR
+/**
+ * 用于控制个别用例在 PR 门禁场景不执行 Kernel
+ */
+constexpr bool FaRunKernelCtrlFlag = false;
+#else
+constexpr bool FaRunKernelCtrlFlag = true;
+#endif
+
 using FaParam = ops::adv::tests::fa::FaParam;
 using PseShapeType = ops::adv::tests::fa::FaParam::PseShapeType;
 using DropMaskShapeType = ops::adv::tests::fa::FaParam::DropMaskShapeType;
@@ -27,8 +36,6 @@ using AttenMaskShapeType = ops::adv::tests::fa::FaParam::AttenMaskShapeType;
 using PrefixShapeType = ops::adv::tests::fa::FaParam::PrefixShapeType;
 using LayoutType = ops::adv::tests::fa::FaParam::LayoutType;
 using FaCase = ops::adv::tests::fa::FaCase;
-using AclnnFaCase = ops::adv::tests::fa::AclnnFaCase;
-using AclnnFaParam = ops::adv::tests::fa::AclnnFaParam;
 
 class Ts_Fa : public Ts<FaCase> {};
 class Ts_Fa_Ascend910B1 : public Ts_Ascend910B1<FaCase> {};
@@ -40,7 +47,3 @@ class Ts_Fa_WithParam_Ascend910B1 : public Ts_WithParam_Ascend910B1<FaCase> {};
 class Ts_Fa_WithParam_Ascend910B2 : public Ts_WithParam_Ascend910B2<FaCase> {};
 class Ts_Fa_WithParam_Ascend910B3 : public Ts_WithParam_Ascend910B3<FaCase> {};
 
-class Ts_Fa_Aclnn_WithParam : public Ts_WithParam<AclnnFaCase> {};
-class Ts_Fa_Aclnn_WithParam_Ascend910B1 : public Ts_WithParam_Ascend910B1<AclnnFaCase> {};
-class Ts_Fa_Aclnn_WithParam_Ascend910B2 : public Ts_WithParam_Ascend910B2<AclnnFaCase> {};
-class Ts_Fa_Aclnn_WithParam_Ascend910B3 : public Ts_WithParam_Ascend910B3<AclnnFaCase> {};

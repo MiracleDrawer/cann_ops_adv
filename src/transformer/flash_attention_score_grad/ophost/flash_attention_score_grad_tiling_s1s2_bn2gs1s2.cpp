@@ -296,7 +296,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::ProcessPseNormal(cons
     auto pseShape = context_->GetOptionalInputShape(PSE_SHIFT);
     auto pseShapeDim = pseShape->GetStorageShape().GetDimNum();
     if (pseShapeDim != PSE_NORMAL_SHAPE_DIM) {
-        OPS_LOG_E(context_, "The shape of pse is not 4 dimensions, got %ld", pseShapeDim);
+        OPS_LOG_E(context_, "The shape of pse is not 4 dimensions, got %lu", pseShapeDim);
         return ge::GRAPH_PARAM_INVALID;
     }
 
@@ -441,7 +441,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::CheckAttenMaskShape()
             return ge::GRAPH_FAILED;
         }
     } else {
-        OPS_LOG_E(context_, "dim num error, dimNum = %ld", dimNum);
+        OPS_LOG_E(context_, "dim num error, dimNum = %lu", dimNum);
         return ge::GRAPH_FAILED;
     }
 
@@ -489,15 +489,15 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::ProcessSparseModeInfo
     fBaseParams.sparseMode = NO_MASK;
     if (attrs->GetAttrNum() > static_cast<size_t>(SPARSE_MODE)) {
         fBaseParams.sparseMode = *(attrs->GetAttrPointer<int>(SPARSE_MODE)); // 7
-        if (fBaseParams.sparseMode < 0 || fBaseParams.sparseMode > BAND_LEFT_UP_CASUAL) {
-            OPS_LOG_E(context_, "FAG sparseMode [%d] is invalid", fBaseParams.sparseMode);
+        if (fBaseParams.sparseMode > BAND_LEFT_UP_CASUAL) {
+            OPS_LOG_E(context_, "FAG sparseMode [%u] is invalid", fBaseParams.sparseMode);
             return ge::GRAPH_FAILED;
         }
     }
 
     if ((fBaseParams.layoutType != INPUT_FROAMT_TND) && 
         (fBaseParams.sparseMode == RIGHT_DOWN_CASUAL_BAND || fBaseParams.sparseMode == BAND_LEFT_UP_CASUAL)) {
-        OPS_LOG_E(context_, " layout %d not support sparsemode %d", fBaseParams.layoutType, fBaseParams.sparseMode);
+        OPS_LOG_E(context_, " layout %u not support sparsemode %u", fBaseParams.layoutType, fBaseParams.sparseMode);
         return ge::GRAPH_FAILED;
     }
 

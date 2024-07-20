@@ -236,7 +236,13 @@ template <typename T> static T AlignUp(T num1, T num2)
     }
     return (num1 + num2 - 1) / num2 * num2;
 }
-
+ge::graphStatus CheckSoftmaxMaxShape(gert::TilingContext *context, uint32_t b, uint32_t n1, uint32_t s1);
+ge::graphStatus CheckTndSoftmaxMaxShape(gert::TilingContext *context, uint32_t t1, uint32_t n1);
+ge::graphStatus CheckSoftmaxSumShape(gert::TilingContext *context, uint32_t b, uint32_t n1, uint32_t s1);
+ge::graphStatus CheckTndSoftmaxSumShape(gert::TilingContext *context, uint32_t t1, uint32_t n1);
+ge::graphStatus CheckAttentionInShape(gert::TilingContext *context);
+ge::graphStatus CheckSoftmaxDtype(gert::TilingContext *context);
+ge::graphStatus CheckAttentionInDtype(gert::TilingContext *context);
 ge::graphStatus CheckShapeValid(gert::TilingContext *context, uint32_t b, uint32_t n1, uint32_t s1, uint32_t d);
 ge::graphStatus CheckTndShapeValid(gert::TilingContext *context, uint32_t t1, uint32_t n1, uint32_t d);
 ge::graphStatus CheckDtypeValid(gert::TilingContext *context);

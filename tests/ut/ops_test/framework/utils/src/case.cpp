@@ -13,8 +13,8 @@
  * \brief 测试用例.
  */
 
-#include <utility>
 #include "tests/utils/case.h"
+#include <utility>
 #include "tests/utils/log.h"
 
 using namespace ops::adv::tests::utils;

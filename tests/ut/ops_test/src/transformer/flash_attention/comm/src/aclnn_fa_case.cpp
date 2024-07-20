@@ -25,6 +25,7 @@ bool FasTilingRunCbf(void *curCase, uint64_t *workSpaceSize, aclOpExecutor **opE
 {
     auto *cs = static_cast<AclnnFaCase *>(curCase);
     auto *aclnnParam = &cs->aclnnParam;
+    auto *exp = &cs->forward.exp;
 
     aclnnStatus ret;
     if (!aclnnParam->IsUnPaddingAttention()) {
@@ -38,7 +39,8 @@ bool FasTilingRunCbf(void *curCase, uint64_t *workSpaceSize, aclOpExecutor **opE
             aclnnParam->aclnnSoftmaxMax.GetAclTensor(), aclnnParam->aclnnSoftmaxSum.GetAclTensor(),
             aclnnParam->aclnnSoftmaxRes.GetAclTensor(), aclnnParam->aclnnAttenRes.GetAclTensor(), workSpaceSize,
             opExecutor);
-        LOG_IF(ret != ACL_SUCCESS, LOG_ERR("aclnnFlashAttentionScoreGetWorkspaceSize failed, ERROR: %d", ret));
+        LOG_IF(ret != ACL_SUCCESS && exp->success,
+               LOG_ERR("aclnnFlashAttentionScoreGetWorkspaceSize failed, ERROR: %d", ret));
     } else {
         ret = aclnnFlashAttentionVarLenScoreGetWorkspaceSize(
             aclnnParam->aclnnQuery.GetAclTensor(), aclnnParam->aclnnKey.GetAclTensor(),
@@ -51,7 +53,8 @@ bool FasTilingRunCbf(void *curCase, uint64_t *workSpaceSize, aclOpExecutor **opE
             aclnnParam->aclnnSoftmaxMax.GetAclTensor(), aclnnParam->aclnnSoftmaxSum.GetAclTensor(),
             aclnnParam->aclnnSoftmaxRes.GetAclTensor(), aclnnParam->aclnnAttenRes.GetAclTensor(), workSpaceSize,
             opExecutor);
-        LOG_IF(ret != ACL_SUCCESS, LOG_ERR("aclnnFlashAttentionVarLenScoreGetWorkspaceSize failed, ERROR: %d", ret));
+        LOG_IF(ret != ACL_SUCCESS && exp->success,
+               LOG_ERR("aclnnFlashAttentionVarLenScoreGetWorkspaceSize failed, ERROR: %d", ret));
     }
     return ret == ACL_SUCCESS;
 }
@@ -79,36 +82,75 @@ bool FagTilingRunCbf(void *curCase, uint64_t *workSpaceSize, aclOpExecutor **opE
 {
     auto *cs = static_cast<AclnnFaCase *>(curCase);
     auto *aclnnParam = &cs->aclnnParam;
+    auto *exp = &cs->reverse.exp;
 
     aclnnStatus ret;
-    if (!aclnnParam->IsUnPaddingAttention()) {
-        ret = aclnnFlashAttentionScoreGradGetWorkspaceSize(
-            aclnnParam->aclnnQuery.GetAclTensor(), aclnnParam->aclnnKey.GetAclTensor(),
-            aclnnParam->aclnnValue.GetAclTensor(), aclnnParam->aclnnDy.GetAclTensor(),
-            aclnnParam->aclnnPse.GetAclTensor(), aclnnParam->aclnnDropMask.GetAclTensor(),
-            aclnnParam->aclnnPaddingMask.GetAclTensor(), aclnnParam->aclnnAttenMask.GetAclTensor(),
-            aclnnParam->aclnnSoftmaxMax.GetAclTensor(), aclnnParam->aclnnSoftmaxSum.GetAclTensor(),
-            aclnnParam->aclnnSoftmaxRes.GetAclTensor(), aclnnParam->aclnnAttenRes.GetAclTensor(),
-            aclnnParam->aclnnPrefixIntAry, aclnnParam->scale, aclnnParam->keepProb, aclnnParam->preTokens,
-            aclnnParam->nxtTokens, aclnnParam->n1, (char *)aclnnParam->layout.c_str(), aclnnParam->innerPrecise,
-            aclnnParam->sparseMode, aclnnParam->aclnnDq.GetAclTensor(), aclnnParam->aclnnDk.GetAclTensor(),
-            aclnnParam->aclnnDv.GetAclTensor(), aclnnParam->aclnnDpse.GetAclTensor(), workSpaceSize, opExecutor);
-        LOG_IF(ret != ACL_SUCCESS, LOG_ERR("aclnnFlashAttentionScoreGradGetWorkspaceSize failed, ERROR: %d", ret));
+    if (aclnnParam->pseType == 1) {
+        if (!aclnnParam->IsUnPaddingAttention()) {
+            ret = aclnnFlashAttentionScoreGradGetWorkspaceSize(
+                aclnnParam->aclnnQuery.GetAclTensor(), aclnnParam->aclnnKey.GetAclTensor(),
+                aclnnParam->aclnnValue.GetAclTensor(), aclnnParam->aclnnDy.GetAclTensor(),
+                aclnnParam->aclnnPse.GetAclTensor(), aclnnParam->aclnnDropMask.GetAclTensor(),
+                aclnnParam->aclnnPaddingMask.GetAclTensor(), aclnnParam->aclnnAttenMask.GetAclTensor(),
+                aclnnParam->aclnnSoftmaxMax.GetAclTensor(), aclnnParam->aclnnSoftmaxSum.GetAclTensor(),
+                aclnnParam->aclnnSoftmaxRes.GetAclTensor(), aclnnParam->aclnnAttenRes.GetAclTensor(),
+                aclnnParam->aclnnPrefixIntAry, aclnnParam->scale, aclnnParam->keepProb, aclnnParam->preTokens,
+                aclnnParam->nxtTokens, aclnnParam->n1, (char *)aclnnParam->layout.c_str(), aclnnParam->innerPrecise,
+                aclnnParam->sparseMode, aclnnParam->aclnnDq.GetAclTensor(), aclnnParam->aclnnDk.GetAclTensor(),
+                aclnnParam->aclnnDv.GetAclTensor(), aclnnParam->aclnnDpse.GetAclTensor(), workSpaceSize, opExecutor);
+            LOG_IF(ret != ACL_SUCCESS && exp->success,
+                   LOG_ERR("aclnnFlashAttentionScoreGradGetWorkspaceSize failed, ERROR: %d", ret));
+        } else {
+            ret = aclnnFlashAttentionUnpaddingScoreGradGetWorkspaceSize(
+                aclnnParam->aclnnQuery.GetAclTensor(), aclnnParam->aclnnKey.GetAclTensor(),
+                aclnnParam->aclnnValue.GetAclTensor(), aclnnParam->aclnnDy.GetAclTensor(),
+                aclnnParam->aclnnPse.GetAclTensor(), aclnnParam->aclnnDropMask.GetAclTensor(),
+                aclnnParam->aclnnPaddingMask.GetAclTensor(), aclnnParam->aclnnAttenMask.GetAclTensor(),
+                aclnnParam->aclnnSoftmaxMax.GetAclTensor(), aclnnParam->aclnnSoftmaxSum.GetAclTensor(),
+                aclnnParam->aclnnSoftmaxRes.GetAclTensor(), aclnnParam->aclnnAttenRes.GetAclTensor(),
+                aclnnParam->aclnnPrefixIntAry, aclnnParam->aclnnActualSeqQLenIntAry,
+                aclnnParam->aclnnActualSeqKvLenIntAry, aclnnParam->scale, aclnnParam->keepProb, aclnnParam->preTokens,
+                aclnnParam->nxtTokens, aclnnParam->n1, (char *)aclnnParam->layout.c_str(), aclnnParam->innerPrecise,
+                aclnnParam->sparseMode, aclnnParam->aclnnDq.GetAclTensor(), aclnnParam->aclnnDk.GetAclTensor(),
+                aclnnParam->aclnnDv.GetAclTensor(), aclnnParam->aclnnDpse.GetAclTensor(), workSpaceSize, opExecutor);
+            LOG_IF(ret != ACL_SUCCESS && exp->success,
+                   LOG_ERR("aclnnFlashAttentionUnpaddingScoreGradGetWorkspaceSize failed, ERROR: %d", ret));
+        }
     } else {
-        ret = aclnnFlashAttentionUnpaddingScoreGradGetWorkspaceSize(
-            aclnnParam->aclnnQuery.GetAclTensor(), aclnnParam->aclnnKey.GetAclTensor(),
-            aclnnParam->aclnnValue.GetAclTensor(), aclnnParam->aclnnDy.GetAclTensor(),
-            aclnnParam->aclnnPse.GetAclTensor(), aclnnParam->aclnnDropMask.GetAclTensor(),
-            aclnnParam->aclnnPaddingMask.GetAclTensor(), aclnnParam->aclnnAttenMask.GetAclTensor(),
-            aclnnParam->aclnnSoftmaxMax.GetAclTensor(), aclnnParam->aclnnSoftmaxSum.GetAclTensor(),
-            aclnnParam->aclnnSoftmaxRes.GetAclTensor(), aclnnParam->aclnnAttenRes.GetAclTensor(),
-            aclnnParam->aclnnPrefixIntAry, aclnnParam->aclnnActualSeqQLenIntAry, aclnnParam->aclnnActualSeqKvLenIntAry,
-            aclnnParam->scale, aclnnParam->keepProb, aclnnParam->preTokens, aclnnParam->nxtTokens, aclnnParam->n1,
-            (char *)aclnnParam->layout.c_str(), aclnnParam->innerPrecise, aclnnParam->sparseMode,
-            aclnnParam->aclnnDq.GetAclTensor(), aclnnParam->aclnnDk.GetAclTensor(), aclnnParam->aclnnDv.GetAclTensor(),
-            aclnnParam->aclnnDpse.GetAclTensor(), workSpaceSize, opExecutor);
-        LOG_IF(ret != ACL_SUCCESS,
-               LOG_ERR("aclnnFlashAttentionUnpaddingScoreGradGetWorkspaceSize failed, ERROR: %d", ret));
+        if (!aclnnParam->IsUnPaddingAttention()) {
+            ret = aclnnFlashAttentionScoreGradV2GetWorkspaceSize(
+                aclnnParam->aclnnQuery.GetAclTensor(), aclnnParam->aclnnKey.GetAclTensor(),
+                aclnnParam->aclnnValue.GetAclTensor(), aclnnParam->aclnnDy.GetAclTensor(),
+                aclnnParam->aclnnPse.GetAclTensor(), aclnnParam->aclnnDropMask.GetAclTensor(),
+                aclnnParam->aclnnPaddingMask.GetAclTensor(), aclnnParam->aclnnAttenMask.GetAclTensor(),
+                aclnnParam->aclnnSoftmaxMax.GetAclTensor(), aclnnParam->aclnnSoftmaxSum.GetAclTensor(),
+                aclnnParam->aclnnSoftmaxRes.GetAclTensor(), aclnnParam->aclnnAttenRes.GetAclTensor(),
+                aclnnParam->aclnnPrefixIntAry, aclnnParam->qStartIdxOptionalIntAry,
+                aclnnParam->kvStartIdxOptionalIntAry, aclnnParam->scale, aclnnParam->keepProb, aclnnParam->preTokens,
+                aclnnParam->nxtTokens, aclnnParam->n1, (char *)aclnnParam->layout.c_str(), aclnnParam->innerPrecise,
+                aclnnParam->sparseMode, aclnnParam->pseType, aclnnParam->aclnnDq.GetAclTensor(),
+                aclnnParam->aclnnDk.GetAclTensor(), aclnnParam->aclnnDv.GetAclTensor(),
+                aclnnParam->aclnnDpse.GetAclTensor(), workSpaceSize, opExecutor);
+            LOG_IF(ret != ACL_SUCCESS && exp->success,
+                   LOG_ERR("aclnnFlashAttentionScoreGradV2GetWorkspaceSize failed, ERROR: %d", ret));
+        } else {
+            ret = aclnnFlashAttentionUnpaddingScoreGradV2GetWorkspaceSize(
+                aclnnParam->aclnnQuery.GetAclTensor(), aclnnParam->aclnnKey.GetAclTensor(),
+                aclnnParam->aclnnValue.GetAclTensor(), aclnnParam->aclnnDy.GetAclTensor(),
+                aclnnParam->aclnnPse.GetAclTensor(), aclnnParam->aclnnDropMask.GetAclTensor(),
+                aclnnParam->aclnnPaddingMask.GetAclTensor(), aclnnParam->aclnnAttenMask.GetAclTensor(),
+                aclnnParam->aclnnSoftmaxMax.GetAclTensor(), aclnnParam->aclnnSoftmaxSum.GetAclTensor(),
+                aclnnParam->aclnnSoftmaxRes.GetAclTensor(), aclnnParam->aclnnAttenRes.GetAclTensor(),
+                aclnnParam->aclnnPrefixIntAry, aclnnParam->aclnnActualSeqQLenIntAry,
+                aclnnParam->aclnnActualSeqKvLenIntAry, aclnnParam->qStartIdxOptionalIntAry,
+                aclnnParam->kvStartIdxOptionalIntAry, aclnnParam->scale, aclnnParam->keepProb, aclnnParam->preTokens,
+                aclnnParam->nxtTokens, aclnnParam->n1, (char *)aclnnParam->layout.c_str(), aclnnParam->innerPrecise,
+                aclnnParam->sparseMode, aclnnParam->pseType, aclnnParam->aclnnDq.GetAclTensor(),
+                aclnnParam->aclnnDk.GetAclTensor(), aclnnParam->aclnnDv.GetAclTensor(),
+                aclnnParam->aclnnDpse.GetAclTensor(), workSpaceSize, opExecutor);
+            LOG_IF(ret != ACL_SUCCESS && exp->success,
+                   LOG_ERR("aclnnFlashAttentionUnpaddingScoreGradV2GetWorkspaceSize failed, ERROR: %d", ret));
+        }
     }
     return ret == ACL_SUCCESS;
 }
@@ -120,14 +162,26 @@ bool FagKernelRunCbf(void *curCase)
     auto *ctx = &cs->aclnnReverseCtx;
 
     aclnnStatus ret;
-    if (!aclnnParam->IsUnPaddingAttention()) {
-        ret = aclnnFlashAttentionScoreGrad(ctx->GetWorkspacePtr(), ctx->GetWorkspaceSize(), ctx->GetAclOpExecutor(),
-                                           ctx->GetAclRtStream());
-        LOG_IF(ret != ACL_SUCCESS, LOG_ERR("aclnnFlashAttentionScoreGrad failed, ERROR: %d", ret));
+    if (aclnnParam->pseType == 1) {
+        if (!aclnnParam->IsUnPaddingAttention()) {
+            ret = aclnnFlashAttentionScoreGrad(ctx->GetWorkspacePtr(), ctx->GetWorkspaceSize(), ctx->GetAclOpExecutor(),
+                                               ctx->GetAclRtStream());
+            LOG_IF(ret != ACL_SUCCESS, LOG_ERR("aclnnFlashAttentionScoreGrad failed, ERROR: %d", ret));
+        } else {
+            ret = aclnnFlashAttentionUnpaddingScoreGrad(ctx->GetWorkspacePtr(), ctx->GetWorkspaceSize(),
+                                                        ctx->GetAclOpExecutor(), ctx->GetAclRtStream());
+            LOG_IF(ret != ACL_SUCCESS, LOG_ERR("aclnnFlashAttentionUnpaddingScoreGrad failed, ERROR: %d", ret));
+        }
     } else {
-        ret = aclnnFlashAttentionUnpaddingScoreGrad(ctx->GetWorkspacePtr(), ctx->GetWorkspaceSize(),
-                                                    ctx->GetAclOpExecutor(), ctx->GetAclRtStream());
-        LOG_IF(ret != ACL_SUCCESS, LOG_ERR("aclnnFlashAttentionUnpaddingScoreGrad failed, ERROR: %d", ret));
+        if (!aclnnParam->IsUnPaddingAttention()) {
+            ret = aclnnFlashAttentionScoreGradV2(ctx->GetWorkspacePtr(), ctx->GetWorkspaceSize(),
+                                                 ctx->GetAclOpExecutor(), ctx->GetAclRtStream());
+            LOG_IF(ret != ACL_SUCCESS, LOG_ERR("aclnnFlashAttentionScoreGradV2 failed, ERROR: %d", ret));
+        } else {
+            ret = aclnnFlashAttentionUnpaddingScoreGradV2(ctx->GetWorkspacePtr(), ctx->GetWorkspaceSize(),
+                                                          ctx->GetAclOpExecutor(), ctx->GetAclRtStream());
+            LOG_IF(ret != ACL_SUCCESS, LOG_ERR("aclnnFlashAttentionUnpaddingScoreGradV2 failed, ERROR: %d", ret));
+        }
     }
     return ret == ACL_SUCCESS;
 }
@@ -142,13 +196,6 @@ AclnnFaCase::AclnnFaCase(const char *name, bool enable, const char *dbgInfo, OpI
     : FaCase(name, enable, dbgInfo, std::move(forward), std::move(reverse), FaParam(), tilingTemplatePriority),
       aclnnParam(aclnnParam)
 {
-}
-
-bool AclnnFaCase::Run()
-{
-    auto ret = FaCase::Run();
-    (void)aclnnFinalize();
-    return ret;
 }
 
 bool AclnnFaCase::InitParam()

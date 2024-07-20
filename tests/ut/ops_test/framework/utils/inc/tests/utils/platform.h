@@ -19,6 +19,7 @@
 #include <map>
 #include <any>
 #include <string>
+#include <dlfcn.h>
 
 namespace ops::adv::tests::utils {
 
@@ -28,6 +29,7 @@ public:
         Ascend910B1,
         Ascend910B2,
         Ascend910B3,
+        Ascend310P3,
     };
     class SocSpec {
     public:
@@ -50,16 +52,16 @@ public:
     [[maybe_unused]] [[nodiscard]] uint32_t GetCoreNum() const;
     [[maybe_unused]] [[nodiscard]] int64_t GetBlockDim() const;
 
-    [[maybe_unused]] static void *LoadSo(const char *absPath);
+    [[maybe_unused]] static void *LoadSo(const char *absPath, int mode = RTLD_NOW | RTLD_GLOBAL);
     [[maybe_unused]] static bool UnLoadSo(void *hdl);
     [[maybe_unused]] [[nodiscard]] static void *LoadSoSym(void *hdl, const char *name);
 
-    [[maybe_unused]] bool LoadTilingSo(const char *relPath);
-    [[maybe_unused]] bool UnLoadTilingSo();
-    [[maybe_unused]] [[nodiscard]] void *LoadTilingSoSym(const char *name);
+    [[maybe_unused]] bool LoadOpTilingSo();
+    [[maybe_unused]] bool UnLoadOpTilingSo();
+    [[maybe_unused]] [[nodiscard]] void *LoadOpTilingSoSym(const char *name);
 
-    [[maybe_unused]] bool LoadProtoSo(const char *relPath);
-    [[maybe_unused]] bool UnLoadProtoSo();
+    [[maybe_unused]] bool LoadOpProtoSo();
+    [[maybe_unused]] bool UnLoadOpProtoSo();
 
 private:
     void *tilingSoHdl_ = nullptr;

@@ -115,7 +115,7 @@ Atlas A2 训练系列产品
 
   - dvOut（aclTensor\*，计算输出）：Device侧的aclTensor，公式中的dV，表示value的梯度，计算输出，数据类型支持FLOAT16、BFLOAT16、FLOAT32，[数据格式](common/数据格式.md)支持ND。
 
-  - dpseOut（aclTensor\*，计算输出）：Device侧的aclTensor，公式中的d\(pse\)，表示pse的梯度，计算输出，数据类型支持FLOAT16、BFLOAT16、FLOAT32，[数据格式](common/数据格式.md)支持ND，**预留参数暂未使用，调用时该参数需传空**。
+  - dpseOut（aclTensor\*，计算输出）：Device侧的aclTensor，公式中的d\(pse\)，表示pse的梯度，计算输出，数据类型支持FLOAT16、BFLOAT16、FLOAT32，[数据格式](common/数据格式.md)支持ND，**预留参数暂未使用**，但在pseShiftOptional不为空时，shape和数据类型与pseShiftOptional一致。
 
   - scaleValueOptional（double，计算输入）：Host侧的double，公式中d开根号的倒数，代表缩放系数，作为计算流中Muls的scalar值，数据类型支持DOUBLE。
 
@@ -192,6 +192,7 @@ Atlas A2 训练系列产品
     - S：取值范围为1\~1M。
     - D：取值范围为1\~512。
     - KeepProb: 取值范围为(0,1].
+-   部分场景下，如果计算量过大可能会导致算子执行超时(aicore error类型报错，errorStr为：timeout or trap error)，此时建议做轴切分处理，注：这里的计算量会受B、S、N、D等参数的影响，值越大计算量越大。
 -   关于softmaxMax与softmaxSum参数的约束：输入格式固定为\[B, N, S, 8\],TND的输入格式除外，此时为\[T, N, 8\]，注：T=B*S。
 -   headNum的取值必须和传入的Query中的N值保持一致。
 -   band场景，preTockensOptional和nextTockensOptional之间必须要有交集。
@@ -384,7 +385,6 @@ REG_OP(FlashAttentionScoreGrad)
     std::vector<short> dkHostData(32768, 0);
     std::vector<short> dvHostData(32768, 0);
 
-
     ret = CreateAclTensor(qHostData, qShape, &qDeviceAddr, aclDataType::ACL_FLOAT16, &q);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     ret = CreateAclTensor(kHostData, kShape, &kDeviceAddr, aclDataType::ACL_FLOAT16, &k);
@@ -407,7 +407,7 @@ REG_OP(FlashAttentionScoreGrad)
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     ret = CreateAclTensor(dvHostData, dvShape, &dvDeviceAddr, aclDataType::ACL_FLOAT16, &dv);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-
+    
     std::vector<int64_t> prefixOp = {0};
     aclIntArray *prefix = aclCreateIntArray(prefixOp.data(), 1);
     double scaleValue = 0.088388;
@@ -417,40 +417,40 @@ REG_OP(FlashAttentionScoreGrad)
     int64_t headNum = 1;
     int64_t innerPrecise = 0;
     int64_t sparseMod = 0;
-
+    
     char layOut[5] = {'S', 'B', 'H', 0};
-
+    
     // 3. 调用CANN算子库API，需要修改为具体的Api名称
     uint64_t workspaceSize = 0;
     aclOpExecutor* executor;
-
+    
     // 调用aclnnFlashAttentionScoreGrad第一段接口
     ret = aclnnFlashAttentionScoreGradGetWorkspaceSize(q, k, v, dx, pse, dropMask, padding,
               attenmask, softmaxMax, softmaxSum, softmaxIn, attentionIn, prefix,
               scaleValue, keepProb, preTockens, nextTockens, headNum, layOut, innerPrecise, sparseMod,
               dq, dk, dv, dpse, &workspaceSize, &executor);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnFlashAttentionScoreGradGetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
-
+    
     // 根据第一段接口计算出的workspaceSize申请device内存
     void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
       ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
       CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);
     }
-
+    
     // 调用aclnnFlashAttentionScoreGrad第二段接口
     ret = aclnnFlashAttentionScoreGrad(workspaceAddr, workspaceSize, executor, stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnFlashAttentionScoreGrad failed. ERROR: %d\n", ret); return ret);
-
+    
     // 4. （固定写法）同步等待任务执行结束
     ret = aclrtSynchronizeStream(stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
-
+    
     // 5. 获取输出的值，将device侧内存上的结果拷贝至host侧，需要根据具体API的接口定义修改
     PrintOutResult(dqShape, &dqDeviceAddr);
     PrintOutResult(dkShape, &dkDeviceAddr);
     PrintOutResult(dvShape, &dvDeviceAddr);
-
+    
     // 6. 释放aclTensor和aclScalar，需要根据具体API的接口定义修改
     aclDestroyTensor(q);
     aclDestroyTensor(k);
@@ -463,7 +463,7 @@ REG_OP(FlashAttentionScoreGrad)
     aclDestroyTensor(dq);
     aclDestroyTensor(dk);
     aclDestroyTensor(dv);
-
+    
     // 7. 释放device资源
     aclrtFree(qDeviceAddr);
     aclrtFree(kDeviceAddr);
@@ -483,8 +483,7 @@ REG_OP(FlashAttentionScoreGrad)
     aclrtDestroyContext(context);
     aclrtResetDevice(deviceId);
     aclFinalize();
-
+    
     return 0;
   }
   ```
-

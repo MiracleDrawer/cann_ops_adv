@@ -21,25 +21,24 @@ using Platform = ops::adv::tests::utils::Platform;
 int main(int argc, char **argv)
 {
     /**
-     * 加载 OpProto.so OpTiling.so
-     * 注意必须加载 OpProto.so OpTiling.so, 因为加载时才会触发框架(register) 执行算子处理函数注册.
+     * 加载 OpTiling.so
+     * 注意必须加载 OpTiling.so, 因为加载时才会触发框架(register) 执行算子处理函数注册.
      */
     Platform platform;
     Platform::SetGlobalPlatform(&platform);
     if (!platform.InitArgsInfo(argc, argv)) {
         return 1;
     }
-    if (!platform.LoadProtoSo("libUTest_OpProto.so")) {
-        return 2;
-    }
-    if (!platform.LoadTilingSo("libUTest_OpTiling.so")) {
-        return 3;
+    if (!platform.LoadOpTilingSo()) {
+        return 1;
     }
 
     testing::InitGoogleTest(&argc, argv);
     int ret = RUN_ALL_TESTS();
 
-    (void)platform.UnLoadTilingSo();
-    (void)platform.UnLoadProtoSo();
+    if (!platform.UnLoadOpTilingSo()) {
+        return 1;
+    }
+
     return ret;
 }

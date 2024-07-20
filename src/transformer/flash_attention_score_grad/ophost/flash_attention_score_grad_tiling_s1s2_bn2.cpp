@@ -207,7 +207,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::SetMaskShapeType(const ger
             return ge::GRAPH_FAILED;
         }
     } else {
-        OPS_LOG_E(context_, "FlashAttentionScoreGradTilingS1s2Bn2 not support attenMaskShape dim num: %d",
+        OPS_LOG_E(context_, "FlashAttentionScoreGradTilingS1s2Bn2 not support attenMaskShape dim num: %u",
                   maskShapeDims);
         return ge::GRAPH_FAILED;
     }
@@ -536,6 +536,11 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::SetSparseParams()
     }
 
     td_.opInfo.set_isSparse(1);
+
+    if (sparseMode == LEFT_UP_CAUSAL || sparseMode == RIGHT_DOWN_CAUSAL) {
+        td_.opInfo.set_preTokens(INT32_MAX);
+        td_.opInfo.set_nextTokens(0);
+    }
     return ge::GRAPH_SUCCESS;
 }
 
@@ -639,7 +644,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::GetShapeAttrsInfo()
                 return ge::GRAPH_FAILED);
 
     if (td_.opInfo.get_keepProb() < 1) {
-        tmpData_.drop_out_cfg = DropOutConfig::EXIST_DROP_OUT; 
+        tmpData_.drop_out_cfg = DropOutConfig::EXIST_DROP_OUT;
         status = ProcessDropInfo();
         if (status != ge::GRAPH_SUCCESS) {
             PrintShapeInfo();
@@ -652,7 +657,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::GetShapeAttrsInfo()
     if (attrs->GetAttrNum() > static_cast<size_t>(SPARSE_MODE)) {
         sparseMode = SparseMode(*(attrs->GetAttrPointer<int>(SPARSE_MODE))); // 7
         uint32_t sparse = *(attrs->GetAttrPointer<int>(SPARSE_MODE));
-        if (sparse < 0 || sparse > BAND_LEFT_UP_CASUAL) {
+        if (sparse > BAND_LEFT_UP_CASUAL) {
             OPS_LOG_E(context_, "FAG sparseMode %u is invalid", sparse);
             return ge::GRAPH_FAILED;
         }
@@ -660,7 +665,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::GetShapeAttrsInfo()
 
     if ((td_.opInfo.get_layout() != static_cast<uint32_t>(InputLayout::TND)) &&
         (sparseMode == RIGHT_DOWN_CASUAL_BAND || sparseMode == BAND_LEFT_UP_CASUAL)) {
-        OPS_LOG_E(context_, " layout %d not support sparsemode %d", td_.opInfo.get_layout(), sparseMode);
+        OPS_LOG_E(context_, " layout %u not support sparsemode %d", td_.opInfo.get_layout(), sparseMode);
         return ge::GRAPH_FAILED;
     }
 
@@ -1047,12 +1052,12 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::DoLibApiTiling()
         return status;
     }
 
-    status = SetBmm31TilingData(baseMmm, aicoreParams_.l1Size);
+    status = SetBmm31TilingData(aicoreParams_.l1Size);
     if (status != ge::GRAPH_SUCCESS) {
         return status;
     }
 
-    status = SetBmm4TilingData(baseMmm, baseNmm, aicoreParams_.l1Size);
+    status = SetBmm4TilingData(aicoreParams_.l1Size);
     if (status != ge::GRAPH_SUCCESS) {
         return status;
     }
@@ -1216,8 +1221,8 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::GetWorkspaceSize()
     // Tiling传递的内存大小、起始地址，统一为字节数，单位为B
     auto blockdim = CalcTschBlockDim(aicoreParams_.blockDim, aicoreParams_.aicNum, aicoreParams_.blockDim);
     OPS_ERR_IF(blockdim == 0,
-               OPS_REPORT_VECTOR_INNER_ERR(context_, 
-                                           "blockdim is 0, aicNum is %ld, aivNum is %ld.", aicoreParams_.aicNum,
+               OPS_REPORT_VECTOR_INNER_ERR(context_,
+                                           "blockdim is 0, aicNum is %lu, aivNum is %lu.", aicoreParams_.aicNum,
                                            aicoreParams_.blockDim),
                return ge::GRAPH_FAILED);
     context_->SetBlockDim(blockdim);
@@ -1366,8 +1371,8 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::SetBaseInfo(const gert::Sh
         if (queryShape.GetDimNum() != DIMS_THREE || keyShape.GetDimNum() != DIMS_THREE) {
             return ge::GRAPH_PARAM_INVALID;
         }
-        int64_t dimD = queryShape.GetDim(DIM_2) / dimN1;
-        int64_t dimN2 = keyShape.GetDim(DIM_2) / dimD;
+        int64_t tempDimD = queryShape.GetDim(DIM_2) / dimN1;
+        int64_t dimN2 = keyShape.GetDim(DIM_2) / tempDimD;
         td_.opInfo.set_B(queryShape.GetDim(DIM_0));
         td_.opInfo.set_G(dimN1 / dimN2);
         OPS_ERR_IF(td_.opInfo.get_G() == 0,
@@ -1376,10 +1381,10 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::SetBaseInfo(const gert::Sh
         td_.opInfo.set_N2(dimN2);
         td_.opInfo.set_S1(queryShape.GetDim(DIM_1));
         td_.opInfo.set_S2(keyShape.GetDim(DIM_1));
-        td_.opInfo.set_D(dimD);
+        td_.opInfo.set_D(tempDimD);
     } else if (td_.opInfo.get_layout() == static_cast<uint32_t>(InputLayout::SBH)) {
-        int64_t dimD = queryShape.GetDim(DIM_2) / dimN1;
-        int64_t dimN2 = keyShape.GetDim(DIM_2) / dimD;
+        int64_t tempDimD = queryShape.GetDim(DIM_2) / dimN1;
+        int64_t dimN2 = keyShape.GetDim(DIM_2) / tempDimD;
         td_.opInfo.set_B(queryShape.GetDim(DIM_1));
         td_.opInfo.set_G(dimN1 / dimN2);
         OPS_ERR_IF(td_.opInfo.get_G() == 0,
@@ -1388,7 +1393,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::SetBaseInfo(const gert::Sh
         td_.opInfo.set_N2(dimN2);
         td_.opInfo.set_S1(queryShape.GetDim(DIM_0));
         td_.opInfo.set_S2(keyShape.GetDim(DIM_0));
-        td_.opInfo.set_D(dimD);
+        td_.opInfo.set_D(tempDimD);
     } else if (td_.opInfo.get_layout() == static_cast<uint32_t>(InputLayout::TND)) {
         auto actualSeqQlenTensor = context_->GetOptionalInputTensor(ACTUAL_SEQ_Q_LEN);
         auto actualSeqKvlenTensor = context_->GetOptionalInputTensor(ACTUAL_SEQ_KV_LEN);
@@ -1588,7 +1593,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::SetBmm1TilingData(uint32_t
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::SetBmm31TilingData(uint32_t sOut, uint32_t l1SizeRemain)
+ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::SetBmm31TilingData(uint32_t l1SizeRemain)
 {
     /*
     BSH/BSND:
@@ -1664,8 +1669,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::SetBmm31TilingData(uint32_
 }
 
 
-ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::SetBmm4TilingData(uint32_t sOut, uint32_t sFla,
-                                                                        uint32_t l1SizeRemain)
+ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::SetBmm4TilingData(uint32_t l1SizeRemain)
 {
     /*
     BSH/BSND

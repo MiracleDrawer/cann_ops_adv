@@ -220,6 +220,14 @@ std::string TensorIntf::ToString(const ge::DataType &dType)
             return "bool";
         case ge::DT_BF16:
             return "bfloat16";
+        case ge::DT_INT64:
+            return "int64";
+        case ge::DT_UINT64:
+            return "uint64";
+        case ge::DT_INT32:
+            return "int32";
+        case ge::DT_INT4:
+            return "int4";
         default:
             return "undefined";
     }
@@ -230,6 +238,8 @@ std::string TensorIntf::ToString(const ge::Format &format)
     switch (format) {
         case ge::FORMAT_ND:
             return "ND";
+        case ge::FORMAT_FRACTAL_NZ:
+            return "FRACTAL_NZ";
         default:
             return "undefined";
     }

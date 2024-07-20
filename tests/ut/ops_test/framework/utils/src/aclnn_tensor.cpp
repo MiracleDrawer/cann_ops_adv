@@ -26,6 +26,9 @@ std::map<ge::DataType, aclDataType> geDtype2AclDtypeMap = {{ge::DataType::DT_FLO
                                                            {ge::DataType::DT_FLOAT, ACL_FLOAT},
                                                            {ge::DataType::DT_BOOL, ACL_BOOL},
                                                            {ge::DataType::DT_UINT8, ACL_UINT8},
+                                                           {ge::DataType::DT_INT4, ACL_INT4},
+                                                           {ge::DataType::DT_INT8, ACL_INT8},
+                                                           {ge::DataType::DT_INT32, ACL_INT32},
                                                            {ge::DataType::DT_INT64, ACL_INT64}};
 }
 

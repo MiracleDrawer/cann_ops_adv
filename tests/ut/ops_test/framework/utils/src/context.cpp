@@ -206,6 +206,9 @@ bool Context::InitTilingJsonStr()
         } else if (value.type() == typeid(std::string)) {
             auto sv = std::any_cast<std::string>(value);
             attrsJson_ += R"(str", "value": ")" + std::string(sv) + R"(" },)";
+        } else if (value.type() == typeid(bool)) {
+            auto bv = std::any_cast<bool>(value);
+            attrsJson_ += R"(bool", "value": )" + std::string(bv ? "true" : "false") + " },";
         } else {
             LOG_ERR("Unknown Attrs(%s)'s dtype(%s).", a.first.c_str(), value.type().name());
             return false;
@@ -250,16 +253,20 @@ bool Context::ParseTilingResult()
         return false;
     }
 
+    uint32_t hexByteSize = 2; // 16进制时使用2个字符表时一个Byte
     uint32_t tilingDataStrLen = tilingDataStr_.length();
-    uint32_t tilingDataLen = tilingDataStrLen / 2;
-    if (tilingDataStrLen % 8 != 0 || tilingDataLen > tilingDataMaxLen_) {
-        LOG_ERR("%s(TilingKey=%lu) TilingDataStrLen(%u) %% 8 = %u != 0 || TilingDataLen(%u) > %u", opName_.c_str(),
-                tilingKey_, tilingDataStrLen, tilingDataStrLen % 8, tilingDataLen, tilingDataMaxLen_);
+    uint32_t tilingDataLen = tilingDataStrLen / hexByteSize;
+    uint32_t tilingDataAlignSize = 8;              // 要求 TilingData 8 字节对齐
+    uint32_t tilingDataRemainder = tilingDataStrLen % tilingDataAlignSize;
+    if (tilingDataRemainder != 0 || tilingDataLen > tilingDataMaxLen_) {
+        LOG_ERR("%s(TilingKey=%lu) TilingDataStrLen(%u) %% %u = %u != 0 || TilingDataLen(%u) > %u", opName_.c_str(),
+                tilingKey_, tilingDataStrLen, tilingDataAlignSize, tilingDataRemainder, tilingDataLen,
+                tilingDataMaxLen_);
         return false;
     }
     tilingData_.resize(tilingDataLen, 0);
-    for (uint32_t i = 0; i < tilingDataStrLen; i += 2) {
-        if (sscanf_s(tilingDataStr_.c_str() + i, "%2hhx", &tilingData_[i / 2]) != 1) {
+    for (uint32_t i = 0; i < tilingDataStrLen; i += hexByteSize) {
+        if (sscanf_s(tilingDataStr_.c_str() + i, "%2hhx", &tilingData_[i / hexByteSize]) != 1) {
             LOG_ERR("%s tiling data parse failed, idx = %u", opName_.c_str(), i);
             return false;
         }

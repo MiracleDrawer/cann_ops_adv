@@ -48,13 +48,6 @@ constexpr uint32_t MAX_KV_SEQLEN = 1536;
         }                                                                                                              \
     } while (0)
 
-#define ALIGN_DOWN(num1, num2)                                                                                         \
-    do {                                                                                                               \
-        if ((num1) > (num2)) {                                                                                         \
-            (num1) -= (num2);                                                                                          \
-        }                                                                                                              \
-    } while (0)
-
 #define NGS1S2BN_TILINGKEY(ub2, ub1, block, dtype, layout, sparse, mmCfg)                                              \
     (GET_TILINGKEY(ub2, ub1, block, dtype, layout, sparse, mmCfg))
 
@@ -161,22 +154,22 @@ public:
             return false;
         }
 
+        OPS_ERR_IF(context_->GetAttrs() == nullptr,
+                   OPS_REPORT_VECTOR_INNER_ERR(context_, "GetAttrs is nullptr."),
+                   return false);
+
+        if (context_->GetAttrs()->GetAttrNum() > static_cast<size_t>(PSETYPE)) {
+            auto psetype = *context_->GetAttrs()->GetAttrPointer<int>(PSETYPE); // 8
+            if (psetype != 1) { // 不支持非默认的psetype
+                return false;
+            }
+        }
+
         OPS_LOG_D(context_, "Ungs1s2Bbn check is capable.");
         int64_t gSqSkvSize = td_.opInfo.get_g() * td_.opInfo.get_sQ() * td_.opInfo.get_sKVAlignSizeVec();
         /* 计算g * sQ * sKVAlign的大小是否小于当前 */
         if (gSqSkvSize == 0 || td_.opInfo.get_g() != 1 || td_.opInfo.get_sKVAlignSizeVec() > MAX_KV_SEQLEN) {
           return false;
-        }
-
-        OPS_ERR_IF(context_->GetAttrs() == nullptr,
-                   OPS_REPORT_VECTOR_INNER_ERR(context_, "GetAttrs is nullptr."),
-                   return ge::GRAPH_FAILED);
-
-        if (context_->GetAttrs()->GetAttrNum() > static_cast<size_t>(PSETYPE)) {
-            auto psetype = *context_->GetAttrs()->GetAttrPointer<int>(PSETYPE); // 8
-            if (psetype != 1) {
-                return false;
-            }
         }
 
         if (gSqSkvSize <= BEST_BASIC_BLOCK_SIZE) {
@@ -1040,7 +1033,7 @@ public:
             CalcTschBlockDim(td_.splitCoreParams.get_usedCoreNum(), aicoreParams_.aicNum, aicoreParams_.blockDim);
         OPS_ERR_IF(blockdim == 0,
                    OPS_REPORT_VECTOR_INNER_ERR(context_,
-                                               "blockdim is 0, aicNum is %ld, aivNum is %ld.", aicoreParams_.aicNum,
+                                               "blockdim is 0, aicNum is %lu, aivNum is %lu.", aicoreParams_.aicNum,
                                                aicoreParams_.blockDim),
                    return ge::GRAPH_FAILED);
         context_->SetBlockDim(blockdim);

@@ -209,7 +209,7 @@ bool FaCase::InitParam()
 
 bool FaCase::InitOpInfo()
 {
-    std::string kernelSoRelPath = "src/transformer/flash_attention/libUTest_Fa_Kernel_";
+    std::string kernelSoRelPath = "src/transformer/flash_attention/libUTest_Fa_OpKernel_";
     if (param.dtype == ge::DataType::DT_FLOAT16) {
         kernelSoRelPath += "fp16.so";
     } else if (param.dtype == ge::DataType::DT_FLOAT) {
@@ -282,9 +282,9 @@ bool FaCase::InitOriginTilingFunc()
     /* FlashAttentionScore FlashAttentionScoreGrad 需提供修改 TilingContext 功能 */
     /* FlashAttentionScoreGrad 需提供按指定优先级调用 Tiling 模板功能 */
     fasOriginTilingFunc =
-        (gert::OpImplKernelRegistry::TilingKernelFunc)platform->LoadTilingSoSym("TilingFlashAttentionScore");
+        (gert::OpImplKernelRegistry::TilingKernelFunc)platform->LoadOpTilingSoSym("TilingFlashAttentionScore");
     fagOriginTilingFunc =
-        (gert::OpImplKernelRegistry::TilingKernelFunc)platform->LoadTilingSoSym("TilingFlashAttentionGradScore");
+        (gert::OpImplKernelRegistry::TilingKernelFunc)platform->LoadOpTilingSoSym("TilingFlashAttentionGradScore");
     if (fasOriginTilingFunc == nullptr || fagOriginTilingFunc == nullptr) {
         LOG_ERR("Can't get origin tiling func, Fas(%p), Fag(%p)", fasOriginTilingFunc, fagOriginTilingFunc);
         return false;

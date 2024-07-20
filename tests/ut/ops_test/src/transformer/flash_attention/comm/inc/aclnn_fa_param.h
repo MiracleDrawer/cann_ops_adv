@@ -32,6 +32,8 @@ public:
     aclIntArray *aclnnPrefixIntAry = nullptr;
     aclIntArray *aclnnActualSeqQLenIntAry = nullptr;
     aclIntArray *aclnnActualSeqKvLenIntAry = nullptr;
+    aclIntArray *qStartIdxOptionalIntAry = nullptr;
+    aclIntArray *kvStartIdxOptionalIntAry = nullptr;
 
 public:
     AclnnFaParam() = default;
@@ -43,6 +45,18 @@ public:
     AclnnFaParam(int64_t b, int64_t n2, int64_t g, int64_t s1, int64_t s2, int64_t d, ge::DataType dtype,
                  LayoutType layoutType, float scale, float keepProb, int64_t preTokens, int64_t nxtTokens,
                  int64_t innerPrecise, int64_t sparseMode, PseShapeType pseShapeType,
+                 DropMaskShapeType dropMaskShapeType, PaddingMaskShapeType paddingMaskShapeType,
+                 AttenMaskShapeType attenMaskShapeType, ge::DataType attenMaskDtype, PrefixShapeType prefixShapeType,
+                 std::vector<int64_t> prefixTensorData, std::vector<int64_t> actualSeqQLenTensorData,
+                 std::vector<int64_t> actualSeqKvLenTensorData);
+    AclnnFaParam(int64_t b, int64_t n2, int64_t g, int64_t s1, int64_t s2, int64_t d, ge::DataType dtype,
+                 LayoutType layoutType, float scale, float keepProb, int64_t preTokens, int64_t nxtTokens,
+                 int64_t innerPrecise, int64_t sparseMode, int64_t pseType, PseShapeType pseShapeType,
+                 DropMaskShapeType dropMaskShapeType, PaddingMaskShapeType paddingMaskShapeType,
+                 AttenMaskShapeType attenMaskShapeType, ge::DataType attenMaskDtype, PrefixShapeType prefixShapeType);
+    AclnnFaParam(int64_t b, int64_t n2, int64_t g, int64_t s1, int64_t s2, int64_t d, ge::DataType dtype,
+                 LayoutType layoutType, float scale, float keepProb, int64_t preTokens, int64_t nxtTokens,
+                 int64_t innerPrecise, int64_t sparseMode, int64_t pseType, PseShapeType pseShapeType,
                  DropMaskShapeType dropMaskShapeType, PaddingMaskShapeType paddingMaskShapeType,
                  AttenMaskShapeType attenMaskShapeType, ge::DataType attenMaskDtype, PrefixShapeType prefixShapeType,
                  std::vector<int64_t> prefixTensorData, std::vector<int64_t> actualSeqQLenTensorData,

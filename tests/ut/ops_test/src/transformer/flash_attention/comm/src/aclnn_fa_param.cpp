@@ -71,6 +71,35 @@ AclnnFaParam::AclnnFaParam(int64_t b, int64_t n2, int64_t g, int64_t s1, int64_t
 {
 }
 
+AclnnFaParam::AclnnFaParam(int64_t b, int64_t n2, int64_t g, int64_t s1, int64_t s2, int64_t d, ge::DataType dtype,
+                           LayoutType layoutType, float scale, float keepProb, int64_t preTokens, int64_t nxtTokens,
+                           int64_t innerPrecise, int64_t sparseMode, int64_t pseType, PseShapeType pseShapeType,
+                           DropMaskShapeType dropMaskShapeType, PaddingMaskShapeType paddingMaskShapeType,
+                           AttenMaskShapeType attenMaskShapeType, ge::DataType attenMaskDtype,
+                           PrefixShapeType prefixShapeType)
+    : AclnnFaParam(b, n2, g, s1, s2, d, dtype, layoutType, scale, keepProb, preTokens, nxtTokens, innerPrecise,
+                   sparseMode, pseType, pseShapeType, dropMaskShapeType, paddingMaskShapeType, attenMaskShapeType,
+                   attenMaskDtype, prefixShapeType, {}, {}, {})
+{
+}
+
+AclnnFaParam::AclnnFaParam(int64_t b, int64_t n2, int64_t g, int64_t s1, int64_t s2, int64_t d, ge::DataType dtype,
+                           FaParam::LayoutType layoutType, float scale, float keepProb, int64_t preTokens,
+                           int64_t nxtTokens, int64_t innerPrecise, int64_t sparseMode, int64_t pseType,
+                           FaParam::PseShapeType pseShapeType, FaParam::DropMaskShapeType dropMaskShapeType,
+                           FaParam::PaddingMaskShapeType paddingMaskShapeType,
+                           FaParam::AttenMaskShapeType attenMaskShapeType, ge::DataType attenMaskDtype,
+                           FaParam::PrefixShapeType prefixShapeType, std::vector<int64_t> prefixTensorData,
+                           std::vector<int64_t> actualSeqQLenTensorData, std::vector<int64_t> actualSeqKvLenTensorData)
+    : FaParam(b, n2, g, s1, s2, d, dtype, layoutType, scale, keepProb, preTokens, nxtTokens, innerPrecise, sparseMode,
+              pseType, pseShapeType, dropMaskShapeType, paddingMaskShapeType, attenMaskShapeType, attenMaskDtype,
+              prefixShapeType, std::move(prefixTensorData), std::move(actualSeqQLenTensorData),
+              std::move(actualSeqKvLenTensorData), {}, {}),
+      aclnnPrefixIntAry(nullptr), aclnnActualSeqQLenIntAry(nullptr), aclnnActualSeqKvLenIntAry(nullptr),
+      qStartIdxOptionalIntAry(nullptr), kvStartIdxOptionalIntAry(nullptr)
+{
+}
+
 AclnnFaParam::~AclnnFaParam()
 {
     if (aclnnPrefixIntAry != nullptr) {

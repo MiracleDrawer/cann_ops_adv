@@ -217,7 +217,7 @@ protected:
     uint32_t blockDim_{0};
     uint64_t workspaceSize_{0};
     uint64_t tilingKey_{0};
-    AiCoreParams aicoreParams_{0};
+    AiCoreParams aicoreParams_{0, 0, 0, 0, 0, 0, 0};
 };
 
 } // namespace optiling

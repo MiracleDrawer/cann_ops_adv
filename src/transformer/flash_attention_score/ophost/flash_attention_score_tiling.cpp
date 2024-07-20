@@ -35,7 +35,7 @@ constexpr size_t ATTENTIONOUT_OUPUT_INDEX = 3;
 constexpr size_t INPUTLAYOUT_ATTRS_INDEX = 5;
 constexpr size_t MIN_COPY_UINT_SIZE = 32;
 
-uint32_t Ceil(uint32_t num1, uint32_t num2)
+static uint32_t Ceil(uint32_t num1, uint32_t num2)
 {
     if (num2 == 0) {
         return 0;
@@ -48,7 +48,7 @@ public:
     FlashAttentionScoreTilingData tilingData;
 
     void FlashAttentionScoreSetEmptyInputTilingData(gert::TilingContext *context,
-                                                    FlashAttentionScoreTilingData &tilingData);
+                                                    FlashAttentionScoreTilingData &faTilingData);
     void GetTilingKeyAttentionScore4EmptyInput(uint32_t &tilingKey, const gert::TilingContext *context);
 };
 
@@ -67,14 +67,14 @@ void FlashAttentionScoreEmptyInputTiling::GetTilingKeyAttentionScore4EmptyInput(
 }
 
 void FlashAttentionScoreEmptyInputTiling::FlashAttentionScoreSetEmptyInputTilingData(
-    gert::TilingContext *context, FlashAttentionScoreTilingData &tilingData)
+    gert::TilingContext *context, FlashAttentionScoreTilingData &faTilingData)
 {
     OPS_LOG_E_IF_NULL(context, context->GetRawTilingData(), return)
-    tilingData.SaveToBuffer(context->GetRawTilingData()->GetData(), context->GetRawTilingData()->GetCapacity());
-    context->GetRawTilingData()->SetDataSize(tilingData.GetDataSize());
+    faTilingData.SaveToBuffer(context->GetRawTilingData()->GetData(), context->GetRawTilingData()->GetCapacity());
+    context->GetRawTilingData()->SetDataSize(faTilingData.GetDataSize());
 }
 
-ge::graphStatus CheckParams(const gert::TilingContext *context)
+static ge::graphStatus CheckParams(const gert::TilingContext *context)
 {
     if (context->GetInputShape(QUERY_INPUT_INDEX) != nullptr && context->GetInputShape(KEY_INPUT_INDEX) != nullptr &&
         context->GetInputShape(VALUE_INPUT_INDEX) != nullptr && context->GetAttrs() != nullptr) {
@@ -116,7 +116,7 @@ ge::graphStatus CheckParams(const gert::TilingContext *context)
     return ge::GRAPH_FAILED;
 }
 
-bool IsEmptyInput(gert::TilingContext *context)
+static bool IsEmptyInput(gert::TilingContext *context)
 {
     auto attenOutShape = context->GetOutputShape(ATTENTIONOUT_OUPUT_INDEX);
     OPS_LOG_E_IF_NULL(context, attenOutShape, return false)
@@ -157,9 +157,9 @@ bool IsEmptyInput(gert::TilingContext *context)
                    return false);
         uint32_t coreNum = compileInfoPtr->aivNum;
         OPS_ERR_IF((coreNum <= 0),
-                   OPS_REPORT_VECTOR_INNER_ERR(context, "platform info is invalid, coreNum=%u", coreNum), return false);
+                   OPS_REPORT_VECTOR_INNER_ERR(context, "platform info is invalid, coreNum=%u.", coreNum), return false);
         OPS_ERR_IF((kernelType != ge::DT_FLOAT16 && kernelType != ge::DT_FLOAT && kernelType != ge::DT_BF16),
-                   OPS_REPORT_VECTOR_INNER_ERR(context, "kernelType is invalid, kernelType is %u", kernelType),
+                   OPS_REPORT_VECTOR_INNER_ERR(context, "kernelType is invalid, kernelType is %d", kernelType),
                    return false);
         uint32_t attentionOutFormerNum;          // attentionOut的主核
         uint32_t attentionOutTailNum;            // attentionOut的尾核

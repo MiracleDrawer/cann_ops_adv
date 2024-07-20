@@ -37,6 +37,7 @@ if (BUILD_OPEN_PROJECT)
         set(_param
                 "--cann_path=${ASCEND_CANN_PACKAGE_PATH}"
                 "--cann_package_name=toolkit"
+                "check_code_compatible"
                 "--code_version_info_file=${CMAKE_CURRENT_SOURCE_DIR}/version.info"
         )
         execute_process(
@@ -72,7 +73,6 @@ set(OP_DEBUG_CONFIG               "false"                         CACHE   STRING
 get_filename_component(OPS_ADV_DIR                  "${CMAKE_CURRENT_SOURCE_DIR}"           REALPATH)
 get_filename_component(OPS_ADV_CMAKE_DIR            "${OPS_ADV_DIR}/cmake"                  REALPATH)
 get_filename_component(OPS_ADV_UTILS_KERNEL_INC     "${OPS_ADV_DIR}/src/utils/inc/kernel"   REALPATH)
-get_filename_component(OPS_ADV_UTEST_OPS_TEST_DIR   "${OPS_ADV_DIR}/tests/ut/ops_test"      REALPATH)
 
 
 #   构建树相关路径
@@ -167,7 +167,6 @@ if (BUILD_OPEN_PROJECT)
     #       修正其取值与构建树根目录 CMAKE_CURRENT_BINARY_DIR 平级
     if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
         get_filename_component(_Install_Path_Prefix "${CMAKE_CURRENT_BINARY_DIR}/../output" REALPATH)
-        file(MAKE_DIRECTORY ${_Install_Path_Prefix})
         set(CMAKE_INSTALL_PREFIX    "${_Install_Path_Prefix}"  CACHE STRING "Install path" FORCE)
     endif ()
 endif ()

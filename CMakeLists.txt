@@ -201,11 +201,19 @@ endif ()
 
 set(OP_LIST)
 set(OP_DIR_LIST)
-set(ALL_OP_DIR_LIST)
-op_add_subdirectory(OP_LIST OP_DIR_LIST ALL_OP_DIR_LIST)
+op_add_subdirectory(OP_LIST OP_DIR_LIST)
 
-foreach (OP_DIR ${ALL_OP_DIR_LIST})
+foreach (OP_DIR ${OP_DIR_LIST})
     add_subdirectory(${OP_DIR}/ophost)
+endforeach ()
+
+set(OP_DEPEND_DIR_LIST)
+op_add_depend_directory(
+        OP_LIST ${OP_LIST}
+        OP_DIR_LIST OP_DEPEND_DIR_LIST
+)
+foreach (OP_DEPEND_DIR ${OP_DEPEND_DIR_LIST})
+    add_subdirectory(${OP_DEPEND_DIR}/ophost)
 endforeach ()
 
 # ------------------------------------------------ aclnn ------------------------------------------------
@@ -250,16 +258,26 @@ else ()
     )
 endif ()
 
-foreach (_src ${base_aclnn_inner_srcs})
-    string(REGEX MATCH "^${CMAKE_CURRENT_SOURCE_DIR}" is_match "${_src}")
-    if (is_match)
-        get_filename_component(name_without_ext ${_src} NAME_WE)
-        string(REGEX REPLACE "_def$" "" _op_name ${name_without_ext})
-        list(APPEND generate_aclnn_inner_srcs ${base_aclnn_binary_dir}/inner/aclnnInner_${_op_name}.cpp)
-        list(APPEND generate_proto_srcs    ${generate_proto_dir}/inner/${_op_name}_proto.cpp)
-        list(APPEND generate_proto_headers ${generate_proto_dir}/inner/${_op_name}_proto.h)
-    endif ()
-endforeach ()
+if (base_aclnn_inner_srcs)
+    foreach (_src ${base_aclnn_inner_srcs})
+        string(REGEX MATCH "^${CMAKE_CURRENT_SOURCE_DIR}" is_match "${_src}")
+        if (is_match)
+            get_filename_component(name_without_ext ${_src} NAME_WE)
+            string(REGEX REPLACE "_def$" "" _op_name ${name_without_ext})
+            list(APPEND generate_aclnn_inner_srcs ${base_aclnn_binary_dir}/inner/aclnnInner_${_op_name}.cpp)
+            list(APPEND generate_proto_srcs    ${generate_proto_dir}/inner/${_op_name}_proto.cpp)
+            list(APPEND generate_proto_headers ${generate_proto_dir}/inner/${_op_name}_proto.h)
+        endif ()
+    endforeach ()
+else ()
+    add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/op_host_aclnn_inner_stub.cpp
+            COMMAND touch ${CMAKE_CURRENT_BINARY_DIR}/op_host_aclnn_inner_stub.cpp
+    )
+
+    target_sources(op_host_aclnnInner PRIVATE
+            ${CMAKE_CURRENT_BINARY_DIR}/op_host_aclnn_inner_stub.cpp
+    )
+endif ()
 
 if (base_aclnn_exclude_srcs)
     foreach (_src ${base_aclnn_exclude_srcs})
@@ -273,22 +291,31 @@ if (base_aclnn_exclude_srcs)
         endif ()
     endforeach ()
 else()
-    add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/empty.cpp
-            COMMAND touch ${CMAKE_CURRENT_BINARY_DIR}/empty.cpp
+    add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/op_host_aclnn_exc_stub.cpp
+            COMMAND touch ${CMAKE_CURRENT_BINARY_DIR}/op_host_aclnn_exc_stub.cpp
     )
 
     target_sources(op_host_aclnnExc PRIVATE
-            ${CMAKE_CURRENT_BINARY_DIR}/empty.cpp
+            ${CMAKE_CURRENT_BINARY_DIR}/op_host_aclnn_exc_stub.cpp
     )
 endif ()
 
 if (BUILD_OPEN_PROJECT)
-    set_source_files_properties(${generate_aclnn_srcs} ${generate_aclnn_inner_srcs}
+    if (generate_aclnn_srcs OR generate_aclnn_inner_srcs)
+        set(ops_aclnn_src ${generate_aclnn_srcs} ${generate_aclnn_inner_srcs})
+    else ()
+        set(ops_aclnn_src ${CMAKE_CURRENT_BINARY_DIR}/ops_aclnn_src_stub.cpp)
+
+        add_custom_command(OUTPUT ${ops_aclnn_src}
+                COMMAND touch ${ops_aclnn_src}
+        )
+    endif ()
+
+    set_source_files_properties(${ops_aclnn_src}
             PROPERTIES GENERATED TRUE
     )
     add_library(ops_aclnn STATIC
-            ${generate_aclnn_srcs}
-            ${generate_aclnn_inner_srcs}
+            ${ops_aclnn_src}
     )
     target_compile_options(ops_aclnn PRIVATE
             $<$<COMPILE_LANGUAGE:CXX>:-std=gnu++1z>
@@ -432,15 +459,17 @@ if (BUILD_OPEN_PROJECT)
             DEPENDS ${generate_aclnn_srcs} ${generate_aclnn_headers} op_host_aclnn
     )
 
-    add_custom_command(OUTPUT ${generate_aclnn_inner_srcs}
-            COMMAND mkdir -p ${base_aclnn_binary_dir}/inner
-            COMMAND OPS_PROTO_SEPARATE=1
-            OPS_ACLNN_GEN=1
-            OPS_PROJECT_NAME=aclnnInner
-            ${OP_BUILD_TOOL}
-            $<TARGET_FILE:op_host_aclnnInner>
-            ${base_aclnn_binary_dir}/inner
-    )
+    if (generate_aclnn_inner_srcs)
+        add_custom_command(OUTPUT ${generate_aclnn_inner_srcs}
+                COMMAND mkdir -p ${base_aclnn_binary_dir}/inner
+                COMMAND OPS_PROTO_SEPARATE=1
+                OPS_ACLNN_GEN=1
+                OPS_PROJECT_NAME=aclnnInner
+                ${OP_BUILD_TOOL}
+                $<TARGET_FILE:op_host_aclnnInner>
+                ${base_aclnn_binary_dir}/inner
+        )
+    endif ()
 
     add_custom_target(opbuild_gen_inner
             DEPENDS ${generate_aclnn_inner_srcs} op_host_aclnnInner

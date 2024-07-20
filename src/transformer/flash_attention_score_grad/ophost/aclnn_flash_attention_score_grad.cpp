@@ -70,6 +70,37 @@ static constexpr int64_t SPARE_ALIGN_D_DIM_SIZE = 16;
 static constexpr int64_t MAX_BSN_DIMS_SIZE = 65535;
 static constexpr int64_t MAX_LAYOUT_SIZE = 5;
 static constexpr int64_t PSE_TYPE_V1 = 1; // add and mul
+static const int64_t HEAD_DIM_72 = 72;
+static const int64_t HEAD_DIM_88 = 88;
+static const int64_t SEQ_LEN_1024 = 1024;
+static constexpr size_t MIN_DIM = 3;
+
+bool CheckIsNeedPad(const FagInShapeInfo &fagShape)
+{
+    if ((fagShape.dDim == HEAD_DIM_72 || fagShape.dDim == HEAD_DIM_88) && fagShape.s1Dim < SEQ_LEN_1024 &&
+         fagShape.s2Dim < SEQ_LEN_1024 &&  fagShape.inputLayoutStr != "BNSD" && fagShape.inputLayoutStr != "TND" &&
+         fagShape.n1Dim == fagShape.n2Dim && fagShape.needTranspose == false) {
+        return false;
+    }
+    return true;
+}
+
+static aclnnStatus InvalidTensorDimCheck(const aclTensor *query, const aclTensor *key, const aclTensor *value,
+                                         const aclTensor *dq, const aclTensor *dk, const aclTensor *dv)
+{
+    auto queryDimNum = query->GetViewShape().GetDimNum();
+    auto keyDimNum = key->GetViewShape().GetDimNum();
+    auto valueDimNum = value->GetViewShape().GetDimNum();
+    auto dqDimNum = dq->GetViewShape().GetDimNum();
+    auto dkDimNum = dk->GetViewShape().GetDimNum();
+    auto dvDimNum = dv->GetViewShape().GetDimNum();
+    if (queryDimNum < MIN_DIM || keyDimNum < MIN_DIM || valueDimNum < MIN_DIM || dqDimNum < MIN_DIM ||
+        dkDimNum < MIN_DIM || dvDimNum < MIN_DIM) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The input or output of FAG does not support tensors with dim less than 3.");
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+    return ACLNN_SUCCESS;
+}
 
 static aclnnStatus GetInputShapeInfo(const aclTensor *query, const aclTensor *key, int64_t headNum,
                                      const char *inputLayout, FagInShapeInfo &fagShape)
@@ -123,6 +154,11 @@ static aclnnStatus GetInputShapeInfo(const aclTensor *query, const aclTensor *ke
         (fagShape.inputLayoutStr != "BNSD" && fagShape.inputLayoutStr != "TND" &&
          (fagShape.querySDimStrideSize > MAX_BSN_DIMS_SIZE || fagShape.kvSDimStrideSize > MAX_BSN_DIMS_SIZE));
     fagShape.needTranspose = needTranspose;
+
+    if (!CheckIsNeedPad(fagShape)) {
+        fagShape.needPadDimD = false;
+    }
+
     fagShape.passThrowInnerFag = (!(fagShape.needPadDimD) && !(fagShape.needTranspose));
     fagShape.needBackwordReshape =
         (fagShape.inputLayoutStr == "SBH" && fagShape.needPadDimD && !(fagShape.needTranspose));
@@ -640,9 +676,12 @@ static aclnnStatus FlashAttentionScoreGradGetWorkspace(
     char *inputLayout, int64_t innerPreciseOptional, int64_t sparseModeOptional, const aclTensor* dqOut,
     const aclTensor *dkOut, const aclTensor *dvOut, const aclTensor *dpseOut, uint64_t *workspaceSize,
     aclOpExecutor *executor) {
+    // 检查tensor是否是标量tensor
+    auto ret = InvalidTensorDimCheck(query, key, value, dqOut, dkOut, dvOut);
+    CHECK_RET(ret == ACLNN_SUCCESS, ret);
     // 获取基本参数
     FagInShapeInfo fagShape;
-    auto ret = GetInputShapeInfo(query, key, headNum, inputLayout, fagShape);
+    ret = GetInputShapeInfo(query, key, headNum, inputLayout, fagShape);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
     // 输入连续性转换
@@ -714,6 +753,9 @@ aclnnStatus aclnnFlashAttentionScoreGradGetWorkspaceSize(
     // 固定写法，创建OpExecutor
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
+    CHECK_RET(query != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(keyIn != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(value != nullptr, ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(dqOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(dkOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(dvOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
@@ -783,6 +825,9 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradGetWorkspaceSize(
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
     // 空Tensor处理
+    CHECK_RET(query != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(keyIn != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(value != nullptr, ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(dqOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(dkOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(dvOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
@@ -836,9 +881,12 @@ static aclnnStatus FlashAttentionScoreGradV2GetWorkspace(
     char *inputLayout, int64_t innerPreciseOptional, int64_t sparseModeOptional, int64_t pseTypeOptional,
     const aclTensor *dqOut, const aclTensor *dkOut, const aclTensor *dvOut, const aclTensor *dpseOut,
     uint64_t *workspaceSize, aclOpExecutor *executor) {
+    // 检查tensor是否是标量tensor
+    auto ret = InvalidTensorDimCheck(query, key, value, dqOut, dkOut, dvOut);
+    CHECK_RET(ret == ACLNN_SUCCESS, ret);
     // 获取基本参数
     FagInShapeInfo fagShape;
-    auto ret = GetInputShapeInfo(query, key, headNum, inputLayout, fagShape);
+    ret = GetInputShapeInfo(query, key, headNum, inputLayout, fagShape);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
     // 输入连续性转换
@@ -913,6 +961,9 @@ aclnnStatus aclnnFlashAttentionScoreGradV2GetWorkspaceSize(
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
     // 空Tensor处理
+    CHECK_RET(query != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(keyIn != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(value != nullptr, ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(dqOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(dkOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(dvOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
@@ -982,6 +1033,9 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV2GetWorkspaceSize(
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
     // 空Tensor处理
+    CHECK_RET(query != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(keyIn != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(value != nullptr, ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(dqOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(dkOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(dvOut != nullptr, ACLNN_ERR_INNER_NULLPTR);

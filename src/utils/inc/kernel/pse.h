@@ -69,6 +69,7 @@ struct PseInfo {
     int64_t kvStartIdx;
     bool needCast;
     bool align8 = false;
+    bool pseEndogenous = false;
 };
 
 template <typename INPUT_T, bool hasPse>

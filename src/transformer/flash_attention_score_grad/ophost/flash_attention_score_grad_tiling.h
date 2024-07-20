@@ -40,5 +40,4 @@ BEGIN_TILING_DATA_DEF(FlashAttentionScoreGradTilingData)
 TILING_DATA_FIELD_DEF_STRUCT(EmptyTensorTilingData, emptyTensorTilingData);
 END_TILING_DATA_DEF;
 REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad, FlashAttentionScoreGradTilingData)
-
 } // namespace optiling

@@ -64,10 +64,7 @@ tests:
         ut:
           ops_test:
             src:
-              - tests/ut/ops_test/stubs
-              - tests/ut/ops_test/utest
-              - tests/ut/ops_test/utils
+              - tests/ut/ops_test/framework
               - tests/ut/ops_test/CMakeLists.txt
-              - tests/ut/ops_test/main.cpp
             options:
               - all

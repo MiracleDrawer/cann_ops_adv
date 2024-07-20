@@ -87,8 +87,8 @@ private:
     ge::graphStatus DoCastTiling();
     void DoPreTiling();
     ge::graphStatus SetBmm1TilingData(uint32_t sOut, uint32_t sFla, uint32_t l1SizeRemain);
-    ge::graphStatus SetBmm31TilingData(uint32_t sOut, uint32_t l1SizeRemain);
-    ge::graphStatus SetBmm4TilingData(uint32_t sOut, uint32_t sFla, uint32_t l1SizeRemain);
+    ge::graphStatus SetBmm31TilingData(uint32_t l1SizeRemain);
+    ge::graphStatus SetBmm4TilingData(uint32_t l1SizeRemain);
     ge::graphStatus SetBaseInfo(const gert::Shape &queryShape, const gert::Shape &keyShape, int64_t dimN1);
     ge::graphStatus ProcessDropInfo();
     ge::graphStatus SetMaskShapeType(const gert::Shape &storageShape, const uint32_t maskShapeDims);
@@ -134,8 +134,8 @@ private:
 
 class FlashAttentionScoreGradTilingDeterministic : public FlashAttentionScoreGradTilingS1s2Bn2 {
 public:
-    explicit FlashAttentionScoreGradTilingDeterministic(gert::TilingContext *context_)
-        : FlashAttentionScoreGradTilingS1s2Bn2(context_)
+    explicit FlashAttentionScoreGradTilingDeterministic(gert::TilingContext *context)
+        : FlashAttentionScoreGradTilingS1s2Bn2(context)
     {
     }
 

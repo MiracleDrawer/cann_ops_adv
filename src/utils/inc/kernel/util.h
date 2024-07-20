@@ -18,6 +18,7 @@
 
 constexpr int32_t blockBytes = 32;
 constexpr int32_t byteBitRatio = 8;
+constexpr int64_t prefixAttenMaskDownHeight = 1024;
 constexpr static int32_t blockSize = blockBytes / 4; // 4 means sizeof(T)
 constexpr static int32_t repeatMaxBytes = 256;
 constexpr static int32_t repeatMaxTimes = 255;

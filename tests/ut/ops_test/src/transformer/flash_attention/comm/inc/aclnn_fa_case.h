@@ -25,6 +25,7 @@ namespace ops::adv::tests::fa {
 class AclnnFaCase : public ops::adv::tests::fa::FaCase {
 public:
     using AclnnContext = ops::adv::tests::utils::AclnnContext;
+    using AclnnFaParam = ops::adv::tests::fa::AclnnFaParam;
 
 public:
     /* 算子控制信息 */
@@ -38,7 +39,6 @@ public:
     AclnnFaCase();
     AclnnFaCase(const char *name, bool enable, const char *dbgInfo, OpInfo forward, OpInfo reverse,
                 const AclnnFaParam &param, int32_t tilingTemplatePriority = kTilingTemplatePriority_Invalid);
-    bool Run() override;
 
 protected:
     bool InitParam() override;

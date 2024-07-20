@@ -31,6 +31,7 @@ function(add_execute_example)
                 ${OPAPI_SHARED_REL_PATH}
                 -lascendcl
                 -lnnopbase
+                -lc_sec
     )
     target_compile_options(${EXAMPLE_TARGET_NAME}
             PRIVATE
@@ -54,9 +55,14 @@ function(add_execute_example)
     if (_execute_flag)
         add_custom_command(
                 TARGET ${EXAMPLE_TARGET_NAME} POST_BUILD
-                COMMAND bash ${EXAMPLE_SCRIPT} ${EXAMPLE_TARGET_NAME} $<TARGET_FILE:${EXAMPLE_TARGET_NAME}>
+                COMMAND bash ${EXAMPLE_SCRIPT} ${EXAMPLE_TARGET_NAME} $<TARGET_FILE:${EXAMPLE_TARGET_NAME}> ${EXAMPLE_TEST_CASE}
                 WORKING_DIRECTORY $<TARGET_FILE_DIR:${EXAMPLE_TARGET_NAME}>
                 COMMENT "Run ${EXAMPLE_TARGET_NAME}"
         )
     endif ()
+
+    if (NOT TARGET ops_test_example)
+        add_custom_target(ops_test_example)
+    endif ()
+    add_dependencies(ops_test_example ${EXAMPLE_TARGET_NAME})
 endfunction()

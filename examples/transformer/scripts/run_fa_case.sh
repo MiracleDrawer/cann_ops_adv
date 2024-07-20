@@ -8,6 +8,8 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # ======================================================================================================================
 
+set -e
+
 CURRENT_DIR=$(dirname $(readlink -f ${BASH_SOURCE[0]}))
 
 # 根据cmake传进来的算子名参数 区分是fa的还是fag的

@@ -1447,6 +1447,9 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
                                extraInfo.s2LoopCount * this->s2BaseNratioSize;
                     this->attenMaskOffsetPre = ComputeOffsetForPrefixRectangle(
                         deltaPre, this->s2BaseNratioSize, this->tilingData->inputParams.attenMaskS2Size);
+                    if (this->blockIdx + extraInfo.vec1S1RealSize < prefixAttenMaskDownHeight) { // in case of out of bound
+                        this->attenMaskOffsetPre += this->tilingData->inputParams.attenMaskS2Size * this->blockIdx;
+                    }
                 }
             } else {
                 return 0;
@@ -1483,6 +1486,9 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
                            extraInfo.s2LoopCount * this->s2BaseNratioSize;
                 this->attenMaskOffsetPre = ComputeOffsetForPrefixRectangle(
                     deltaPre, this->s2BaseNratioSize, this->tilingData->inputParams.attenMaskS2Size);
+                if (this->blockIdx + extraInfo.vec1S1RealSize < prefixAttenMaskDownHeight) { // in case of out of bound
+                    this->attenMaskOffsetPre += this->tilingData->inputParams.attenMaskS2Size * this->blockIdx;
+                }
             }
         } else {
             return 0;

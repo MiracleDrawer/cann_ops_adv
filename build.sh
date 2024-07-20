@@ -50,6 +50,9 @@ function help_info() {
     echo "--tiling_key         Sets the tiling key list for operators. If there are multiple values, separate them with semicolons and use quotation marks. The default is all."
     echo "                     For example: --tiling_key \"1\" or --tiling_key \"1;2;3;4\""
     echo
+    echo "--op_debug_config    Sets the operator debug configuration. Supported options are (oom, dump_cce, dump_bin, dump_loc, ccec_O0, ccec_g, check_flag)"
+    echo "                     For example: --op_debug_config dump_cce or --op_debug_config ccec_g"
+    echo
     echo "--asan               Compiles with asan."
     echo
     echo "--cov                Compiles with cov."
@@ -81,11 +84,13 @@ function clean()
         rm -rf ${BUILD_DIR}
     fi
 
-    if [ -n "${OUTPUT_DIR}" ];then
-        rm -rf ${OUTPUT_DIR}
+    if [ -z "${TEST}" ] && [ -z "${EXAMPLE}" ];then
+        if [ -n "${OUTPUT_DIR}" ];then
+            rm -rf ${OUTPUT_DIR}
+        fi
     fi
 
-    mkdir ${BUILD_DIR}
+    mkdir -p ${BUILD_DIR} ${OUTPUT_DIR}
 }
 
 function cmake_config()
@@ -141,10 +146,6 @@ function build_kernel(){
     build ops_kernel
 }
 
-function build_test() {
-    build ops_test_utest
-}
-
 while [[ $# -gt 0 ]]; do
     case $1 in
     -h|--help)
@@ -185,6 +186,7 @@ while [[ $# -gt 0 ]]; do
         else
             TEST="all"
         fi
+        BUILD=ops_test_utest
         ;;
     -e|--example)
         shift
@@ -200,11 +202,13 @@ while [[ $# -gt 0 ]]; do
         else
             EXAMPLE="all"
         fi
+        BUILD=ops_test_example
         ;;
     -f|--changed_list)
         filelist_path="$2"
         shift 2
-        changed_list=$(python3 $CURRENT_DIR/cmake/scripts/parse_changed_files.py -c $CURRENT_DIR/classify_rule.yaml -f $filelist_path get_related_ut)
+        changed_list=$(python3 "$CURRENT_DIR"/cmake/scripts/parse_changed_files.py -c "$CURRENT_DIR"/classify_rule.yaml -f "$filelist_path" get_related_ut)
+        TESTS_UT_OPS_TEST_CI_PR="ON"
         ;;
     --parent_job)
         PARENT_JOB="true"
@@ -271,6 +275,9 @@ fi
 
 if [ -n "${TEST}" ];then
     CUSTOM_OPTION="${CUSTOM_OPTION} -DTESTS_UT_OPS_TEST=${TEST}"
+    if [ -n "${TEST}" ];then
+      CUSTOM_OPTION="${CUSTOM_OPTION} -DTESTS_UT_OPS_TEST_CI_PR=${TESTS_UT_OPS_TEST_CI_PR}"
+    fi
 fi
 
 if [ "${ASAN}" == "true" ];then
@@ -337,10 +344,7 @@ fi
 
 cd ${BUILD_DIR}
 
-if [ -n "${TEST}" ];then
-    cmake_config
-    build_test
-elif [ "${BUILD}" == "host" ];then
+if [ "${BUILD}" == "host" ];then
     cmake_config -DENABLE_OPS_KERNEL=OFF
     build_host
     # TO DO

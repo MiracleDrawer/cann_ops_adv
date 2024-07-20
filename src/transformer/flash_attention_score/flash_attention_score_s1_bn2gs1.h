@@ -1453,7 +1453,9 @@ FlashAttentionScoreS1Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INP
 
             this->attenMaskOffsetPre = this->ComputeOffsetForPrefixRectangle(
                 prefixNTmp + 1, this->tilingData->inputParams.s2Size, this->tilingData->inputParams.attenMaskS2Size);
-
+            if (this->blockIdx + extraInfo.vecS1TailSize < prefixAttenMaskDownHeight) { // in case of out of bound
+                this->attenMaskOffsetPre += this->tilingData->inputParams.attenMaskS2Size * this->blockIdx;
+            }
             int64_t intersectionX = s1s2Sub + prefixNTmp;
             if (s1VOffset > intersectionX) {
                 this->attenMaskComputeMode = AttenMaskComputeMode::CAUSAL_OR_NEXT_ONLY_MODE;

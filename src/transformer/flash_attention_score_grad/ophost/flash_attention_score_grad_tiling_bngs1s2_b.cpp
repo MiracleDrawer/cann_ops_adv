@@ -130,11 +130,11 @@ public:
 
         OPS_ERR_IF(context_->GetAttrs() == nullptr,
                    OPS_REPORT_VECTOR_INNER_ERR(context_, "GetAttrs is nullptr."),
-                   return ge::GRAPH_FAILED);
+                   return false);
 
         if (context_->GetAttrs()->GetAttrNum() > static_cast<size_t>(PSETYPE)) {
             auto psetype = *context_->GetAttrs()->GetAttrPointer<int>(PSETYPE); // 8
-            if (psetype != 1) {
+            if (psetype != 1) { // 不支持非默认的psetype
                 return false;
             }
         }
@@ -431,7 +431,7 @@ public:
                     return ge::GRAPH_FAILED;
                 }
             } else {
-                OPS_LOG_E(context_, "Ungs1s2Bb not support pseShape dim num: %zu",
+                OPS_LOG_D(context_, "Ungs1s2Bb not support pseShape dim num: %zu",
                           pseShapeDims);
                 return ge::GRAPH_FAILED;
             }
@@ -722,7 +722,7 @@ public:
         }
 
         OPS_ERR_IF(aicoreParams_.ubSize <= 0,
-                   OPS_REPORT_VECTOR_INNER_ERR(context_, "ubSize is %ld.",
+                   OPS_REPORT_VECTOR_INNER_ERR(context_, "ubSize is %lu.",
                                                aicoreParams_.ubSize),
                    return ge::GRAPH_PARAM_INVALID);
 
@@ -789,7 +789,7 @@ public:
         return ge::GRAPH_SUCCESS;
     }
 
-    ge::graphStatus SetMm1AndMm2Tiling(matmul_tiling::MatmulApiTiling &mm1AndMm2, int32_t l1SizeRemain, int64_t bIn,
+    ge::graphStatus SetMm1AndMm2Tiling(matmul_tiling::MatmulApiTiling &mm1AndMm2, int64_t bIn,
                                        TCubeTiling &mm1AndMm2Tiling)
     {
         mm1AndMm2.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND,
@@ -820,7 +820,7 @@ public:
         return ge::GRAPH_SUCCESS;
     }
 
-    ge::graphStatus SetMm31Tiling(matmul_tiling::MatmulApiTiling &mm31, int32_t l1SizeRemain, int64_t bIn,
+    ge::graphStatus SetMm31Tiling(matmul_tiling::MatmulApiTiling &mm31, int64_t bIn,
                                   TCubeTiling &mm31Tiling)
     {
         mm31.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, matmul_tiling::DataType::DT_FLOAT16,
@@ -850,7 +850,7 @@ public:
         return ge::GRAPH_SUCCESS;
     }
 
-    ge::graphStatus SetMm32AndMm4Tiling(matmul_tiling::MatmulApiTiling &mm32AndMm4, int32_t l1SizeRemain, int64_t bIn,
+    ge::graphStatus SetMm32AndMm4Tiling(matmul_tiling::MatmulApiTiling &mm32AndMm4, int64_t bIn,
                                         TCubeTiling &mm32AndMm4Tiling)
     {
         mm32AndMm4.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND,
@@ -885,15 +885,14 @@ public:
     {
         // mm tiling
         OPS_LOG_D("FAG_SPLIT_B", "DoLibApiTiling begin.");
-        int32_t l1SizeRemain = static_cast<int32_t>(aicoreParams_.l1Size);
         matmul_tiling::MatmulApiTiling mm1AndMm2;
-        SetMm1AndMm2Tiling(mm1AndMm2, l1SizeRemain, td_.singleCoreParams.get_bIn(), td_.mm1AndMm2TilingData);
+        SetMm1AndMm2Tiling(mm1AndMm2, td_.singleCoreParams.get_bIn(), td_.mm1AndMm2TilingData);
 
         matmul_tiling::MatmulApiTiling mm31;
-        SetMm31Tiling(mm31, l1SizeRemain, td_.singleCoreParams.get_bIn(), td_.mm31TilingData);
+        SetMm31Tiling(mm31, td_.singleCoreParams.get_bIn(), td_.mm31TilingData);
 
         matmul_tiling::MatmulApiTiling mm32AndMm4;
-        SetMm32AndMm4Tiling(mm32AndMm4, l1SizeRemain, td_.singleCoreParams.get_bIn(), td_.mm32AndMm4TilingData);
+        SetMm32AndMm4Tiling(mm32AndMm4, td_.singleCoreParams.get_bIn(), td_.mm32AndMm4TilingData);
 
         // vector tiling
         auto softmaxShape =
@@ -951,7 +950,7 @@ public:
             CalcTschBlockDim(td_.splitCoreParams.get_usedCoreNum(), aicoreParams_.aicNum, aicoreParams_.blockDim);
         OPS_ERR_IF(blockdim == 0,
                    OPS_REPORT_VECTOR_INNER_ERR(context_,
-                                               "blockdim is 0, aicNum is %ld, aivNum is %ld.", aicoreParams_.aicNum,
+                                               "blockdim is 0, aicNum is %lu, aivNum is %lu.", aicoreParams_.aicNum,
                                                aicoreParams_.blockDim),
                    return ge::GRAPH_FAILED);
         context_->SetBlockDim(blockdim);

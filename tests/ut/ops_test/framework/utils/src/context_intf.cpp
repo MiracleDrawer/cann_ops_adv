@@ -13,8 +13,8 @@
  * \brief 提供 Tiling / Kernel 阶段上下文功能基类, 辅助 Tiling / Kernel 运行.
  */
 
-#include <algorithm>
 #include "tests/utils/context_intf.h"
+#include <algorithm>
 #include "tests/utils/case.h"
 #include "tests/utils/log.h"
 

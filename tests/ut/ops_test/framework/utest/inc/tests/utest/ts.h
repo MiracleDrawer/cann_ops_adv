@@ -92,6 +92,15 @@ protected:
     }
 };
 
+template <class C>
+class Ts_Ascend310P3 : public Ts<C> {
+ protected:
+  void SetUp() override {
+    Ts<C>::socVersion_ = SocVersion::Ascend310P3;
+    Ts<C>::SetUp();
+  }
+};
+
 /**
  * 支持 TEST_P 类型用例的 TestSuite
  */
@@ -131,4 +140,14 @@ protected:
         Ts_WithParam<C>::socVersion_ = SocVersion::Ascend910B3;
         Ts_WithParam<C>::SetUp();
     }
+};
+
+
+template <class C>
+class Ts_WithParam_Ascend310P3 : public Ts_WithParam<C> {
+ protected:
+  void SetUp() override {
+    Ts_WithParam<C>::socVersion_ = SocVersion::Ascend310P3;
+    Ts_WithParam<C>::SetUp();
+  }
 };

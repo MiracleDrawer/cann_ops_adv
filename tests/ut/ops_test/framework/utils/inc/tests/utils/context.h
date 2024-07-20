@@ -15,8 +15,8 @@
 
 #pragma once
 
-#include "tests/utils/context_intf.h"
 #include <any>
+#include "tests/utils/context_intf.h"
 
 namespace ops::adv::tests::utils {
 

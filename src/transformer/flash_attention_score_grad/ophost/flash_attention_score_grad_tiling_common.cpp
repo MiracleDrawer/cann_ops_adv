@@ -27,7 +27,7 @@ ge::graphStatus CheckSoftmaxMaxShape(gert::TilingContext *context, uint32_t b, u
     }
     auto softmaxMaxShapeDim = softmaxMaxShape->GetStorageShape().GetDimNum();
     if (softmaxMaxShapeDim != 4) { // softmaxMax only support 4 dimensions
-        OPS_LOG_E(context, "The shape of softmaxMax is invalid, got %ld dimensions", softmaxMaxShapeDim);
+        OPS_LOG_E(context, "The shape of softmaxMax is invalid, got %lu dimensions", softmaxMaxShapeDim);
         return ge::GRAPH_FAILED;
     }
     auto dim0 = softmaxMaxShape->GetStorageShape().GetDim(0); // 0:b
@@ -35,8 +35,8 @@ ge::graphStatus CheckSoftmaxMaxShape(gert::TilingContext *context, uint32_t b, u
     auto dim2 = softmaxMaxShape->GetStorageShape().GetDim(2); // 2:s1
     auto dim3 = softmaxMaxShape->GetStorageShape().GetDim(3); // 3:8
     if (dim0 != b || dim1 != n1 || dim2 != s1 || dim3 != 8) { // softmaxMax pad to 8
-        OPS_LOG_E(context, "The shape of softmaxMax is invalid, got (%ld,%ld,%ld,%ld), should be (%u,%u,%u,8)", dim0,
-                  dim1, dim2, dim3, b, n1, s1);
+        OPS_LOG_E(context, "The shape of softmaxMax is invalid, got (%ld,%ld,%ld,%ld), should be (%u,%u,%u,8)",
+                  dim0, dim1, dim2, dim3, b, n1, s1);
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -50,7 +50,7 @@ ge::graphStatus CheckTndSoftmaxMaxShape(gert::TilingContext *context, uint32_t t
     }
     auto softmaxMaxShapeDim = softmaxMaxShape->GetStorageShape().GetDimNum();
     if (softmaxMaxShapeDim != 3) { // TND softmaxMax only support 3 dimensions
-        OPS_LOG_E(context, "The shape of softmaxMax is invalid, got %ld dimensions", softmaxMaxShapeDim);
+        OPS_LOG_E(context, "The shape of softmaxMax is invalid, got %lu dimensions", softmaxMaxShapeDim);
         return ge::GRAPH_FAILED;
     }
     auto dim0 = softmaxMaxShape->GetStorageShape().GetDim(0); // 0:t1
@@ -72,7 +72,7 @@ ge::graphStatus CheckSoftmaxSumShape(gert::TilingContext *context, uint32_t b, u
     }
     auto softmaxSumShapeDim = softmaxSumShape->GetStorageShape().GetDimNum();
     if (softmaxSumShapeDim != 4) { // softmaxSum only support 4 dimensions
-        OPS_LOG_E(context, "The shape of softmaxSum is invalid, got %ld dimensions", softmaxSumShapeDim);
+        OPS_LOG_E(context, "The shape of softmaxSum is invalid, got %lu dimensions", softmaxSumShapeDim);
         return ge::GRAPH_FAILED;
     }
     auto dim0 = softmaxSumShape->GetStorageShape().GetDim(0); // 0:b
@@ -95,7 +95,7 @@ ge::graphStatus CheckTndSoftmaxSumShape(gert::TilingContext *context, uint32_t t
     }
     auto softmaxSumShapeDim = softmaxSumShape->GetStorageShape().GetDimNum();
     if (softmaxSumShapeDim != 3) { // TND softmaxSum only support 3 dimensions
-        OPS_LOG_E(context, "The shape of softmaxSum is invalid, got %ld dimensions", softmaxSumShapeDim);
+        OPS_LOG_E(context, "The shape of softmaxSum is invalid, got %lu dimensions", softmaxSumShapeDim);
         return ge::GRAPH_FAILED;
     }
     auto dim0 = softmaxSumShape->GetStorageShape().GetDim(0); // 0:t1

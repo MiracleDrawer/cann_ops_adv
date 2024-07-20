@@ -120,6 +120,7 @@ Atlas A2 训练系列产品
     -   S：取值范围为1\~1M。
     -   D：取值范围为1\~512。
     -   T(B*S)：取值范围为1\~1M。
+- 部分场景下，如果计算量过大可能会导致算子执行超时(aicore error类型报错，errorStr为：timeout or trap error)，此时建议做轴切分处理，注：这里的计算量会受B、S、N、D等参数的影响，值越大计算量越大。
 - band场景，preTockensOptional和nextTockensOptional之间必须要有交集。
 - prefixOptional稀疏计算场景即sparseModeOptional=6，当Sq > Skv时，prefix的N值取值范围\[0, Skv\]，当Sq <= Skv时，prefix的N值取值范围\[Skv-Sq, Skv\]。
 - sparse_mode=7或者8时，不支持可选输入realShiftOptional。
@@ -291,7 +292,6 @@ REG_OP(FlashAttentionScore)
     std::vector<float> softmaxMaxHostData(2048, 3.0);
     std::vector<float> softmaxSumHostData(2048, 3.0);
 
-
     ret = CreateAclTensor(qHostData, qShape, &qDeviceAddr, aclDataType::ACL_FLOAT16, &q);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     ret = CreateAclTensor(kHostData, kShape, &kDeviceAddr, aclDataType::ACL_FLOAT16, &k);
@@ -306,7 +306,7 @@ REG_OP(FlashAttentionScore)
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     ret = CreateAclTensor(softmaxSumHostData, softmaxSumShape, &softmaxSumDeviceAddr, aclDataType::ACL_FLOAT, &softmaxSum);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-
+    
     std::vector<int64_t> prefixOp = {0};
     aclIntArray *prefix = aclCreateIntArray(prefixOp.data(), 1);
     std::vector<int64_t> qStartIdxOp = {0};
@@ -325,13 +325,13 @@ REG_OP(FlashAttentionScore)
     int64_t innerPrecise = 0;
     int64_t sparseMod = 0;
     int64_t pseType = 1;
-
+    
     char layOut[5] = {'T', 'N', 'D', 0};
-
+    
     // 3. 调用CANN算子库API，需要修改为具体的Api名称
     uint64_t workspaceSize = 0;
     aclOpExecutor* executor;
-
+    
     // 调用aclnnFlashAttentionVarLenScore第一段接口
     ret = aclnnFlashAttentionVarLenScoreV2GetWorkspaceSize(
               q, k, v, pse, dropMask, padding, attenmask, prefix, acSeqQLen, acSeqKvLen, qStartIdx, kvStartIdx,
@@ -339,27 +339,27 @@ REG_OP(FlashAttentionScore)
               sparseMod, pseType, softmaxMax, softmaxSum, softmaxOut, attentionOut, &workspaceSize, &executor);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnFlashAttentionVarLenScoreV2GetWorkspaceSize failed. ERROR: %d\n", ret);
               return ret);
-
+    
     // 根据第一段接口计算出的workspaceSize申请device内存
     void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {
       ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
       CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);
     }
-
+    
     // 调用aclnnFlashAttentionVarLenScoreV2第二段接口
     ret = aclnnFlashAttentionVarLenScoreV2(workspaceAddr, workspaceSize, executor, stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnFlashAttentionVarLenScoreV2 failed. ERROR: %d\n", ret); return ret);
-
+    
     // 4. （固定写法）同步等待任务执行结束
     ret = aclrtSynchronizeStream(stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
-
+    
     // 5. 获取输出的值，将device侧内存上的结果拷贝至host侧，需要根据具体API的接口定义修改
     PrintOutResult(attentionOutShape, &attentionOutDeviceAddr);
     PrintOutResult(softmaxMaxShape, &softmaxMaxDeviceAddr);
     PrintOutResult(softmaxSumShape, &softmaxSumDeviceAddr);
-
+    
     // 6. 释放aclTensor和aclScalar，需要根据具体API的接口定义修改
     aclDestroyTensor(q);
     aclDestroyTensor(k);
@@ -368,7 +368,7 @@ REG_OP(FlashAttentionScore)
     aclDestroyTensor(attentionOut);
     aclDestroyTensor(softmaxMax);
     aclDestroyTensor(softmaxSum);
-
+    
     // 7. 释放device资源
     aclrtFree(qDeviceAddr);
     aclrtFree(kDeviceAddr);
@@ -383,7 +383,8 @@ REG_OP(FlashAttentionScore)
     aclrtDestroyStream(stream);
     aclrtResetDevice(deviceId);
     aclFinalize();
-
+    
     return 0;
   }
+
   ```

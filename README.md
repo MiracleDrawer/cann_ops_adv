@@ -201,7 +201,7 @@ UT（单元测试用例），用来看护编译是否正常，依次执行如下
   cd cann-ops-adv
   mkdir build && cd build             # 在融合算子源码根目录下创建临时目录并进入
   cmake .. -DTESTS_UT_OPS_TEST=ALL    # 指定编译所有融合算子的单元测试用例
-  make -j 并发数                      # 编译并执行所有融合算子的单元测试用例，并发数请替换为实际取值
+  make ops_test_utest -j 并发数        # 编译并执行所有融合算子的单元测试用例，并发数请替换为实际取值
   ```
 
 执行UT用例依赖googletest单元测试框架，关于googletest更多功能请参见[googletest官网](https://google.github.io/googletest/advanced.html#running-a-subset-of-the-tests)。

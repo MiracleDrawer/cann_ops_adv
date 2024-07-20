@@ -22,7 +22,6 @@ using namespace ge;
 using namespace AscendC;
 
 namespace optiling {
-
 constexpr uint32_t OUTPUT_IDX_DQ = 0;
 constexpr uint32_t OUTPUT_IDX_DK = 1;
 constexpr uint32_t OUTPUT_IDX_DV = 2;
@@ -40,7 +39,7 @@ constexpr uint32_t LAYOUT_ATTR_IDX = 5;
 
 constexpr uint32_t FAG_EMPTY_TILING_KEY = 90;
 
-uint32_t CalculateTschBlockDim(uint32_t sliceNum, uint32_t aicCoreNum, uint32_t aivCoreNum)
+static uint32_t CalculateTschBlockDim(uint32_t sliceNum, uint32_t aicCoreNum, uint32_t aivCoreNum)
 {
     uint32_t ration;
     if (aicCoreNum == 0 || aivCoreNum == 0 || aicCoreNum > aivCoreNum) {
@@ -118,7 +117,7 @@ public:
     }
 };
 
-bool IsEmptyOutput(gert::TilingContext *context)
+static bool IsEmptyOutput(gert::TilingContext *context)
 {
     const gert::StorageShape *dqShape = context->GetOutputShape(OUTPUT_IDX_DQ);
     const gert::StorageShape *dkShape = context->GetOutputShape(OUTPUT_IDX_DK);
@@ -132,7 +131,7 @@ bool IsEmptyOutput(gert::TilingContext *context)
     return false;
 }
 
-ge::graphStatus CheckAttrs(gert::TilingContext *context)
+static ge::graphStatus CheckAttrs(gert::TilingContext *context)
 {
     auto attrs = context->GetAttrs();
     OPS_LOG_E_IF_NULL(context, attrs, return ge::GRAPH_FAILED)
@@ -155,7 +154,7 @@ ge::graphStatus CheckAttrs(gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckParams(gert::TilingContext *context)
+static ge::graphStatus CheckParams(gert::TilingContext *context)
 {
     OPS_LOG_E_IF(context == nullptr, context, return ge::GRAPH_FAILED, "context is null");
     OPS_ERR_IF(CheckAttrs(context) != ge::GRAPH_SUCCESS,
