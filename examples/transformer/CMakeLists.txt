@@ -10,3 +10,7 @@
 set(EXAMPLES_TRANSFORMER_SCRIPTS ${CMAKE_CURRENT_SOURCE_DIR}/scripts)
 add_subdirectory(flash_attention_score)
 add_subdirectory(flash_attention_score_grad)
+add_subdirectory(ffn)
+add_subdirectory(incre_flash_attention)
+add_subdirectory(prompt_flash_attention)
+add_subdirectory(fused_infer_attention_score)

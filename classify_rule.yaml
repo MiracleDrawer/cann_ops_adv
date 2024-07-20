@@ -46,6 +46,54 @@ src:
             options:
               - flash_attention
 
+    ffn:
+      module: True
+      src:
+        - src/transformer/ffn
+      tests:
+        ut:
+          ops_test:
+            src:
+              - tests/ut/ops_test/src/transformer/ffn
+            options:
+              - ffn
+
+    incre_flash_attention:
+      module: True
+      src:
+        - src/transformer/incre_flash_attention
+      tests:
+        ut:
+          ops_test:
+            src:
+              - tests/ut/ops_test/src/transformer/incre_flash_attention
+            options:
+              - incre_flash_attention
+
+    prompt_flash_attention:
+      module: True
+      src:
+        - src/transformer/prompt_flash_attention
+      tests:
+        ut:
+          ops_test:
+            src:
+              - tests/ut/ops_test/src/transformer/prompt_flash_attention
+            options:
+              - prompt_flash_attention
+
+    fused_infer_attention_score:
+      module: True
+      src:
+        - src/transformer/fused_infer_attention_score
+      tests:
+        ut:
+          ops_test:
+            src:
+              - tests/ut/ops_test/src/transformer/fused_infer_attention_score
+            options:
+              - fused_infer_attention_score
+
   utils:
     module: True
     src:

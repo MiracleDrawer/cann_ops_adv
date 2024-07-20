@@ -9,5 +9,8 @@
 
 set(flash_attention_score_alias flash_attention)
 set(flash_attention_score_grad_alias flash_attention)
-
+set(ffn_alias ffn)
+set(incre_flash_attention incre_flash_attention)
+set(prompt_flash_attention prompt_flash_attention)
+set(fused_infer_attention_score fused_infer_attention_score)
 OpsTestUt_AddSubdirectory()
