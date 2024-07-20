@@ -10,6 +10,15 @@ approvers:
 - shawn-hu
 - li-shengxian
 - xig514
+- zhang-kaiyu
+- chen-vvjob
+- renkyk
+- yang-binrong
+- song-jionghui
+- huangwei791
+- shunqi
+- wangjun-qt
+- jiang-lirui
 reviewers:
 - li-xulong
 - Allan_Yu
@@ -21,3 +30,26 @@ reviewers:
 - shawn-hu
 - li-shengxian
 - xig514
+- hilihli
+- chen-vvjob
+- renkyk
+- yang-binrong
+- song-jionghui
+- huangwei791
+- shunqi
+- wangjun-qt
+- jiang-lirui
+
+files:
+  "blacklist.txt":
+    approvers:
+      - yangxu19921206
+      - li-shengxian
+  "CMakeLists.txt":
+    approvers:
+      - yangxu19921206
+      - li-shengxian
+  "LICENSE"
+    approvers:
+      - yangxu19921206
+      - li-shengxian
