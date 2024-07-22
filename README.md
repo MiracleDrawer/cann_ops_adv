@@ -27,33 +27,33 @@ cann-ops-adv，是基于昇腾硬件的融合算子库（adv表示advanced）。
   ├── docs                                           # 算子使用说明和资料
   ├── examples                                       # 所有算子的使用示例代码
   |   ├── transformer                                # 大模型算子
+  |       ├── ffn                                    # 推理FFN算子示例代码
   |       ├── flash_attention_score                  # 训练FA算子示例代码
   |       ├── flash_attention_score_grad             # 训练FAG算子示例代码
+  |       ├── fused_infer_attention_score            # 推理FIA算子示例代码
   |       ├── incre_flash_attention                  # 推理IFA算子示例代码
   |       ├── prompt_flash_attention                 # 推理PFA算子示例代码
-  |       ├── fused_infer_attention_score            # 推理FIA算子示例代码
-  |       ├── ffn                                    # 推理FFN算子示例代码
   |
   ├── src                                            # 所有算子的源代码
   |   ├── transformer                                # 大模型算子
+  |   |   ├── ffn                                    # 推理FFN算子源代码
+  |   |   |   ├── ophost                             # ophost目录，包含tiling策略、aclnn接口、算子原型、信息库配置
+  |   |   |   ├── ffn*.*                             # FFN算子Kernel源文件
   |   |   ├── flash_attention_score                  # 训练FA算子源代码
   |   |   |   ├── ophost                             # ophost目录，包含tiling策略、aclnn接口、算子原型、信息库配置
   |   |   |   ├── flash_attention_score*.*           # FA算子kernel源文件
   |   |   ├── flash_attention_score_grad             # 训练FAG算子源代码
   |   |   |   ├── ophost                             # ophost目录，包含tiling策略、aclnn接口、算子原型、信息库配置
   |   |   |   ├── flash_attention_score_grad*.*      # FAG算子kernel源文件
+  |   |   ├── fused_infer_attention_score            # 推理FIA算子源代码
+  |   |   |   ├── ophost                             # ophost目录，包含tiling策略、aclnn接口、算子原型、信息库配置
+  |   |   |   ├── fused_infer_attention_score*.*     # FIA算子Kernel源文件
   |   |   ├── incre_flash_attention                  # 推理IFA算子源代码
   |   |   |   ├── ophost                             # ophost目录，包含tiling策略、aclnn接口、算子原型、信息库配置
   |   |   |   ├── incre_flash_attention*.*           # IFA算子kernel源文件
   |   |   ├── prompt_flash_attention                 # 推理PFA算子源代码
-  |   |   |   ├── ophost                             # ophost目录，包含tiling策略、aclnn接口、算子原型、信息库配置
-  |   |   |   ├── prompt_flash_attention*.*          # PFA算子Kernel源文件
-  |   |   ├── fused_infer_attention_score            # 推理FIA算子源代码
-  |   |   |   ├── ophost                             # ophost目录，包含tiling策略、aclnn接口、算子原型、信息库配置
-  |   |   |   ├── fused_infer_attention_score*.*     # FIA算子Kernel源文件
-  |   |   ├── ffn                                    # 推理FFN算子源代码
   |   |       ├── ophost                             # ophost目录，包含tiling策略、aclnn接口、算子原型、信息库配置
-  |   |       ├── ffn*.*                             # FFN算子Kernel源文件
+  |   |       ├── prompt_flash_attention*.*          # PFA算子Kernel源文件
   |   |
   |   ├── utils                                      # 所有算子用到的公共接口
   |       ├── inc                                    # 公共头文件
@@ -70,22 +70,22 @@ cann-ops-adv，是基于昇腾硬件的融合算子库（adv表示advanced）。
 
 | 算子名                     | 概述                                                         | 实现接口                                                     |
 | -------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| FlashAttentionScore        | 使用FlashAttention算法实现self-attention（自注意力）的计算。 | <li>[FlashAttentionScore](./docs/FlashAttentionScore.md)<br> <li>[FlashAttentionVarLenScore](./docs/FlashAttentionVarLenScore.md) |
-| FlashAttentionScoreV2      | 训练场景下，使用FlashAttention算法实现self-attention（自注意力）的计算。**相较于FlashAttentionScore，新增psetype、q_start_idx、kv_start_idx参数**。 | <li>[FlashAttentionScoreV2](./docs/FlashAttentionScoreV2.md)<br/> <li>[FlashAttentionVarLenScoreV2](./docs/FlashAttentionVarLenScoreV2.md) |
-| FlashAttentionScoreGrad    | 完成FlashAttentionScore算子的反向计算。                      | <li>[FlashAttentionScoreGrad](./docs/FlashAttentionScoreGrad.md) <br> <li>[FlashAttentionUnpaddingScoreGrad](./docs/FlashAttentionUnpaddingScoreGrad.md) |
-| FlashAttentionScoreGradV2  | FlashAttentionScoreV2的反向计算，**相较于FlashAttentionScoreGard，新增psetype、q_start_idx、kv_start_idx参数**。 | <li>[FlashAttentionScoreGradV2](./docs/FlashAttentionScoreGradV2.md) <br/> <li>[FlashAttentionUnpaddingScoreGradV2](./docs/FlashAttentionUnpaddingScoreGradV2.md) |
 | FFN                        | 将Transformer网络结构中的FFN融合成一个算子进行计算。         | [FFN](./docs/FFN.md)                                         |
 | FFNV2                      | 相较于FFN，新增了tokensIndexFlag参数，以支持输入expertTokens为索引值。 | [FFNV2](./docs/FFNV2.md)                                     |
 | FFNV3                      | 相较于FFNV2，expertTokens从aclIntArray指针输入改为了aclTensor指针输入。 | [FFNV3](./docs/FFNV3.md)                                     |
-| PromptFlashAttention       | 使用FlashAttention算法实现self-attention（自注意力）的计算。 | [PromptFlashAttention](./docs/PromptFlashAttention.md)       |
-| PromptFlashAttentionV2     | 相较于PromptFlashAttention新增量化特性、sparse特性、指定key/value的有效Sequence Length特性                   | [PromptFlashAttentionV2](./docs/PromptFlashAttentionV2.md)   |
-| PromptFlashAttentionV3     | 相较于PromptFlashAttentionV2新增支持指定精度模式特性    | [PromptFlashAttentionV3](./docs/PromptFlashAttentionV3.md)   |
+| FlashAttentionScore        | 使用FlashAttention算法实现self-attention（自注意力）的计算。 | <li>[FlashAttentionScore](./docs/FlashAttentionScore.md)<br> <li>[FlashAttentionVarLenScore](./docs/FlashAttentionVarLenScore.md) |
+| FlashAttentionScoreGrad    | 完成FlashAttentionScore算子的反向计算。                      | <li>[FlashAttentionScoreGrad](./docs/FlashAttentionScoreGrad.md) <br/> <li>[FlashAttentionUnpaddingScoreGrad](./docs/FlashAttentionUnpaddingScoreGrad.md) |
+| FlashAttentionScoreV2      | 训练场景下，使用FlashAttention算法实现self-attention（自注意力）的计算。相较于FlashAttentionScore，新增psetype、q_start_idx、kv_start_idx参数。 | <li>[FlashAttentionScoreV2](./docs/FlashAttentionScoreV2.md)<br/> <li>[FlashAttentionVarLenScoreV2](./docs/FlashAttentionVarLenScoreV2.md) |
+| FlashAttentionScoreGradV2  | FlashAttentionScoreV2的反向计算，相较于FlashAttentionScoreGard，新增psetype、q_start_idx、kv_start_idx参数。 | <li>[FlashAttentionScoreGradV2](./docs/FlashAttentionScoreGradV2.md) <br/> <li>[FlashAttentionUnpaddingScoreGradV2](./docs/FlashAttentionUnpaddingScoreGradV2.md) |
+| FusedInferAttentionScore   | 融合PromptFlashAttentionV3，IncreFlashAttentionV4的功能 。<br/>IFA新增:  lse输出、per-token伪量化特性。<br/>PFA新增: lse输出、伪量化、左Padding特性。 | [FusedInferAttentionScores](./docs/FusedInferAttentionScore.md) |
+| FusedInferAttentionScoreV2 | 在FusedInferAttentionScore基础上， IFA 新增kv伪量化参数分离。 | [FusedInferAttentionScoreV2](./docs/FusedInferAttentionScoreV2.md) |
 | IncreFlashAttention        | 使用FlashAttention算法实现self-attention（自注意力）的计算。 | [IncreFlashAttention](./docs/IncreFlashAttention.md)         |
-| IncreFlashAttentionV2      | 在IncreFlashAttention基础上新增量化特性                      | [IncreFlashAttentionV2](./docs/IncreFlashAttentionV2.md)     |
-| IncreFlashAttentionV3      | 在IncreFlashAttentionV2基础上新增位置编码，page attention，kv cache反量化特性 | [IncreFlashAttentionV3](./docs/IncreFlashAttentionV3.md)     |
-| IncreFlashAttentionV4      | 在IncreFlashAttentionV3基础上新增kv左Padding特性             | [IncreFlashAttentionV4](./docs/IncreFlashAttentionV4.md)     |
-| FusedInferAttentionScore   | 融合PromptFlashAttentionV3，IncreFlashAttentionV4的功能 <br>IFA新增:  lse输出，per-token伪量化特性<br>PFA新增: lse输出，伪量化，左Padding特性 | [FusedInferAttentionScores](./docs/FusedInferAttentionScore.md) |
-| FusedInferAttentionScoreV2 | 在FusedInferAttentionScore基础上， IFA 新增kv伪量化参数分离  | [FusedInferAttentionScoreV2](./docs/FusedInferAttentionScoreV2.md) |
+| IncreFlashAttentionV2      | 在IncreFlashAttention基础上新增量化特性。                    | [IncreFlashAttentionV2](./docs/IncreFlashAttentionV2.md)     |
+| IncreFlashAttentionV3      | 在IncreFlashAttentionV2基础上新增位置编码、page attention、kv cache反量化特性。 | [IncreFlashAttentionV3](./docs/IncreFlashAttentionV3.md)     |
+| IncreFlashAttentionV4      | 在IncreFlashAttentionV3基础上新增kv左Padding特性。           | [IncreFlashAttentionV4](./docs/IncreFlashAttentionV4.md)     |
+| PromptFlashAttention       | 使用FlashAttention算法实现self-attention（自注意力）的计算。 | [PromptFlashAttention](./docs/PromptFlashAttention.md)       |
+| PromptFlashAttentionV2     | 相较于PromptFlashAttention新增量化特性、sparse特性、指定key/value的有效Sequence Length特性。 | [PromptFlashAttentionV2](./docs/PromptFlashAttentionV2.md)   |
+| PromptFlashAttentionV3     | 相较于PromptFlashAttentionV2新增支持指定精度模式特性。       | [PromptFlashAttentionV3](./docs/PromptFlashAttentionV3.md)   |
 
 以上算子当前支持Atlas A2 训练系列产品。
 ## 环境准备<a name="1"></a>
@@ -267,9 +267,9 @@ UT（单元测试用例），用来看护编译是否正常，依次执行如下
 
 cann-ops-adv仓提供了如下融合算子的代码实现设计，方便开发人员更深入的理解融合算子：
 - [FA/FAG算子设计介绍](./docs/common/FA-FAG算子设计介绍.md)
+- [FFN算子设计介绍](./docs/common/FFN算子设计介绍.md)
 - [IFA算子设计介绍](./docs/common/IFA算子设计介绍.md)
 - [PFA算子设计介绍](./docs/common/PromptFlashAttention算子设计介绍.md)
-- [FFN算子设计介绍](./docs/common/FFN算子设计介绍.md)
 
 ## 贡献指南
 
