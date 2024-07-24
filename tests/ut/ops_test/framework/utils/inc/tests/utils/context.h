@@ -51,9 +51,8 @@ public:
     [[maybe_unused]] [[nodiscard]] bool AddAttrs(std::vector<std::pair<std::string, std::any>> attrs);
     [[maybe_unused]] [[nodiscard]] bool MdfAttrs(const std::pair<std::string, std::any> &attr);
     [[maybe_unused]] [[nodiscard]] bool SetTilingMaxDataSize(uint32_t size = kMaxTilingDataSize);
-    [[maybe_unused]] [[nodiscard]] bool SetKernelSoRelPath(const char *relPath);
-    [[maybe_unused]] [[nodiscard]] bool SetKernelFuncName(const char *funcName);
     [[maybe_unused]] [[nodiscard]] bool SetKernelRunCbf(KernelRunCbf cbf);
+    [[maybe_unused]] [[nodiscard]] bool SetKernelMainFunc(void* func);
 
     /* 属性获取 */
     [[maybe_unused]] [[nodiscard]] int32_t GetTilingDataNum() const;
@@ -70,10 +69,8 @@ protected:
     /* 属性 */
     std::vector<std::pair<std::string, std::any>> attrs_;
     uint32_t tilingDataMaxLen_ = kMaxTilingDataSize;
-    std::string kernelSoAbsPath_;
-    std::string kernelFuncName_;
-    void *kernelSoHdl_ = nullptr;
     KernelRunCbf kernelRunCbf_ = nullptr;
+    void* kernelMainFunc_ = nullptr;
     int64_t deterministic_ = 0; /**< 默认不开启确定性计算 */
 
     /* Tiling */

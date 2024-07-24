@@ -33,14 +33,14 @@ set(_FFN_OpProtoSourcesExt
 
 aux_source_directory(${CMAKE_SOURCE_DIR}/src/transformer/ffn _FFN_KernelSourcesExt)
 set(_FFN_KernelPrivateCompileDefinitionsExt
-        KernelSoSuffix fp16 DTYPE_X=half DTYPE_WEIGHT1=half DTYPE_WEIGHT2=half DTYPE_BIAS1=half DTYPE_BIAS2=half DTYPE_Y=half
-        KernelSoSuffix bf16 DTYPE_X=bfloat16_t DTYPE_WEIGHT1=bfloat16_t DTYPE_WEIGHT2=bfloat16_t DTYPE_BIAS1=float DTYPE_BIAS2=float DTYPE_Y=bfloat16_t
-        KernelSoSuffix quant_fp16 DTYPE_X=int8_t DTYPE_WEIGHT1=int8_t DTYPE_WEIGHT2=int8_t DTYPE_BIAS1=int32_t DTYPE_BIAS2=int32_t DTYPE_Y=half
-        KernelSoSuffix quant_bf16 DTYPE_X=int8_t DTYPE_WEIGHT1=int8_t DTYPE_WEIGHT2=int8_t DTYPE_BIAS1=int32_t DTYPE_BIAS2=int32_t DTYPE_Y=bfloat16_t
-        KernelSoSuffix a16w8_fp16 DTYPE_X=half DTYPE_WEIGHT1=int8_t DTYPE_WEIGHT2=int8_t DTYPE_BIAS1=half DTYPE_BIAS2=half DTYPE_Y=half
-        KernelSoSuffix a16w8_bf16 DTYPE_X=bfloat16_t DTYPE_WEIGHT1=int8_t DTYPE_WEIGHT2=int8_t DTYPE_BIAS1=float DTYPE_BIAS2=float DTYPE_Y=bfloat16_t
-        KernelSoSuffix a16w4_fp16 DTYPE_X=half DTYPE_WEIGHT1=int4b_t DTYPE_WEIGHT2=int4b_t DTYPE_BIAS1=half DTYPE_BIAS2=half DTYPE_Y=half
-        KernelSoSuffix a16w4_bf16 DTYPE_X=bfloat16_t DTYPE_WEIGHT1=int4b_t DTYPE_WEIGHT2=int4b_t DTYPE_BIAS1=float DTYPE_BIAS2=float DTYPE_Y=bfloat16_t
+        KernelCtrlParam ffn fp16 DTYPE_X=half DTYPE_WEIGHT1=half DTYPE_WEIGHT2=half DTYPE_BIAS1=half DTYPE_BIAS2=half DTYPE_Y=half
+        KernelCtrlParam ffn bf16 DTYPE_X=bfloat16_t DTYPE_WEIGHT1=bfloat16_t DTYPE_WEIGHT2=bfloat16_t DTYPE_BIAS1=float DTYPE_BIAS2=float DTYPE_Y=bfloat16_t
+        KernelCtrlParam ffn quant_fp16 DTYPE_X=int8_t DTYPE_WEIGHT1=int8_t DTYPE_WEIGHT2=int8_t DTYPE_BIAS1=int32_t DTYPE_BIAS2=int32_t DTYPE_Y=half
+        KernelCtrlParam ffn quant_bf16 DTYPE_X=int8_t DTYPE_WEIGHT1=int8_t DTYPE_WEIGHT2=int8_t DTYPE_BIAS1=int32_t DTYPE_BIAS2=int32_t DTYPE_Y=bfloat16_t
+        KernelCtrlParam ffn a16w8_fp16 DTYPE_X=half DTYPE_WEIGHT1=int8_t DTYPE_WEIGHT2=int8_t DTYPE_BIAS1=half DTYPE_BIAS2=half DTYPE_Y=half
+        KernelCtrlParam ffn a16w8_bf16 DTYPE_X=bfloat16_t DTYPE_WEIGHT1=int8_t DTYPE_WEIGHT2=int8_t DTYPE_BIAS1=float DTYPE_BIAS2=float DTYPE_Y=bfloat16_t
+        KernelCtrlParam ffn a16w4_fp16 DTYPE_X=half DTYPE_WEIGHT1=int4b_t DTYPE_WEIGHT2=int4b_t DTYPE_BIAS1=half DTYPE_BIAS2=half DTYPE_Y=half
+        KernelCtrlParam ffn a16w4_bf16 DTYPE_X=bfloat16_t DTYPE_WEIGHT1=int4b_t DTYPE_WEIGHT2=int4b_t DTYPE_BIAS1=float DTYPE_BIAS2=float DTYPE_Y=bfloat16_t
 )
 
 set(_FFN_TargetPrivateIncludeExt

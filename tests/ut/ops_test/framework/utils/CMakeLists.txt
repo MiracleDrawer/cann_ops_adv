@@ -10,7 +10,7 @@
 set(_Target ${UTest_NamePrefix}_Utils)
 aux_source_directory(src _Sources)
 
-add_library(${_Target} SHARED)
+add_library(${_Target} STATIC)
 target_sources(${_Target} PRIVATE ${_Sources})
 target_include_directories(${_Target}
         PUBLIC
@@ -32,8 +32,8 @@ target_link_libraries(${_Target}
             nnopbase
             ascend_hal
             dl
-        PRIVATE
             tikicpulib::${OPS_ADV_UTEST_OPS_TEST_ASCEND_PRODUCT_TYPE}
+        PRIVATE
             $<BUILD_INTERFACE:intf_utest_strict_compile_options>
             $<BUILD_INTERFACE:intf_pub_utest>
 )

@@ -60,9 +60,9 @@ set(_FA_OpKernelTilingDataDefH
         ${_FASG_OpKernelTilingDataDefH_def}
 )
 set(_FA_OpKernelPrivateCompileDefinitionsExt
-        KernelSoSuffix fp16 ORIG_DTYPE_QUERY=DT_FLOAT16 DTYPE_DQ=half
-        KernelSoSuffix bf16 ORIG_DTYPE_QUERY=DT_BF16    DTYPE_DQ=bfloat16_t
-        KernelSoSuffix fp32 ORIG_DTYPE_QUERY=DT_FLOAT   DTYPE_DQ=float
+        KernelCtrlParam flash_attention_score,flash_attention_score_grad fp16 ORIG_DTYPE_QUERY=DT_FLOAT16 DTYPE_DQ=half
+        KernelCtrlParam flash_attention_score,flash_attention_score_grad bf16 ORIG_DTYPE_QUERY=DT_BF16    DTYPE_DQ=bfloat16_t
+        KernelCtrlParam flash_attention_score,flash_attention_score_grad fp32 ORIG_DTYPE_QUERY=DT_FLOAT   DTYPE_DQ=float
 )
 set(_FA_UTestCommonPrivateIncludeExt
         # FAS
@@ -73,6 +73,7 @@ set(_FA_UTestCommonPrivateLinkLibrariesExt
         # FAG
         ops_utils_tiling_headers        # 用于 FAG 指定模板优先级相关实现
         ${UTest_NamePrefix}_OpTiling    # 用于 FAG 指定模板优先级相关实现
+        error_manager                   # 用于 FAG 指定模板优先级相关实现
 )
 
 OpsTest_Level2_AddOp(

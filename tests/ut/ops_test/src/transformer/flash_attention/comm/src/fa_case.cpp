@@ -88,21 +88,35 @@ ASCENDC_EXTERN_C ge::graphStatus FlashAttentionScoreGradTilingFuncStub(gert::Til
 
 } // namespace
 
-typedef void (*FasKernelFunc)(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *pse,
-                              __gm__ uint8_t *dropMask, __gm__ uint8_t *paddingMask, __gm__ uint8_t *attenMask,
-                              __gm__ uint8_t *prefix, __gm__ uint8_t *actualSeqLengths,
-                              __gm__ uint8_t *actualSeqLengthsKv, __gm__ uint8_t *qStartIdx, __gm__ uint8_t *kvStartIdx,
-                              __gm__ uint8_t *softmaxMax, __gm__ uint8_t *softmaxSum, __gm__ uint8_t *softmaxOut,
-                              __gm__ uint8_t *attentionOut, __gm__ uint8_t *workspace, __gm__ uint8_t *tiling);
+/**
+ * 以下函数声明需要保持与 CMakeList.txt 中调用 OpsTest_Level2_AddOp 函数时 KERNEL_PRIVATE_COMPILE_DEFINITIONS_EXT
+ * 参数所控制的 Kernel 入口一致.
+ */
+#define FAS_KERNEL_PARAM                                                                                               \
+    (__gm__ uint8_t * query, __gm__ uint8_t * key, __gm__ uint8_t * value, __gm__ uint8_t * pse,                       \
+     __gm__ uint8_t * dropMask, __gm__ uint8_t * paddingMask, __gm__ uint8_t * attenMask, __gm__ uint8_t * prefix,     \
+     __gm__ uint8_t * actualSeqLengths, __gm__ uint8_t * actualSeqLengthsKv, __gm__ uint8_t * qStartIdx,               \
+     __gm__ uint8_t * kvStartIdx, __gm__ uint8_t * softmaxMax, __gm__ uint8_t * softmaxSum,                            \
+     __gm__ uint8_t * softmaxOut, __gm__ uint8_t * attentionOut, __gm__ uint8_t * workspace, __gm__ uint8_t * tiling)
 
-typedef void (*FagKernelFunc)(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *dy,
-                              __gm__ uint8_t *pse_shift, __gm__ uint8_t *drop_mask, __gm__ uint8_t *padding_mask,
-                              __gm__ uint8_t *atten_mask, __gm__ uint8_t *softmax_max, __gm__ uint8_t *softmax_sum,
-                              __gm__ uint8_t *softmax_in, __gm__ uint8_t *attention_in, __gm__ uint8_t *prefix,
-                              __gm__ uint8_t *actual_seq_qlen, __gm__ uint8_t *actual_seq_kvlen,
-                              __gm__ uint8_t *q_start_idx, __gm__ uint8_t *kv_start_idx, __gm__ uint8_t *dq,
-                              __gm__ uint8_t *dk, __gm__ uint8_t *dv, __gm__ uint8_t *dpse, __gm__ uint8_t *workspace,
-                              __gm__ uint8_t *tiling_data);
+#define FAG_KERNEL_PARAM                                                                                               \
+    (__gm__ uint8_t * query, __gm__ uint8_t * key, __gm__ uint8_t * value, __gm__ uint8_t * dy,                        \
+     __gm__ uint8_t * pse_shift, __gm__ uint8_t * drop_mask, __gm__ uint8_t * padding_mask,                            \
+     __gm__ uint8_t * atten_mask, __gm__ uint8_t * softmax_max, __gm__ uint8_t * softmax_sum,                          \
+     __gm__ uint8_t * softmax_in, __gm__ uint8_t * attention_in, __gm__ uint8_t * prefix,                              \
+     __gm__ uint8_t * actual_seq_qlen, __gm__ uint8_t * actual_seq_kvlen, __gm__ uint8_t * q_start_idx,                \
+     __gm__ uint8_t * kv_start_idx, __gm__ uint8_t * dq, __gm__ uint8_t * dk, __gm__ uint8_t * dv,                     \
+     __gm__ uint8_t * dpse, __gm__ uint8_t * workspace, __gm__ uint8_t * tiling_data)
+
+typedef void(*FasKernelFunc) FAS_KERNEL_PARAM;
+typedef void(*FagKernelFunc) FAG_KERNEL_PARAM;
+
+extern "C" __global__ __aicore__ void flash_attention_score_fp16 FAS_KERNEL_PARAM;
+extern "C" __global__ __aicore__ void flash_attention_score_fp32 FAS_KERNEL_PARAM;
+extern "C" __global__ __aicore__ void flash_attention_score_bf16 FAS_KERNEL_PARAM;
+extern "C" __global__ __aicore__ void flash_attention_score_grad_fp16 FAG_KERNEL_PARAM;
+extern "C" __global__ __aicore__ void flash_attention_score_grad_fp32 FAG_KERNEL_PARAM;
+extern "C" __global__ __aicore__ void flash_attention_score_grad_bf16 FAG_KERNEL_PARAM;
 
 using namespace ops::adv::tests::fa;
 using TensorIntf = ops::adv::tests::utils::TensorIntf;
@@ -209,13 +223,14 @@ bool FaCase::InitParam()
 
 bool FaCase::InitOpInfo()
 {
-    std::string kernelSoRelPath = "src/transformer/flash_attention/libUTest_Fa_OpKernel_";
+    auto *fasKernelFunc = (void *)flash_attention_score_bf16;
+    auto *fagKernelFunc = (void *)flash_attention_score_grad_bf16;
     if (param.dtype == ge::DataType::DT_FLOAT16) {
-        kernelSoRelPath += "fp16.so";
+        fasKernelFunc = (void *)flash_attention_score_fp16;
+        fagKernelFunc = (void *)flash_attention_score_grad_fp16;
     } else if (param.dtype == ge::DataType::DT_FLOAT) {
-        kernelSoRelPath += "fp32.so";
-    } else {
-        kernelSoRelPath += "bf16.so";
+        fasKernelFunc = (void *)flash_attention_score_fp32;
+        fagKernelFunc = (void *)flash_attention_score_grad_fp32;
     }
 
     bool rst = forwardCtx.SetOpName(forward.name.c_str());
@@ -233,9 +248,8 @@ bool FaCase::InitOpInfo()
                                       {"inner_precise", param.innerPrecise},
                                       {"sparse_mode", param.sparseMode},
                                       {"pse_type", param.pseType}});
-    rst = rst && forwardCtx.SetKernelSoRelPath(kernelSoRelPath.c_str());
-    rst = rst && forwardCtx.SetKernelFuncName("flash_attention_score");
     rst = rst && forwardCtx.SetKernelRunCbf(RunFlashAttention);
+    rst = rst && forwardCtx.SetKernelMainFunc((void *)fasKernelFunc);
     rst = rst && forward.SetContext(&forwardCtx);
     rst = rst && reverseCtx.SetOpName(reverse.name.c_str());
     rst = rst && reverseCtx.SetDeterministic(reverse.ctr.deterministic);
@@ -254,9 +268,8 @@ bool FaCase::InitOpInfo()
                                       {"sparse_mode", param.sparseMode},
                                       {"pse_type", param.pseType}});
     rst = rst && reverseCtx.SetTilingMaxDataSize(2560);
-    rst = rst && reverseCtx.SetKernelSoRelPath(kernelSoRelPath.c_str());
-    rst = rst && reverseCtx.SetKernelFuncName("flash_attention_score_grad");
     rst = rst && reverseCtx.SetKernelRunCbf(RunFlashAttentionGrad);
+    rst = rst && reverseCtx.SetKernelMainFunc((void *)fagKernelFunc);
     rst = rst && reverse.SetContext(&reverseCtx);
     if (!rst) {
         return rst;

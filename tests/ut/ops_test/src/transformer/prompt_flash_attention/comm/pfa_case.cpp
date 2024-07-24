@@ -21,12 +21,21 @@
 #include "tests/utils/platform.h"
 #include "tiling/pfa/tiling_data.h"
 
-typedef void (*PfaKernelFunc)(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
-                              __gm__ uint8_t* pseShift, __gm__ uint8_t* attenMask, __gm__ uint8_t* actualSeqLengths,
-                              __gm__ uint8_t* actualSeqLengthsKV, __gm__ uint8_t* deq_scale1,
-                              __gm__ uint8_t* quant_scale1, __gm__ uint8_t* deq_scale2, __gm__ uint8_t* quant_scale2,
-                              __gm__ uint8_t* quant_offset2, __gm__ uint8_t* attentionOut, __gm__ uint8_t* workspace,
-                              __gm__ uint8_t* tiling);
+/**
+ * 以下函数声明需要保持与 CMakeList.txt 中调用 OpsTest_Level2_AddOp 函数时 KERNEL_PRIVATE_COMPILE_DEFINITIONS_EXT 参数所控制的
+ * Kernel 入口一致.
+ */
+
+#define PFA_KERNEL_PARAM                                                                                               \
+    (__gm__ uint8_t * query, __gm__ uint8_t * key, __gm__ uint8_t * value, __gm__ uint8_t * pseShift,                  \
+     __gm__ uint8_t * attenMask, __gm__ uint8_t * actualSeqLengths, __gm__ uint8_t * actualSeqLengthsKV,               \
+     __gm__ uint8_t * deq_scale1, __gm__ uint8_t * quant_scale1, __gm__ uint8_t * deq_scale2,                          \
+     __gm__ uint8_t * quant_scale2, __gm__ uint8_t * quant_offset2, __gm__ uint8_t * attentionOut,                     \
+     __gm__ uint8_t * workspace, __gm__ uint8_t * tiling)
+
+typedef void (*PfaKernelFunc) PFA_KERNEL_PARAM;
+
+extern "C" __global__ __aicore__ void prompt_flash_attention PFA_KERNEL_PARAM;
 
 using namespace ops::adv::tests::pfa;
 using Tensor = ops::adv::tests::utils::TensorIntf;
@@ -114,6 +123,7 @@ bool PfaCase::InitOpInfo() {
                                    {"sparse_mode", param.sparseMode},
                                    {"inner_precise", param.innerPrecise}});
   rst = rst && promptCtx.SetKernelRunCbf(RunPromptFlashAttention);
+  rst = rst && promptCtx.SetKernelMainFunc((void *)prompt_flash_attention);
   rst = rst && prompt.SetContext(&promptCtx);
   return rst;
 }

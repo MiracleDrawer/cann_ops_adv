@@ -22,13 +22,22 @@
 #include "tiling/ifa/tiling_data.h"
 #include "tiling/tiling_base.h"
 
-typedef void (*IfaKernelFunc)(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
-                              __gm__ uint8_t* pseShift, __gm__ uint8_t* attenMask, __gm__ uint8_t* actualSeqLengths,
-                              __gm__ uint8_t* deqScale1, __gm__ uint8_t* quantScale1, __gm__ uint8_t* deqScale2,
-                              __gm__ uint8_t* quantScale2, __gm__ uint8_t* quantOffset2, __gm__ uint8_t* antiquantScale,
-                              __gm__ uint8_t* antiquantOffset, __gm__ uint8_t* blocktable,
-                              __gm__ uint8_t* kvPaddingSize, __gm__ uint8_t* attentionOut, __gm__ uint8_t* workspace,
-                              __gm__ uint8_t* tiling);
+/**
+ * 以下函数声明需要保持与 CMakeList.txt 中调用 OpsTest_Level2_AddOp 函数时 KERNEL_PRIVATE_COMPILE_DEFINITIONS_EXT 参数所控制的
+ * Kernel 入口一致.
+ */
+
+#define IFA_KERNEL_PARAM                                                                                               \
+    (__gm__ uint8_t * query, __gm__ uint8_t * key, __gm__ uint8_t * value, __gm__ uint8_t * pseShift,                  \
+     __gm__ uint8_t * attenMask, __gm__ uint8_t * actualSeqLengths, __gm__ uint8_t * deqScale1,                        \
+     __gm__ uint8_t * quantScale1, __gm__ uint8_t * deqScale2, __gm__ uint8_t * quantScale2,                           \
+     __gm__ uint8_t * quantOffset2, __gm__ uint8_t * antiquantScale, __gm__ uint8_t * antiquantOffset,                 \
+     __gm__ uint8_t * blocktable, __gm__ uint8_t * kvPaddingSize, __gm__ uint8_t * attentionOut,                       \
+     __gm__ uint8_t * workspace, __gm__ uint8_t * tiling)
+
+typedef void (*IfaKernelFunc) IFA_KERNEL_PARAM;
+
+extern "C" __global__ __aicore__ void incre_flash_attention IFA_KERNEL_PARAM;
 
 using namespace ops::adv::tests::ifa;
 using TensorIntf = ops::adv::tests::utils::TensorIntf;
@@ -130,7 +139,6 @@ bool IfaCase::InitParam() {
 }
 
 bool IfaCase::InitOpInfo() {
-  std::string kernelSoRealPath = "src/transformer/incre_flash_attention/libAsdcOpTestUt_Ifa_Kernel.so";
   bool rst = increCtx.SetOpName("IncreFlashAttention");
   rst = rst && increCtx.SetDeterministic(false);
   rst = rst && increCtx.SetInputs({&query, &key, &value, &pseShift, &attenMask, &actualSeqLengths, &deqScale1,
@@ -143,9 +151,8 @@ bool IfaCase::InitOpInfo() {
                                    {"num_key_value_heads", param.kvNumHeads},
                                    {"block_size", param.blockSize},
                                    {"inner_precise", param.innerPrecise}});
-  rst = rst && increCtx.SetKernelSoRelPath(kernelSoRealPath.c_str());
-  rst = rst && increCtx.SetKernelFuncName("incre_flash_attention");
   rst = rst && increCtx.SetKernelRunCbf(RunIncreFlashAttention);
+  rst = rst && increCtx.SetKernelMainFunc((void *)incre_flash_attention);
   rst = rst && incre.SetContext(&increCtx);
   return rst;
 }

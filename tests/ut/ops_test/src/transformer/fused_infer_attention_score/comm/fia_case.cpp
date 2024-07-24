@@ -21,18 +21,24 @@
 #include "tiling/fia/tiling_data.h"
 #include "tiling/tiling_base.h"
 
-typedef void (*FiaKernelFunc)(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
-                              __gm__ uint8_t* pse_shift, __gm__ uint8_t* attenMask, __gm__ uint8_t* actualSeqLengths,
-                              __gm__ uint8_t* actualSeqLengthsKV, __gm__ uint8_t* deq_scale1,
-                              __gm__ uint8_t* quant_scale1, __gm__ uint8_t* deq_scale2, __gm__ uint8_t* quant_scale2,
-                              __gm__ uint8_t* quant_offset2, __gm__ uint8_t* antiquantScale,
-                              __gm__ uint8_t* antiquantOffset, __gm__ uint8_t* blocktable,
-                              __gm__ uint8_t* queryPaddingSize, __gm__ uint8_t* kvPaddingSize,
-                              __gm__ uint8_t* keyAntiquantScale, __gm__ uint8_t* keyAntiquantOffset,
-                              __gm__ uint8_t* valueAntiquantScale, __gm__ uint8_t* valueAntiquantOffset,
-                              __gm__ uint8_t* keySharedPrefix, __gm__ uint8_t* valueSharedPrefix,
-                              __gm__ uint8_t* actualSharedPrefixLen, __gm__ uint8_t* attentionOut,
-                              __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace, __gm__ uint8_t* tiling);
+/**
+ * 以下函数声明需要保持与 CMakeList.txt 中调用 OpsTest_Level2_AddOp 函数时 KERNEL_PRIVATE_COMPILE_DEFINITIONS_EXT
+ * 参数所控制的 Kernel 入口一致.
+ */
+#define FIA_KERNEL_PARAM                                                                                               \
+    (__gm__ uint8_t * query, __gm__ uint8_t * key, __gm__ uint8_t * value, __gm__ uint8_t * pse_shift,                 \
+     __gm__ uint8_t * attenMask, __gm__ uint8_t * actualSeqLengths, __gm__ uint8_t * actualSeqLengthsKV,               \
+     __gm__ uint8_t * deq_scale1, __gm__ uint8_t * quant_scale1, __gm__ uint8_t * deq_scale2,                          \
+     __gm__ uint8_t * quant_scale2, __gm__ uint8_t * quant_offset2, __gm__ uint8_t * antiquantScale,                   \
+     __gm__ uint8_t * antiquantOffset, __gm__ uint8_t * blocktable, __gm__ uint8_t * queryPaddingSize,                 \
+     __gm__ uint8_t * kvPaddingSize, __gm__ uint8_t * keyAntiquantScale, __gm__ uint8_t * keyAntiquantOffset,          \
+     __gm__ uint8_t * valueAntiquantScale, __gm__ uint8_t * valueAntiquantOffset, __gm__ uint8_t * keySharedPrefix,    \
+     __gm__ uint8_t * valueSharedPrefix, __gm__ uint8_t * actualSharedPrefixLen, __gm__ uint8_t * attentionOut,        \
+     __gm__ uint8_t * softmaxLse, __gm__ uint8_t * workspace, __gm__ uint8_t * tiling)
+
+typedef void (*FiaKernelFunc) FIA_KERNEL_PARAM;
+
+extern "C" __global__ __aicore__ void fused_infer_attention_score FIA_KERNEL_PARAM;
 
 using namespace ops::adv::tests::fia;
 using TensorIntf = ops::adv::tests::utils::TensorIntf;
@@ -82,7 +88,6 @@ bool FiaCase::InitParam() {
 }
 
 bool FiaCase::InitOpInfo() {
-  std::string kernelSoRealPath = "src/transformer/fused_infer_attention_score/libAsdcOpTestUt_Fia_Kernel.so";
   bool rst = fiaCtx.SetOpName("FusedInferAttentionScore");
   rst = rst && fiaCtx.SetDeterministic(false);
   rst = rst && fiaCtx.SetInputs({&query, &key, &value, &pseShift, &attenMask, &actualSeqLengths, &actualSeqLengthsKV,
@@ -104,9 +109,8 @@ bool FiaCase::InitOpInfo() {
                                 {"softmax_lse_flag", param.softmax_lse_flag},
                                 {"key_antiquant_mode", param.key_antiquant_mode},
                                 {"value_antiquant_mode", param.value_antiquant_mode}});
-  rst = rst && fiaCtx.SetKernelSoRelPath(kernelSoRealPath.c_str());
-  rst = rst && fiaCtx.SetKernelFuncName("fused_infer_attention_score");
   rst = rst && fiaCtx.SetKernelRunCbf(RunFusedInferAttentionScore);
+  rst = rst && fiaCtx.SetKernelMainFunc((void *)fused_infer_attention_score);
   rst = rst && fia.SetContext(&fiaCtx);
   return rst;
 }

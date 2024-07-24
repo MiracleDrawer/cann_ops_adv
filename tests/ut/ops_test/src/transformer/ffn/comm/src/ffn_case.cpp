@@ -29,13 +29,28 @@ using FFNCase = ops::adv::tests::ffn::FFNCase;
 using ops::adv::tests::utils::ReadFile;
 using ops::adv::tests::utils::WriteFile;
 
-typedef void (*FFNKernelFunc)(__gm__ uint8_t *x, __gm__ uint8_t *weight1, __gm__ uint8_t *weight2,
-                              __gm__ uint8_t *expertTokens, __gm__ uint8_t *bias1, __gm__ uint8_t *bias2,
-                              __gm__ uint8_t *scale, __gm__ uint8_t *offset, __gm__ uint8_t *deqScale1,
-                              __gm__ uint8_t *deqScale2, __gm__ uint8_t *antiquant_scale1,
-                              __gm__ uint8_t *antiquant_scale2, __gm__ uint8_t *antiquant_offset1,
-                              __gm__ uint8_t *antiquant_offset2, __gm__ uint8_t *y, __gm__ uint8_t *workSpace,
-                              __gm__ uint8_t *tiling);
+/**
+ * 以下函数声明需要保持与 CMakeList.txt 中调用 OpsTest_Level2_AddOp 函数时 KERNEL_PRIVATE_COMPILE_DEFINITIONS_EXT 参数所控制的
+ * Kernel 入口一致.
+ */
+
+#define FFN_KERNEL_PARAM                                                                                               \
+    (__gm__ uint8_t * x, __gm__ uint8_t * weight1, __gm__ uint8_t * weight2, __gm__ uint8_t * expertTokens,            \
+     __gm__ uint8_t * bias1, __gm__ uint8_t * bias2, __gm__ uint8_t * scale, __gm__ uint8_t * offset,                  \
+     __gm__ uint8_t * deqScale1, __gm__ uint8_t * deqScale2, __gm__ uint8_t * antiquant_scale1,                        \
+     __gm__ uint8_t * antiquant_scale2, __gm__ uint8_t * antiquant_offset1, __gm__ uint8_t * antiquant_offset2,        \
+     __gm__ uint8_t * y, __gm__ uint8_t * workSpace, __gm__ uint8_t * tiling)
+
+typedef void (*FFNKernelFunc) FFN_KERNEL_PARAM;
+
+extern "C" __global__ __aicore__ void ffn_quant_fp16 FFN_KERNEL_PARAM;
+extern "C" __global__ __aicore__ void ffn_quant_bf16 FFN_KERNEL_PARAM;
+extern "C" __global__ __aicore__ void ffn_fp16 FFN_KERNEL_PARAM;
+extern "C" __global__ __aicore__ void ffn_bf16 FFN_KERNEL_PARAM;
+extern "C" __global__ __aicore__ void ffn_a16w8_fp16 FFN_KERNEL_PARAM;
+extern "C" __global__ __aicore__ void ffn_a16w8_bf16 FFN_KERNEL_PARAM;
+extern "C" __global__ __aicore__ void ffn_a16w4_fp16 FFN_KERNEL_PARAM;
+extern "C" __global__ __aicore__ void ffn_a16w4_bf16 FFN_KERNEL_PARAM;
 
 using namespace ops::adv::tests::ffn;
 using ops::adv::tests::utils::Platform;
@@ -109,38 +124,38 @@ bool FFNCase::InitParam()
 
 bool FFNCase::InitOpInfo()
 {
-    std::string kernelSoRelPath = "src/transformer/ffn/libUTest_FFN_OpKernel_";
+    auto *ffnKernelFunc = (void *)ffn_quant_fp16;;
     if (param.tensors["x"].GetDataType() == param.tensors["weight1"].GetDataType()) {
         if (param.tensors["weight1"].GetDataType() == ge::DataType::DT_INT8) { // 量化
             isQuant = true;
             if (param.tensors["y"].GetDataType() == ge::DataType::DT_FLOAT16) {
-                kernelSoRelPath += "quant_fp16";
+                ffnKernelFunc = (void *)ffn_quant_fp16;
             } else {
-                kernelSoRelPath += "quant_bf16";
+                ffnKernelFunc = (void *)ffn_quant_bf16;
             }
         } else { // 非量化
             if (param.tensors["weight1"].GetDataType() == ge::DataType::DT_FLOAT16) {
-                kernelSoRelPath += "fp16";
+                ffnKernelFunc = (void *)ffn_fp16;
             } else {
-                kernelSoRelPath += "bf16";
+                ffnKernelFunc = (void *)ffn_bf16;
             }
         }
     } else { // 伪量化
         if (param.tensors["weight1"].GetDataType() == ge::DataType::DT_INT8) {
             if (param.tensors["x"].GetDataType() == ge::DataType::DT_FLOAT16) {
-                kernelSoRelPath += "a16w8_fp16";
+                ffnKernelFunc = (void *)ffn_a16w8_fp16;
             } else {
-                kernelSoRelPath += "a16w8_bf16";
+                ffnKernelFunc = (void *)ffn_a16w8_bf16;
             }
         } else {
             if (param.tensors["x"].GetDataType() == ge::DataType::DT_FLOAT16) {
-                kernelSoRelPath += "a16w4_fp16";
+                ffnKernelFunc = (void *)ffn_a16w4_fp16;
             } else {
-                kernelSoRelPath += "a16w4_bf16";
+                ffnKernelFunc = (void *)ffn_a16w4_bf16;
             }
         }
     }
-    kernelSoRelPath += ".so";
+
     bool rst = ctx.SetOpName(opInfo.name.c_str());
     rst = rst && ctx.SetDeterministic(opInfo.ctr.deterministic);
     rst = rst && ctx.SetInputs({&param.tensors["x"], &param.tensors["weight1"], &param.tensors["weight2"],
@@ -154,9 +169,8 @@ bool FFNCase::InitOpInfo()
                                {"inner_precise", param.innerPrecise},
                                {"output_dtype", param.outputDtype},
                                {"tokens_index_flag", param.tokensIndexFlag}});
-    rst = rst && ctx.SetKernelSoRelPath(kernelSoRelPath.c_str());
-    rst = rst && ctx.SetKernelFuncName("ffn");
     rst = rst && ctx.SetKernelRunCbf(RunFFN);
+    rst = rst && ctx.SetKernelMainFunc((void *)ffnKernelFunc);
     rst = rst && opInfo.SetContext(&ctx);
     return rst;
 }

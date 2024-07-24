@@ -36,7 +36,7 @@ set(_FIA_TargetPrivateLinkLibrariesExt
 )
 aux_source_directory(${CMAKE_SOURCE_DIR}/src/transformer/fused_infer_attention_score _FIA_KernelSourcesExt)
 set(_FIA_CompileDefintions
-        PFA_UT
+        KernelCtrlParam incre_flash_attention,incre_flash_attention_FIAS,prompt_flash_attention,prompt_flash_attention_FIAS fia PFA_UT
 )
 OpsTest_Level2_AddOp(
          BRIEF                                         Fia

@@ -26,8 +26,8 @@ set(_OpsTestUt_OpTilingSources            "" CACHE INTERNAL "" FORCE)  # Sources
 set(_OpsTestUt_OpTilingPrivateIncludesExt "" CACHE INTERNAL "" FORCE)  # PrivateIncludesExt
 set(_OpsTestUt_OpTilingLinkLibrariesExt   "" CACHE INTERNAL "" FORCE)  # LinkLibrariesExt
 
-# 缓存此次编译 Kernel 目标(多 dtype 场景下可能有多个)
-set(_OpsTestUt_OpKernelLibraries "" CACHE INTERNAL "" FORCE)
+# 缓存所有算子 UTest 场景 OpKernel 目标
+set(_OpsTestUt_OpKernelLibraries "" CACHE INTERNAL "" FORCE)  # LinkLibrariesExt
 
 # 缓存所有算子 UTest 场景 UTest用例 动态库相关信息
 set(_OpsTestUt_UTestCaseLibraries        "" CACHE INTERNAL "" FORCE)
@@ -309,7 +309,7 @@ function(OpsTest_AddOpTilingShared)
     set(_UTest_OpTilingLibrary ${_Target} PARENT_SCOPE)
 endfunction()
 
-# Level1, 添加算子 Kernel 动态库
+# Level1, 添加算子 Kernel 静态库
 #[[
 调用参数:
   one_value_keywords:
@@ -328,16 +328,19 @@ endfunction()
      如 flash_attention_score 算子需要 data_copy_transpose_tiling_def.h 和 flash_attention_score_tiling.h;
      - 在 NPU 编译时, 编译框架使用 ccec 编译器并使用 -include 编译选项注入所需的多个 TilingData 定义头文件 至 Kernel 源文件;
      - 但 CPU 编译时, CMake 早期版本在处理 -include 选项时有 Bug(只第一个 -include 指定的头文件生效).
-       故本框架通过新增一个 {op_brief_name}_tiling_data.h, 再在该文件中 include 所需的多个 TilingData 定义头文件,
-       再通过 -include 编译选项注入 {op_brief_name}_tiling_data.h 的方式规避 CPU 编译时 CMake 不能处理多个 -include 选项的 Bug;
+       故本框架通过新增一个 {BRIEF}_tiling_data.h, 再在该文件中 include 所需的多个 TilingData 定义头文件,
+       再通过 -include 编译选项注入 {BRIEF}_tiling_data.h 的方式规避 CPU 编译时 CMake 不能处理多个 -include 选项的 Bug;
   4. PRIVATE_COMPILE_DEFINITIONS_EXT 设置格式如下:
-        optional{KernelSoSuffix suffix} optional{OtherCompileDefinitions} optional{OtherCompileDefinitions}
-            其中 KernelSoSuffix 为标识 suffix 起点关键字
-     4.1 当不设置 KernelSoSuffix 时, 本函数仅会编译一个 Kernel.so 并以 OtherCompileDefinitions 设置编译 Definitions(如设置);
-     4.2 若当设置 KernelSoSuffix 时, 本函数会按 KernelSoSuffix 个数逐个编译 Kernel.so,
-         并以 KernelSoSuffix 间 OtherCompileDefinitions 设置编译宏定义;
+        optional{KernelCtrlParam func suffix} optional{OtherCompileDefinitions}}
+     其中 KernelCtrlParam 用于指定 Kernel 编译控制参数, func 为标识 Kernel 原始入口函数名,
+     suffix 为标识当前 Kernel 二进制及 Kernel 入口函数后缀; 其设置逻辑如下:
+     4.0 KernelCtrlParam 内 func, suffix 必需按序设置;
+     4.1 当不设置 KernelCtrlParam 时, 仅会编译一个 Kernel.a 并以 OtherCompileDefinitions 设置编译 Definitions(如设置);
+     4.2 若当设置 KernelCtrlParam 时, 本函数会按 KernelCtrlParam 个数逐个编译 Kernel.a,
+         并以 KernelCtrlParam 间 OtherCompileDefinitions 设置编译宏定义; 并将 func 重命名为 {func}_{suffix};
+     4.3 KernelCtrlParam 内 func 支持指定多个, 指定多个时 func 之间用','间隔;
 ]]
-function(OpsTest_Level1_AddOpKernelShared)
+function(OpsTest_Level1_AddOpKernelStatic)
     cmake_parse_arguments(
             TMP
             ""
@@ -373,7 +376,6 @@ function(OpsTest_Level1_AddOpKernelShared)
     set(_TargetPrefix  ${UTest_NamePrefix}_${TMP_BRIEF}_OpKernel)
     aux_source_directory(${OPS_ADV_DIR}/src/${TMP_SUB_SYSTEM}/${TMP_SNAKE} _Sources)
     list(APPEND _Sources ${TMP_SOURCES_EXT})
-
     set(_PrivateIncludeDirectories
             ${_OpsTest_GenDirInc}
             ${OPS_ADV_DIR}/src/${TMP_SUB_SYSTEM}/${TMP_SNAKE}
@@ -388,47 +390,62 @@ function(OpsTest_Level1_AddOpKernelShared)
             c_sec
             $<BUILD_INTERFACE:intf_pub_utest>
     )
+
     # 多 Kernel 处理
-    set(_OpsTestUt_OpKernelLibraries CACHE INTERNAL "" FORCE)
-    list(FIND TMP_PRIVATE_COMPILE_DEFINITIONS_EXT KernelSoSuffix _TMP_IDX)
-    if ("${_TMP_IDX}" STREQUAL "-1")
-        # 不存在多 Kernel 配置时, 不添加后缀, 编译一个 Kernel.so
+    set(_OpKernelLibraries)
+    list(FIND TMP_PRIVATE_COMPILE_DEFINITIONS_EXT KernelCtrlParam _GrpIdx)
+    if ("${_GrpIdx}" STREQUAL "-1")
+        # 不存在多 Kernel 配置时, 不添加后缀, 编译一个 Kernel.a
         set(_Target ${_TargetPrefix})
-        add_library(${_Target} SHARED)
+        add_library(${_Target} STATIC)
         target_sources(${_Target} PRIVATE ${_Sources})
         target_include_directories(${_Target} PRIVATE ${_PrivateIncludeDirectories})
         target_compile_definitions(${_Target} PRIVATE ${TMP_PRIVATE_COMPILE_DEFINITIONS_EXT})
         target_compile_options(${_Target} PRIVATE ${_PrivateCompileOptions})
-        target_link_libraries(${_Target} PRIVATE ${_PrivateLinkLibraries})
-        target_link_libraries(${_Target} PUBLIC tikicpulib::${OPS_ADV_UTEST_OPS_TEST_ASCEND_PRODUCT_TYPE})
-        set(_OpsTestUt_OpKernelLibraries ${_OpsTestUt_OpKernelLibraries} ${_Target} CACHE INTERNAL "" FORCE)
+        target_link_libraries(${_Target}
+                PUBLIC
+                    tikicpulib::${OPS_ADV_UTEST_OPS_TEST_ASCEND_PRODUCT_TYPE}
+                PRIVATE
+                    ${_PrivateLinkLibraries}
+        )
+        list(APPEND _OpKernelLibraries ${_Target})
     else ()
-        # 存在 1/n 多 Kernel 配置时, 添加后缀, 编译多 Kernel.so
-        while (NOT "${_TMP_IDX}" STREQUAL "-1")
-            # 获取当前 Suffix
-            math(EXPR _SuffixIdx "${_TMP_IDX} + 1")
+        # 存在 1/n 多 Kernel 配置时, 添加后缀, 编译多 Kernel.a
+        while (NOT "${_GrpIdx}" STREQUAL "-1")
+            # 获取当前 Func, Suffix, CompileDefinitions
+            math(EXPR _FuncIdx "${_GrpIdx} + 1")
+            math(EXPR _SuffixIdx "${_GrpIdx} + 2")
+            math(EXPR _SubLstBgnIdx "${_GrpIdx} + 3")
+            list(GET TMP_PRIVATE_COMPILE_DEFINITIONS_EXT ${_FuncIdx} _FuncOriValList)
             list(GET TMP_PRIVATE_COMPILE_DEFINITIONS_EXT ${_SuffixIdx} _SuffixVal)
-            math(EXPR _SubLstBgnIdx "${_TMP_IDX} + 2")
             list(SUBLIST TMP_PRIVATE_COMPILE_DEFINITIONS_EXT ${_SubLstBgnIdx} -1 TMP_PRIVATE_COMPILE_DEFINITIONS_EXT)
-            # 获取此 Suffix 对应 CompileDefinitions
-            set(_DefBgnIdx 0)
-            list(FIND TMP_PRIVATE_COMPILE_DEFINITIONS_EXT KernelSoSuffix _TMP_IDX)
-            list(SUBLIST TMP_PRIVATE_COMPILE_DEFINITIONS_EXT 0 ${_TMP_IDX} _SubCompileDefinitions)
+            list(FIND TMP_PRIVATE_COMPILE_DEFINITIONS_EXT KernelCtrlParam _GrpIdx)  # _GrpIdx 移动
+            list(SUBLIST TMP_PRIVATE_COMPILE_DEFINITIONS_EXT 0 ${_GrpIdx} _SubCompileDefinitions)
+            string(REPLACE "," ";" _FuncOriValList "${_FuncOriValList}")
+            set(_FuncValDef)
+            foreach (_f ${_FuncOriValList})
+                list(APPEND _FuncValDef "-D${_f}=${_f}_${_SuffixVal}")
+            endforeach ()
             # 编译目标
             set(_Target ${_TargetPrefix}_${_SuffixVal})
-            add_library(${_Target} SHARED)
+            add_library(${_Target} STATIC)
             target_sources(${_Target} PRIVATE ${_Sources})
             target_include_directories(${_Target} PRIVATE ${_PrivateIncludeDirectories})
-            target_compile_definitions(${_Target} PRIVATE ${_SubCompileDefinitions})
+            target_compile_definitions(${_Target} PRIVATE ${_FuncValDef} ${_SubCompileDefinitions})
             target_compile_options(${_Target} PRIVATE ${_PrivateCompileOptions})
-            target_link_libraries(${_Target} PRIVATE ${_PrivateLinkLibraries})
-            target_link_libraries(${_Target} PUBLIC tikicpulib::${OPS_ADV_UTEST_OPS_TEST_ASCEND_PRODUCT_TYPE})
-            set(_OpsTestUt_OpKernelLibraries ${_OpsTestUt_OpKernelLibraries} ${_Target} CACHE INTERNAL "" FORCE)
+            target_link_libraries(${_Target}
+                    PUBLIC
+                        tikicpulib::${OPS_ADV_UTEST_OPS_TEST_ASCEND_PRODUCT_TYPE}
+                    PRIVATE
+                        ${_PrivateLinkLibraries}
+            )
+            list(APPEND _OpKernelLibraries ${_Target})
         endwhile ()
     endif ()
+    set(_OpsTestUt_OpKernelLibraries ${_OpsTestUt_OpKernelLibraries} ${_OpKernelLibraries} CACHE INTERNAL "" FORCE)
 endfunction()
 
-# Level1, 添加算子 UTest 用例动态库
+# Level1, 添加算子 UTest 用例静态库
 #[[
 调用参数:
   one_value_keywords:
@@ -445,13 +462,13 @@ endfunction()
       UTEST_ACLNN_PRIVATE_LINK_LIBRARIES_EXT    : 可选参数, 额外链接库 (UTest_Aclnn)
 
 备注说明:
-  本函数提供编译算子对应 UTest 动态库 的功能.
-  1. 在 UTest 场景下, 本函数将会将 comm (可选) 编译成一个动态库作为 aclnn UTest 用例及普通 UTest 用例共用的库;
-  2. 将 utest 及 utest_aclnn 路径下所有源文件分别编译成动态库, 在所有算子的动态库编译完成后,
-     在 OpsTestUt_AddLaunch 函数内链接这些对应动态库(_OpsTestUt_UTestCaseLibraries/_OpsTestUt_UTestAclnnCaseLibraries)
+  本函数提供编译算子对应 UTest 静态库 的功能.
+  1. 在 UTest 场景下, 本函数将会将 comm (可选) 编译成一个作为 aclnn UTest 用例及普通 UTest 用例共用的静态库;
+  2. 将 utest 及 utest_aclnn 路径下所有源文件分别编译成静态库, 在所有算子的静态库编译完成后,
+     在 OpsTestUt_AddLaunch 函数内链接这些对应静态库(_OpsTestUt_UTestCaseLibraries/_OpsTestUt_UTestAclnnCaseLibraries)
      并添加 GTest 所需的 main 函数, 统一编译成一个可执行程序;
 ]]
-function(OpsTest_Level1_AddUTestCaseShared)
+function(OpsTest_Level1_AddUTestCaseStatic)
     cmake_parse_arguments(
             TMP
             ""
@@ -474,7 +491,7 @@ function(OpsTest_Level1_AddUTestCaseShared)
     set(_Target_UTest_Common)
     if (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/comm)
         set(_Target_UTest_Common ${UTest_NamePrefix}_${TMP_BRIEF}_UTest_Common)
-        add_library(${_Target_UTest_Common} SHARED)
+        add_library(${_Target_UTest_Common} STATIC)
         if (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/comm/inc)
             aux_source_directory(${CMAKE_CURRENT_SOURCE_DIR}/comm/src _Common_Sources)
             target_sources(${_Target_UTest_Common} PRIVATE ${_Common_Sources})
@@ -495,12 +512,10 @@ function(OpsTest_Level1_AddUTestCaseShared)
                     ${_PrivateLinkLibraries}
                     ${TMP_UTEST_COMMON_PRIVATE_LINK_LIBRARIES_EXT}
         )
-        # 需要 dlopen 获取具体 Kernel 入口函数并执行, 故添加依赖
-        add_dependencies(${_Target_UTest_Common} ${_OpsTestUt_OpKernelLibraries})
     endif ()
     if (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/utest)
         set(_Target_UTest ${UTest_NamePrefix}_${TMP_BRIEF}_UTest_Case)
-        add_library(${_Target_UTest} SHARED)
+        add_library(${_Target_UTest} STATIC)
         file(GLOB_RECURSE _Src1 "${CMAKE_CURRENT_SOURCE_DIR}/utest/*.cc")
         file(GLOB_RECURSE _Src2 "${CMAKE_CURRENT_SOURCE_DIR}/utest/*.cpp")
         list(APPEND _UTest_Sources ${TMP_UTEST_SOURCES_EXT} ${_Src1} ${_Src2})
@@ -529,7 +544,7 @@ function(OpsTest_Level1_AddUTestCaseShared)
     endif ()
     if (EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/utest_aclnn)
         set(_Target_UTest_Aclnn ${UTest_NamePrefix}_${TMP_BRIEF}_UTest_Case_Aclnn)
-        add_library(${_Target_UTest_Aclnn} SHARED)
+        add_library(${_Target_UTest_Aclnn} STATIC)
         file(GLOB_RECURSE _Src1 "${CMAKE_CURRENT_SOURCE_DIR}/utest_aclnn/*.cc")
         file(GLOB_RECURSE _Src2 "${CMAKE_CURRENT_SOURCE_DIR}/utest_aclnn/*.cpp")
         list(APPEND _UTest_Aclnn_Sources ${TMP_UTEST_SOURCES_EXT} ${_Src1} ${_Src2})
@@ -558,7 +573,7 @@ function(OpsTest_Level1_AddUTestCaseShared)
     endif ()
 endfunction()
 
-# Level2, 添加算子 UTest 用例动态库 及其所需全部库(OpTiling.so, OpKernel.so 等)
+# Level2, 添加算子 UTest 用例动态库 及其所需全部库(OpTiling.so, OpKernel.a 等)
 #[[
 调用参数:
   one_value_keywords:
@@ -575,17 +590,17 @@ endfunction()
       TILING_SOURCES_EXT                        : 透传参数, 详情参见 OpsTest_Level1_AddOpTilingShared 函数说明
       TILING_PRIVATE_INCLUDES_EXT               : 透传参数, 详情参见 OpsTest_Level1_AddOpTilingShared 函数说明
       TILING_PRIVATE_LINK_LIBRARIES_EXT         : 透传参数, 详情参见 OpsTest_Level1_AddOpTilingShared 函数说明
-      KERNEL_SOURCES_EXT                        : 透传参数, 详情参见 OpsTest_Level1_AddOpKernelShared 函数说明
-      KERNEL_TILING_DATA_DEF_H                  : 透传参数, 详情参见 OpsTest_Level1_AddOpKernelShared 函数说明
-      KERNEL_PRIVATE_COMPILE_DEFINITIONS_EXT    : 透传参数, 详情参见 OpsTest_Level1_AddOpKernelShared 函数说明
-      UTEST_COMMON_PRIVATE_INCLUDES_EXT         : 透传参数, 详情参见 OpsTest_Level1_AddUTestCaseShared 函数说明
-      UTEST_COMMON_PRIVATE_LINK_LIBRARIES_EXT   : 透传参数, 详情参见 OpsTest_Level1_AddUTestCaseShared 函数说明
-      UTEST_SOURCES_EXT                         : 透传参数, 详情参见 OpsTest_Level1_AddUTestCaseShared 函数说明
-      UTEST_PRIVATE_INCLUDES_EXT                : 透传参数, 详情参见 OpsTest_Level1_AddUTestCaseShared 函数说明
-      UTEST_PRIVATE_LINK_LIBRARIES_EXT          : 透传参数, 详情参见 OpsTest_Level1_AddUTestCaseShared 函数说明
-      UTEST_ACLNN_SOURCES_EXT                   : 透传参数, 详情参见 OpsTest_Level1_AddUTestCaseShared 函数说明
-      UTEST_ACLNN_PRIVATE_INCLUDES_EXT          : 透传参数, 详情参见 OpsTest_Level1_AddUTestCaseShared 函数说明
-      UTEST_ACLNN_PRIVATE_LINK_LIBRARIES_EXT    : 透传参数, 详情参见 OpsTest_Level1_AddUTestCaseShared 函数说明
+      KERNEL_SOURCES_EXT                        : 透传参数, 详情参见 OpsTest_Level1_AddOpKernelStatic 函数说明
+      KERNEL_TILING_DATA_DEF_H                  : 透传参数, 详情参见 OpsTest_Level1_AddOpKernelStatic 函数说明
+      KERNEL_PRIVATE_COMPILE_DEFINITIONS_EXT    : 透传参数, 详情参见 OpsTest_Level1_AddOpKernelStatic 函数说明
+      UTEST_COMMON_PRIVATE_INCLUDES_EXT         : 透传参数, 详情参见 OpsTest_Level1_AddUTestCaseStatic 函数说明
+      UTEST_COMMON_PRIVATE_LINK_LIBRARIES_EXT   : 透传参数, 详情参见 OpsTest_Level1_AddUTestCaseStatic 函数说明
+      UTEST_SOURCES_EXT                         : 透传参数, 详情参见 OpsTest_Level1_AddUTestCaseStatic 函数说明
+      UTEST_PRIVATE_INCLUDES_EXT                : 透传参数, 详情参见 OpsTest_Level1_AddUTestCaseStatic 函数说明
+      UTEST_PRIVATE_LINK_LIBRARIES_EXT          : 透传参数, 详情参见 OpsTest_Level1_AddUTestCaseStatic 函数说明
+      UTEST_ACLNN_SOURCES_EXT                   : 透传参数, 详情参见 OpsTest_Level1_AddUTestCaseStatic 函数说明
+      UTEST_ACLNN_PRIVATE_INCLUDES_EXT          : 透传参数, 详情参见 OpsTest_Level1_AddUTestCaseStatic 函数说明
+      UTEST_ACLNN_PRIVATE_LINK_LIBRARIES_EXT    : 透传参数, 详情参见 OpsTest_Level1_AddUTestCaseStatic 函数说明
 ]]
 function(OpsTest_Level2_AddOp)
     cmake_parse_arguments(
@@ -621,7 +636,7 @@ function(OpsTest_Level2_AddOp)
             PRIVATE_INCLUDES_EXT        ${TMP_TILING_PRIVATE_INCLUDES_EXT}
             PRIVATE_LINK_LIBRARIES_EXT  ${TMP_TILING_PRIVATE_LINK_LIBRARIES_EXT}
     )
-    OpsTest_Level1_AddOpKernelShared(
+    OpsTest_Level1_AddOpKernelStatic(
             SUB_SYSTEM                       ${TMP_SUB_SYSTEM}
             BRIEF                            ${TMP_BRIEF}
             SNAKE                            ${TMP_SNAKE}
@@ -629,7 +644,7 @@ function(OpsTest_Level2_AddOp)
             TILING_DATA_DEF_H                ${TMP_KERNEL_TILING_DATA_DEF_H}
             PRIVATE_COMPILE_DEFINITIONS_EXT  ${TMP_KERNEL_PRIVATE_COMPILE_DEFINITIONS_EXT}
     )
-    OpsTest_Level1_AddUTestCaseShared(
+    OpsTest_Level1_AddUTestCaseStatic(
             BRIEF                                   ${TMP_BRIEF}
             SNAKE                                   ${TMP_SNAKE}
             UTEST_COMMON_PRIVATE_INCLUDES_EXT       ${TMP_UTEST_COMMON_PRIVATE_INCLUDES_EXT}
@@ -780,6 +795,7 @@ function(OpsTest_AddLaunch)
                     ${UTest_NamePrefix}_Stubs
                     ${UTest_NamePrefix}_Utils
                     ${_UTest_OpApiLibrary}   # 若算子在 UTest_{Op}_Common 内实现 Aclnn 相关执行逻辑, 则需要连接
+                    ${_OpsTestUt_OpKernelLibraries}  # 需要 dlsym 获取具体 Kernel 入口函数并执行, 故添加依赖
                     -Wl,--as-needed
                     -Wl,--no-whole-archive
                     c_sec
@@ -827,6 +843,7 @@ function(OpsTest_AddLaunch)
                     ${UTest_NamePrefix}_Stubs
                     ${UTest_NamePrefix}_Utils
                     ${_UTest_OpApiLibrary}
+                    ${_OpsTestUt_OpKernelLibraries}  # 当前各算子 common 内以 extern 方式声明 kernel 入口, 故添加依赖
                     -Wl,--as-needed
                     -Wl,--no-whole-archive
                     c_sec

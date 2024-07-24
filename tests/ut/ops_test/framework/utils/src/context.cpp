@@ -65,36 +65,18 @@ bool Context::SetTilingMaxDataSize(uint32_t size)
     return true;
 }
 
-bool Context::SetKernelSoRelPath(const char *relPath)
-{
-    if (relPath == nullptr) {
-        LOG_ERR("Kernel so relative path is null,");
-        return false;
-    }
-    Platform *platform = Platform::GetGlobalPlatform();
-    if (platform == nullptr) {
-        LOG_ERR("Can't get global platform.");
-        return false;
-    }
-    kernelSoAbsPath_ = std::string(platform->GetExeAbsPath()) + std::string(relPath);
-    return true;
-}
-
-bool Context::SetKernelFuncName(const char *funcName)
-{
-    if (funcName == nullptr) {
-        return false;
-    }
-    kernelFuncName_ = std::string(funcName);
-    return true;
-}
-
 bool Context::SetKernelRunCbf(KernelRunCbf cbf)
 {
     if (cbf == nullptr) {
         return false;
     }
     kernelRunCbf_ = cbf;
+    return true;
+}
+
+bool Context::SetKernelMainFunc(void *funcName)
+{
+    kernelMainFunc_ = funcName;
     return true;
 }
 
@@ -141,17 +123,16 @@ bool Context::RunKernelProcess()
     if (kernelRunCbf_ == nullptr) {
         return false;
     }
-    kernelSoHdl_ = Platform::LoadSo(kernelSoAbsPath_.c_str());
-    void *func = Platform::LoadSoSym(kernelSoHdl_, kernelFuncName_.c_str());
-    if (func == nullptr) {
-        LOG_ERR("Can't get KernelFunc[%s] from KernelSo[%p: %s]", kernelFuncName_.c_str(), kernelSoHdl_,
-                kernelSoAbsPath_.c_str());
+
+    if (kernelMainFunc_ == nullptr) {
+        LOG_ERR("Can't get KernelMainFunc");
         return false;
     }
+    // 调用回调函数, 触发具体算子 Kernel 执行
     ICPU_SET_TILING_KEY(tilingKey_);
-    LOG_DBG("[BGN] Run %s Kernel(%s) async, TilingKey=%lu, BlockDim=%ld", opName_.c_str(), kernelFuncName_.c_str(),
-            tilingKey_, tilingBlockDim_);
-    return kernelRunCbf_(func, tilingKey_, tilingBlockDim_, inputs_, outputs_, workspacePtr_, tilingData_.data());
+    LOG_DBG("[BGN] Run %s Kernel async, TilingKey=%lu, BlockDim=%ld", opName_.c_str(), tilingKey_, tilingBlockDim_);
+    return kernelRunCbf_(kernelMainFunc_, tilingKey_, tilingBlockDim_, inputs_, outputs_, workspacePtr_,
+                         tilingData_.data());
 }
 
 uint8_t *Context::AllocWorkspaceImpl(uint64_t size)
@@ -256,7 +237,7 @@ bool Context::ParseTilingResult()
     uint32_t hexByteSize = 2; // 16进制时使用2个字符表时一个Byte
     uint32_t tilingDataStrLen = tilingDataStr_.length();
     uint32_t tilingDataLen = tilingDataStrLen / hexByteSize;
-    uint32_t tilingDataAlignSize = 8;              // 要求 TilingData 8 字节对齐
+    uint32_t tilingDataAlignSize = 8; // 要求 TilingData 8 字节对齐
     uint32_t tilingDataRemainder = tilingDataStrLen % tilingDataAlignSize;
     if (tilingDataRemainder != 0 || tilingDataLen > tilingDataMaxLen_) {
         LOG_ERR("%s(TilingKey=%lu) TilingDataStrLen(%u) %% %u = %u != 0 || TilingDataLen(%u) > %u", opName_.c_str(),
@@ -318,8 +299,4 @@ void Context::Destroy()
         workspacePtr_ = nullptr;
     }
     workspaceSize_ = 0;
-
-    if (kernelSoHdl_ != nullptr) {
-        (void)Platform::UnLoadSo(kernelSoHdl_);
-    }
 }
