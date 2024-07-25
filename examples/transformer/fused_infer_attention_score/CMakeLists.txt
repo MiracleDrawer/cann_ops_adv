@@ -7,8 +7,6 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # ======================================================================================================================
 
-if (NOT "${ASCEND_COMPUTE_UNIT}" STREQUAL "ascend310p")
-
 add_executable(test_fused_infer_attention_score
         test_fused_infer_attention_score.cpp
 )
@@ -43,4 +41,3 @@ target_link_libraries(test_fused_infer_attention_score PRIVATE
 target_link_libraries(test_fused_infer_attention_score_v2 PRIVATE
     -lc_sec
 )
-endif()

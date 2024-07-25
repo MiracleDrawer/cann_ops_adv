@@ -77,7 +77,7 @@ cann-ops-adv，是基于昇腾硬件的融合算子库（adv表示advanced）。
 | FlashAttentionScoreGrad    | 完成FlashAttentionScore算子的反向计算。                      | <li>[FlashAttentionScoreGrad](./docs/FlashAttentionScoreGrad.md) <br/> <li>[FlashAttentionUnpaddingScoreGrad](./docs/FlashAttentionUnpaddingScoreGrad.md) |
 | FlashAttentionScoreV2      | 训练场景下，使用FlashAttention算法实现self-attention（自注意力）的计算。相较于FlashAttentionScore，新增psetype、q_start_idx、kv_start_idx参数。 | <li>[FlashAttentionScoreV2](./docs/FlashAttentionScoreV2.md)<br/> <li>[FlashAttentionVarLenScoreV2](./docs/FlashAttentionVarLenScoreV2.md) |
 | FlashAttentionScoreGradV2  | FlashAttentionScoreV2的反向计算，相较于FlashAttentionScoreGard，新增psetype、q_start_idx、kv_start_idx参数。 | <li>[FlashAttentionScoreGradV2](./docs/FlashAttentionScoreGradV2.md) <br/> <li>[FlashAttentionUnpaddingScoreGradV2](./docs/FlashAttentionUnpaddingScoreGradV2.md) |
-| FusedInferAttentionScore   | 融合PromptFlashAttentionV3，IncreFlashAttentionV4的功能 。<br/>IFA新增:  lse输出、per-token伪量化特性。<br/>PFA新增: lse输出、伪量化、左Padding特性。 | [FusedInferAttentionScores](./docs/FusedInferAttentionScore.md) |
+| FusedInferAttentionScore   | 融合PromptFlashAttentionV3，IncreFlashAttentionV4的功能 。<br/>IFA新增:  lse输出、per-token伪量化特性。<br/>PFA新增: lse输出、伪量化、左Padding特性。 | [FusedInferAttentionScore](./docs/FusedInferAttentionScore.md) |
 | FusedInferAttentionScoreV2 | 在FusedInferAttentionScore基础上， IFA 新增kv伪量化参数分离。 | [FusedInferAttentionScoreV2](./docs/FusedInferAttentionScoreV2.md) |
 | IncreFlashAttention        | 使用FlashAttention算法实现self-attention（自注意力）的计算。 | [IncreFlashAttention](./docs/IncreFlashAttention.md)         |
 | IncreFlashAttentionV2      | 在IncreFlashAttention基础上新增量化特性。                    | [IncreFlashAttentionV2](./docs/IncreFlashAttentionV2.md)     |
