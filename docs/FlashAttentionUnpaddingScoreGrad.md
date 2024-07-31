@@ -59,7 +59,7 @@ Atlas A2 训练系列产品
 
 每个算子分为[两段式接口](common/两段式接口.md)，必须先调用“aclnnFlashAttentionUnpaddingScoreGradGetWorkspaceSize”接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用“aclnnFlashAttentionUnpaddingScoreGrad”接口执行计算。
 
-- `aclnnStatus aclnnFlashAttentionUnpaddingScoreGradGetWorkspaceSize(const aclTensor* query, const aclTensor* keyIn, const aclTensor* value, const aclTensor* dy, const aclTensor* pseShiftOptional, const aclTensor* dropMaskOptional, const aclTensor* paddingMaskOptional, const aclTensor* attenMaskOptional, const aclTensor* softmaxMaxOptional, const aclTensor* softmaxSumOptional, const aclTensor* softmaxInOptional, const aclTensor* attentionInOptional, const aclIntArray* prefixOptional, const aclIntArray* actualSeqQLenOptional, const aclIntArray* actualSeqKvLenOptional, double scaleValueOptional, double keepProbOptional, int64_t preTockensOptional, int64_t nextTockensOptional, int64_t headNum, char* inputLayout, int64_t innerPreciseOptional, int64_t sparseModeOptional, const aclTensor* dqOut, const aclTensor* dkOut, const aclTensor* dvOut, const aclTensor* dpseOut, uint64_t* workspaceSize, aclOpExecutor** executor)`
+- `aclnnStatus aclnnFlashAttentionUnpaddingScoreGradGetWorkspaceSize(const aclTensor* query, const aclTensor* keyIn, const aclTensor* value, const aclTensor* dy, const aclTensor* pseShiftOptional, const aclTensor* dropMaskOptional, const aclTensor* paddingMaskOptional, const aclTensor* attenMaskOptional, const aclTensor* softmaxMaxOptional, const aclTensor* softmaxSumOptional, const aclTensor* softmaxInOptional, const aclTensor* attentionInOptional, const aclIntArray* prefixOptional, const aclIntArray* actualSeqQLenOptional, const aclIntArray* actualSeqKvLenOptional, double scaleValueOptional, double keepProbOptional, int64_t preTokensOptional, int64_t nextTokensOptional, int64_t headNum, char* inputLayout, int64_t innerPreciseOptional, int64_t sparseModeOptional, const aclTensor* dqOut, const aclTensor* dkOut, const aclTensor* dvOut, const aclTensor* dpseOut, uint64_t* workspaceSize, aclOpExecutor** executor)`
 - `aclnnStatus aclnnFlashAttentionUnpaddingScoreGrad(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream)`
 
 **说明**：
@@ -78,7 +78,7 @@ Atlas A2 训练系列产品
 
   - dy（aclTensor\*，计算输入）：Device侧的aclTensor，公式中的输入dY，数据类型支持、FLOAT16、BFLOAT16、FLOAT32，[数据格式](common/数据格式.md)支持ND。综合约束请见[约束与限制](#1)。
 
-  - pseShiftOptional（aclTensor\*，计算输入）：Device侧的aclTensor，公式中的输入pse，可选参数，表示位置编码。数据类型支持FLOAT16、BFLOAT16、FLOAT32，[数据格式](common/数据格式.md)支持ND，支持shape范围为\[B,N,H,S\]、\[1,N,H,S\]，H固定为1024。alibi位置编码场景，preTockensOptional和nextTockensOptional必须配置下三角，且Sq和Skv是等长的。
+  - pseShiftOptional（aclTensor\*，计算输入）：Device侧的aclTensor，公式中的输入pse，可选参数，表示位置编码。数据类型支持FLOAT16、BFLOAT16、FLOAT32，[数据格式](common/数据格式.md)支持ND，支持shape范围为\[B,N,H,S\]、\[1,N,H,S\]，H固定为1024。alibi位置编码场景，preTokensOptional和nextTokensOptional必须配置下三角，且Sq和Skv是等长的。
 
   - dropMaskOptional（aclTensor\*，计算输入）：Device侧的aclTensor，可选属性，数据类型支持UINT8，[数据格式](common/数据格式.md)支持ND，其shape和数据排布可表示为：
 
@@ -116,9 +116,9 @@ Atlas A2 训练系列产品
 
   - keepProbOptional（double，计算输入）：Host侧的double，可选参数，代表dropMaskOptional中1的比例，数据类型支持DOUBLE。综合约束请见[约束与限制](#1)。
 
-  - preTockensOptional（int64\_t，计算输入）：Host侧的int64\_t，用于稀疏计算的参数，可选参数，数据类型支持INT64。
+  - preTokensOptional（int64\_t，计算输入）：Host侧的int64\_t，用于稀疏计算的参数，可选参数，数据类型支持INT64。
 
-  - nextTockensOptional（int64\_t，计算输入）：Host侧的int64\_t，用于稀疏计算的参数，可选参数，数据类型支持INT64。
+  - nextTokensOptional（int64\_t，计算输入）：Host侧的int64\_t，用于稀疏计算的参数，可选参数，数据类型支持INT64。
 
   - headNum（int64\_t，计算输入）：Host侧的int64\_t，代表head个数，数据类型支持INT64。综合约束请见[约束与限制](#1)。
 
@@ -131,20 +131,20 @@ Atlas A2 训练系列产品
 
   - sparseModeOptional（int64\_t，计算输入）：Host侧的int，表示sparse的模式。数据类型支持INT64。
 
-    -   sparseModeOptional为0时，代表defaultMask模式，如果attenMaskOptional未传入则不做mask操作，忽略preTockensOptional和nextTockensOptional\(内部赋值为INT\_MAX\)；如果传入，则需要传入完整的attenMaskOptional矩阵（S1Max \* S2Max），表示preTockensOptional和nextTockensOptional之间的部分需要计算。
+    -   sparseModeOptional为0时，代表defaultMask模式，如果attenMaskOptional未传入则不做mask操作，忽略preTokensOptional和nextTokensOptional\(内部赋值为INT\_MAX\)；如果传入，则需要传入完整的attenMaskOptional矩阵（S1Max \* S2Max），表示preTokensOptional和nextTokensOptional之间的部分需要计算。
     -   sparseModeOptional为1时，代表allMask，即传入完整的attenMaskOptional矩阵。
     -   sparseModeOptional为2时，代表leftUpCausal模式的mask，对应以左顶点为划分的下三角场景，需要传入优化后的attenMaskOptional矩阵（2048\*2048）。
     -   sparseModeOptional为3时，代表rightDownCausal模式的mask，对应以右下顶点为划分的下三角场景，需要传入优化后的attenMaskOptional矩阵（2048\*2048）。
-    -   sparseModeOptional为4时，代表band场景，即计算preTockensOptional和nextTockensOptional之间的部分。
+    -   sparseModeOptional为4时，代表band场景，即计算preTokensOptional和nextTokensOptional之间的部分。
     -   sparseModeOptional为5时，**不支持**。
     -   sparseModeOptional为6时，代表prefix压缩场景，需要传入shape为\[3072, 2048\]的attenMaskOptional矩阵；分为两部分：其中上半部分为\[2048, 2048\]的下三角矩阵；下半部分为\[1024, 2048\]的矩阵，矩形矩阵左半部分全0，右半部分全1。0代表保留，1代表掩掉。
-    -   sparseModeOptional为7时，代表rightDownCausal_Band场景，该场景由长序列外切产生，需要正确配置preTockensOptional和nextTockensOptional参数；传入shape为\[2048, 2048\]的下三角attenMaskOptional矩阵。
-    -   sparseModeOptional为8时，代表band_LeftUpCausal场景，该场景由长序列外切产生，需要正确配置preTockensOptional和nextTockensOptional参数；传入shape为\[2048, 2048\]的下三角attenMaskOptional矩阵。
+    -   sparseModeOptional为7时，代表rightDownCausal_Band场景，该场景由长序列外切产生，需要正确配置preTokensOptional和nextTokensOptional参数；传入shape为\[2048, 2048\]的下三角attenMaskOptional矩阵。
+    -   sparseModeOptional为8时，代表band_LeftUpCausal场景，该场景由长序列外切产生，需要正确配置preTokensOptional和nextTokensOptional参数；传入shape为\[2048, 2048\]的下三角attenMaskOptional矩阵。
 
     用户不特意指定时可传入默认值0。sparse不同模式的详细说明请参见[sparse模式说明](./common/sparse_mode参数说明.md)。
 
     **说明：**
-    当所有的attenMaskOptional的shape小于2048且相同的时候，建议使用default模式，来减少内存使用量；sparseModeOptional配置为1、2、3、5、6时，用户配置的preTockensOptional、nextTockensOptional不会生效；sparse\_mode配置为0、4时，须保证attenMaskOptional与preTockensOptional、nextTockensOptional的范围一致。
+    当所有的attenMaskOptional的shape小于2048且相同的时候，建议使用default模式，来减少内存使用量；sparseModeOptional配置为1、2、3、5、6时，用户配置的preTokensOptional、nextTokensOptional不会生效；sparse\_mode配置为0、4时，须保证attenMaskOptional与preTokensOptional、nextTokensOptional的范围一致。
 
   - workspaceSize（uint64\_t\*，出参）：返回用户需要在Device侧申请的workspace大小。
 
@@ -412,8 +412,8 @@ REG_OP(FlashAttentionScoreGrad)
     aclIntArray* acSeqKvLen = aclCreateIntArray(acSeqKvLenOp.data(), acSeqKvLenOp.size());
     double scaleValue = 0.088388;
     double keepProb = 1;
-    int64_t preTockens = 65536;
-    int64_t nextTockens = 65536;
+    int64_t preTokens = 65536;
+    int64_t nextTokens = 65536;
     int64_t headNum = 1;
     int64_t innerPrecise = 0;
     int64_t sparseMod = 0;
@@ -427,7 +427,7 @@ REG_OP(FlashAttentionScoreGrad)
     // 调用aclnnFlashAttentionUnpaddingScoreGrad第一段接口
     ret = aclnnFlashAttentionUnpaddingScoreGradGetWorkspaceSize(q, k, v, dx, pse, dropMask, padding,
               attenmask, softmaxMax, softmaxSum, softmaxIn, attentionIn, prefix, acSeqQLen, acSeqKvLen,
-              scaleValue, keepProb, preTockens, nextTockens, headNum, layOut, innerPrecise, sparseMod,
+              scaleValue, keepProb, preTokens, nextTokens, headNum, layOut, innerPrecise, sparseMod,
               dq, dk, dv, dpse, &workspaceSize, &executor);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnFlashAttentionUnpaddingScoreGradGetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
     

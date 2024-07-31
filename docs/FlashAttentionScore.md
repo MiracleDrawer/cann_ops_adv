@@ -43,7 +43,7 @@ Atlas A2 训练系列产品
 
 每个算子分为[两段式接口](common/两段式接口.md)，必须先调用“aclnnFlashAttentionScoreGetWorkspaceSize”接口获取计算所需workspace大小以及包含了算子计算流程的执行器，再调用“aclnnFlashAttentionScore”接口执行计算。
 
-* `aclnnStatus aclnnFlashAttentionScoreGetWorkspaceSize(const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *realShiftOptional, const aclTensor *dropMaskOptional, const aclTensor *paddingMaskOptional, const aclTensor *attenMaskOptional, const aclIntArray *prefixOptional, double scaleValueOptional, double keepProbOptional, int64_t preTockensOptional, int64_t nextTockensOptional, int64_t headNum, char *inputLayout, int64_t innerPreciseOptional, int64_t sparseModeOptional, const aclTensor *softmaxMaxOut, const aclTensor *softmaxSumOut, const aclTensor *softmaxOutOut, const aclTensor *attentionOutOut, uint64_t *workspaceSize, aclOpExecutor **executor)`
+* `aclnnStatus aclnnFlashAttentionScoreGetWorkspaceSize(const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *realShiftOptional, const aclTensor *dropMaskOptional, const aclTensor *paddingMaskOptional, const aclTensor *attenMaskOptional, const aclIntArray *prefixOptional, double scaleValueOptional, double keepProbOptional, int64_t preTokensOptional, int64_t nextTokensOptional, int64_t headNum, char *inputLayout, int64_t innerPreciseOptional, int64_t sparseModeOptional, const aclTensor *softmaxMaxOut, const aclTensor *softmaxSumOut, const aclTensor *softmaxOutOut, const aclTensor *attentionOutOut, uint64_t *workspaceSize, aclOpExecutor **executor)`
 * `aclnnStatus aclnnFlashAttentionScore(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, const aclrtStream stream)`
 
 **说明**：
@@ -79,9 +79,9 @@ Atlas A2 训练系列产品
 
   - keepProbOptional（double，计算输入）：Host侧的double，可选参数，代表dropMaskOptional中1的比例，数据类型支持DOUBLE；综合约束请见[约束与限制](#1)。
 
-  - preTockensOptional（int64\_t，计算输入）：Host侧的int64_t，可选参数，用于稀疏计算 ，表示slides window的左边界，数据类型支持INT64；综合约束请见[约束与限制](#1)。
+  - preTokensOptional（int64\_t，计算输入）：Host侧的int64_t，可选参数，用于稀疏计算 ，表示slides window的左边界，数据类型支持INT64；综合约束请见[约束与限制](#1)。
 
-  - nextTockensOptional（int64\_t，计算输入）：Host侧的int64_t，可选参数，用于稀疏计算，表示slides window的右边界，数据类型支持INT64；综合约束请见[约束与限制](#1)。
+  - nextTokensOptional（int64\_t，计算输入）：Host侧的int64_t，可选参数，用于稀疏计算，表示slides window的右边界，数据类型支持INT64；综合约束请见[约束与限制](#1)。
 
   - headNum（int64\_t，计算输入）：Host侧的int64_t，代表单卡的head个数，即输入query的N轴长度，数据类型支持INT64；综合约束请见[约束与限制](#1)。
 
@@ -149,9 +149,9 @@ Atlas A2 训练系列产品
 - 部分场景下，如果计算量过大可能会导致算子执行超时(aicore error类型报错，errorStr为：timeout or trap error)，此时建议做轴切分处理，注：这里的计算量会受B、S、N、D等参数的影响，值越大计算量越大。
 - keepProbOptional的取值范围为(0, 1]。
 - prefixOptional稀疏计算场景即sparseModeOptional=5或者sparseModeOptional=6，当Sq > Skv时，prefix的N值取值范围\[0, Skv\]，当Sq <= Skv时，prefix的N值取值范围\[Skv-Sq, Skv\]。
-- band场景，preTockensOptional和nextTockensOptional之间必须要有交集。
-- sparseModeOptional配置为1、2、3、5、6时，用户配置的preTockensOptional、nextTockensOptional不会生效；sparseModeOptional配置为0、4时，须保证attenMaskOptional与preTockensOptional、nextTockensOptional的范围一致。
-- sparseModeOptional为1、2、3、4、5、6时，应传入对应正确的attenMaskOptional，否则将导致计算结果错误。当attenMaskOptional输入为None时，sparseModeOptional、preTockensOptional、nextTockensOptional参数不生效，固定为全计算。
+- band场景，preTokensOptional和nextTokensOptional之间必须要有交集。
+- sparseModeOptional配置为1、2、3、5、6时，用户配置的preTokensOptional、nextTokensOptional不会生效；sparseModeOptional配置为0、4时，须保证attenMaskOptional与preTokensOptional、nextTokensOptional的范围一致。
+- sparseModeOptional为1、2、3、4、5、6时，应传入对应正确的attenMaskOptional，否则将导致计算结果错误。当attenMaskOptional输入为None时，sparseModeOptional、preTokensOptional、nextTokensOptional参数不生效，固定为全计算。
 - realShiftOptional Sq大于1024时如果配置BNHS、1NHS，需要Sq和Skv等长。
 ## 算子原型
 
@@ -337,8 +337,8 @@ REG_OP(FlashAttentionScore)
     aclIntArray *prefix = aclCreateIntArray(prefixOp.data(), 1);
     double scaleValue = 0.088388;
     double keepProb = 1;
-    int64_t preTockens = 65536;
-    int64_t nextTockens = 65536;
+    int64_t preTokens = 65536;
+    int64_t nextTokens = 65536;
     int64_t headNum = 1;
     int64_t innerPrecise = 0;
     int64_t sparseMod = 0;
@@ -352,7 +352,7 @@ REG_OP(FlashAttentionScore)
     // 调用aclnnFlashAttentionScore第一段接口
     ret = aclnnFlashAttentionScoreGetWorkspaceSize(
               q, k, v, pse, dropMask, padding, attenmask, prefix, scaleValue,
-              keepProb, preTockens, nextTockens, headNum, layOut, innerPrecise,
+              keepProb, preTokens, nextTokens, headNum, layOut, innerPrecise,
               sparseMod, softmaxMax, softmaxSum, softmaxOut, attentionOut, &workspaceSize, &executor);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnFlashAttentionScoreGetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
     
