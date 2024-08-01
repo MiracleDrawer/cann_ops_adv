@@ -19,7 +19,7 @@ add_executable(test_ffn_v3
         test_ffn_v3.cpp
 )
 
-if (NOT "${ASCEND_COMPUTE_UNIT}" STREQUAL "ascend310p")
+if (_SocName MATCHES ascend910b*)
         add_execute_example(
                 TARGET_NAME test_ffn
                 SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/run_ffn_case.sh
