@@ -20,7 +20,7 @@ class Ts_Fag_Ascend910B2_PseInnerGenerate : public Ts_Fag_WithParam_Ascend910B2 
 TEST_P(Ts_Fag_Ascend910B2_PseInnerGenerate, Tc_Fag_PseInnerGenerate_Case)
 {
     ASSERT_TRUE(case_->Init());
-    ASSERT_EQ(case_->Run(), case_->reverse.exp.success);
+    ASSERT_EQ(case_->Run(), case_->mReverse.mExp.mSuccess);
 }
 
 const auto Tc_Fag_PseInnerGenerate_Case = ::testing::Values(
@@ -346,6 +346,29 @@ const auto Tc_Fag_PseInnerGenerate_Case = ::testing::Values(
                     {1},                                            /* qStartIdxTensorData */
                     {2}),                                           /* kvStartIdxTensorData */
             FagCase::kTemplatePriority_Ubngs1s2_Bb                  /* TilingTemplatePriority */
+            ),
+    FagCase("Fag_PseInnerGenerate_Case_014", true,                  /* CaseName, Enable */
+            "",                                                     /* DebugInfo */
+            OpInfo(ControlInfo(true, false, false),                 /* RunTiling, RunKernel, Deterministic */
+                   ExpectInfo(true,                                 /* ExpectSuccess */
+                              ExpectInfo::kInvalidTilingKey,        /* ExpectTilingKey */
+                              ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
+            FaParam(2, 30, 1, 33, 33, 72,                           /* B, N2, G, S1, S2, D */
+                    ge::DataType::DT_FLOAT16, LayoutType::TND,      /* Dtype, Layout */
+                    0.08838f, 1.0f, 65536, 0,                       /* Scale, KeepProb, PreTokens, NxtTokens */
+                    0, 0, 1,                                        /* InnerPrecise, Sparsemode, pseType */
+                    PseShapeType::NONE,                             /* PseShapeType */
+                    DropMaskShapeType::B_N1_S1_S2,                  /* DropMaskShapeType */
+                    PaddingMaskShapeType::NONE,                     /* PaddingMaskShapeType */
+                    AttenMaskShapeType::S1_S2,                      /* AttentionMaskShapeType*/
+                    ge::DataType::DT_BOOL,                          /* AttentionMaskDtype*/
+                    PrefixShapeType::NONE,                          /* PrefixShapeType */
+                    {},                                             /* PrefixTensorData */
+                    {15, 15},                                       /* ActualSeqQTensorData */
+                    {15, 15},                                       /* ActualSeqKVTensorData */
+                    {1},                                            /* qStartIdxTensorData */
+                    {2}),                                           /* kvStartIdxTensorData */
+            FagCase::kTemplatePriority_Us1s2_Bbn2gs1s2              /* TilingTemplatePriority */
             )
 
 );

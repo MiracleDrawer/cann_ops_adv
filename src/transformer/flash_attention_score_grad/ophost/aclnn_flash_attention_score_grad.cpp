@@ -33,6 +33,13 @@ using namespace op;
 extern "C" {
 #endif
 
+#define CHECK_SCALAR_TENSOR(condition)                                                                                             \
+    do {                                                                                                                           \
+        if (condition) {                                                                                                           \
+            OP_LOGW("There is a scalar tensor in the input optional parameters, and we will treat this input parameter as null."); \
+        }                                                                                                                          \
+    } while (0)
+
 typedef struct FagInShapeInfoS {
     int64_t n1Dim;
     int64_t n2Dim;
@@ -86,16 +93,19 @@ bool CheckIsNeedPad(const FagInShapeInfo &fagShape)
 }
 
 static aclnnStatus InvalidTensorDimCheck(const aclTensor *query, const aclTensor *key, const aclTensor *value,
-                                         const aclTensor *dq, const aclTensor *dk, const aclTensor *dv)
+                                         const aclTensor *dy, const aclTensor *attentionIn, const aclTensor *dq,
+                                         const aclTensor *dk, const aclTensor *dv)
 {
     auto queryDimNum = query->GetViewShape().GetDimNum();
     auto keyDimNum = key->GetViewShape().GetDimNum();
     auto valueDimNum = value->GetViewShape().GetDimNum();
+    auto dyDimNum = dy->GetViewShape().GetDimNum();
+    auto attentionInDimNum = attentionIn->GetViewShape().GetDimNum();
     auto dqDimNum = dq->GetViewShape().GetDimNum();
     auto dkDimNum = dk->GetViewShape().GetDimNum();
     auto dvDimNum = dv->GetViewShape().GetDimNum();
-    if (queryDimNum < MIN_DIM || keyDimNum < MIN_DIM || valueDimNum < MIN_DIM || dqDimNum < MIN_DIM ||
-        dkDimNum < MIN_DIM || dvDimNum < MIN_DIM) {
+    if (queryDimNum < MIN_DIM || keyDimNum < MIN_DIM || valueDimNum < MIN_DIM || dyDimNum < MIN_DIM ||
+        attentionInDimNum < MIN_DIM || dqDimNum < MIN_DIM || dkDimNum < MIN_DIM || dvDimNum < MIN_DIM) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The input or output of FAG does not support tensors with dim less than 3.");
         return ACLNN_ERR_PARAM_INVALID;
     }
@@ -127,8 +137,11 @@ static aclnnStatus GetInputShapeInfo(const aclTensor *query, const aclTensor *ke
         fagShape.dDim = queryShape.GetDim(2);  // 2:d
         fagShape.n1Dim = queryShape.GetDim(1); // 1:n1
         fagShape.n2Dim = kvShape.GetDim(1);    // 1:n2
-    } else {
+    } else if (queryShape.GetDimNum() > MIN_DIM) {
         fagShape.dDim = queryShape.GetDim(3); // 3:d
+    } else {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The dimension of the tensor whose input is BNSD/BSND is less than 4.");
+        return ACLNN_ERR_PARAM_INVALID;
     }
 
     if (fagShape.inputLayoutStr == "BSND") { // stride is N * D
@@ -172,6 +185,9 @@ static inline aclnnStatus ContiguousTensorWithCheck(const aclTensor *inputTensor
         *outTensor = l0op::Contiguous(inputTensor, executor);
         CHECK_RET(*outTensor != nullptr, ACLNN_ERR_INNER_NULLPTR);
     }
+
+    // 输入入参如果是标量tensor，将会按照此可选输入为null处理 ;
+    CHECK_SCALAR_TENSOR(inputTensor != nullptr && inputTensor->GetViewShape().GetDimNum() == 0);
 
     return ACLNN_SUCCESS;
 }
@@ -676,8 +692,8 @@ static aclnnStatus FlashAttentionScoreGradGetWorkspace(
     char *inputLayout, int64_t innerPreciseOptional, int64_t sparseModeOptional, const aclTensor* dqOut,
     const aclTensor *dkOut, const aclTensor *dvOut, const aclTensor *dpseOut, uint64_t *workspaceSize,
     aclOpExecutor *executor) {
-    // 检查tensor是否是标量tensor
-    auto ret = InvalidTensorDimCheck(query, key, value, dqOut, dkOut, dvOut);
+    // 检查tensor维度是否大于2
+    auto ret = InvalidTensorDimCheck(query, key, value, dy, attentionInOptional, dqOut, dkOut, dvOut);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
     // 获取基本参数
     FagInShapeInfo fagShape;
@@ -753,12 +769,17 @@ aclnnStatus aclnnFlashAttentionScoreGradGetWorkspaceSize(
     // 固定写法，创建OpExecutor
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
+
     CHECK_RET(query != nullptr, ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(keyIn != nullptr, ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(value != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(dy != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(attentionInOptional != nullptr, ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(dqOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(dkOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(dvOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(workspaceSize != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(executor != nullptr, ACLNN_ERR_INNER_NULLPTR);
     // 空Tensor处理
     if (dqOut->IsEmpty() && dkOut->IsEmpty() && dvOut->IsEmpty()) {
         if (dpseOut == nullptr || dpseOut->IsEmpty()) {
@@ -828,9 +849,13 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradGetWorkspaceSize(
     CHECK_RET(query != nullptr, ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(keyIn != nullptr, ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(value != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(dy != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(attentionInOptional != nullptr, ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(dqOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(dkOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(dvOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(workspaceSize != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(executor != nullptr, ACLNN_ERR_INNER_NULLPTR);
     if (dqOut->IsEmpty() && dkOut->IsEmpty() && dvOut->IsEmpty()) {
         if (dpseOut == nullptr || dpseOut->IsEmpty()) {
             OP_LOGD("All out tensor is empty");
@@ -881,8 +906,8 @@ static aclnnStatus FlashAttentionScoreGradV2GetWorkspace(
     char *inputLayout, int64_t innerPreciseOptional, int64_t sparseModeOptional, int64_t pseTypeOptional,
     const aclTensor *dqOut, const aclTensor *dkOut, const aclTensor *dvOut, const aclTensor *dpseOut,
     uint64_t *workspaceSize, aclOpExecutor *executor) {
-    // 检查tensor是否是标量tensor
-    auto ret = InvalidTensorDimCheck(query, key, value, dqOut, dkOut, dvOut);
+    // 检查tensor维度是否大于2
+    auto ret = InvalidTensorDimCheck(query, key, value, dy, attentionInOptional, dqOut, dkOut, dvOut);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
     // 获取基本参数
     FagInShapeInfo fagShape;
@@ -964,9 +989,13 @@ aclnnStatus aclnnFlashAttentionScoreGradV2GetWorkspaceSize(
     CHECK_RET(query != nullptr, ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(keyIn != nullptr, ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(value != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(dy != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(attentionInOptional != nullptr, ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(dqOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(dkOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(dvOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(workspaceSize != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(executor != nullptr, ACLNN_ERR_INNER_NULLPTR);
     if (dqOut->IsEmpty() && dkOut->IsEmpty() && dvOut->IsEmpty()) {
         if (dpseOut == nullptr || dpseOut->IsEmpty()) {
             OP_LOGD("All out tensor is empty");
@@ -1036,9 +1065,13 @@ aclnnStatus aclnnFlashAttentionUnpaddingScoreGradV2GetWorkspaceSize(
     CHECK_RET(query != nullptr, ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(keyIn != nullptr, ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(value != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(dy != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(attentionInOptional != nullptr, ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(dqOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(dkOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(dvOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(workspaceSize != nullptr, ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(executor != nullptr, ACLNN_ERR_INNER_NULLPTR);
     if (dqOut->IsEmpty() && dkOut->IsEmpty() && dvOut->IsEmpty()) {
         if (dpseOut == nullptr || dpseOut->IsEmpty()) {
             OP_LOGD("All out tensor is empty");

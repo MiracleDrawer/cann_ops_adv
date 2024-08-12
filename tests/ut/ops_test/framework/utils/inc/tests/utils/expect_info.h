@@ -30,17 +30,17 @@ public:
     /**
      * 期望该用例成功
      */
-    bool success = true;
+    bool mSuccess = true;
 
     /**
      * 期望 TilingKey 取值
      */
-    uint64_t tilingKey = kInvalidTilingKey;
+    uint64_t mTilingKey = kInvalidTilingKey;
 
     /**
      * 期望 TilingBlockDim 取值
      */
-    int64_t tilingBlockDim = kInvalidTilingBlockDim;
+    int64_t mTilingBlockDim = kInvalidTilingBlockDim;
 
 public:
     ExpectInfo() = default;

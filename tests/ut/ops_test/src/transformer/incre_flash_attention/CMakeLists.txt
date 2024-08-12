@@ -28,10 +28,11 @@ set(_IFA_TargetPrivateLinkLibrariesExt
 aux_source_directory(${CMAKE_SOURCE_DIR}/src/transformer/incre_flash_attention _IFA_KernelSourcesExt)
 
 OpsTest_Level2_AddOp(
-         BRIEF                                         Ifa
-         SNAKE                                         incre_flash_attention
-         KERNEL_TILING_DATA_DEF_H                      ${_IFA_KernelTilingDataDefH}
-         KERNEL_SOURCES_EXT                            ${_IFA_KernelSourcesExt}
-         TILING_SOURCES_EXT                            ${_IFA_TilingSourcesExt}
-         UTEST_COMMON_PRIVATE_LINK_LIBRARIES_EXT       ${_IFA_TargetPrivateLinkLibrariesExt}
+        SUB_SYSTEM                              transformer
+        BRIEF                                   Ifa
+        SNAKE                                   incre_flash_attention
+        KERNEL_TILING_DATA_DEF_H                ${_IFA_KernelTilingDataDefH}
+        KERNEL_SOURCES_EXT                      ${_IFA_KernelSourcesExt}
+        TILING_SOURCES_EXT                      ${_IFA_TilingSourcesExt}
+        UTEST_COMMON_PRIVATE_LINK_LIBRARIES_EXT ${_IFA_TargetPrivateLinkLibrariesExt}
 )

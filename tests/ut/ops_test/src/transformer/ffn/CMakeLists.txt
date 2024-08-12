@@ -55,6 +55,7 @@ set(_FFN_TargetPrivateLinkLibrariesExt
 )
 
 OpsTest_Level2_AddOp(
+        SUB_SYSTEM                              transformer
         BRIEF                                   FFN
         SNAKE                                   ffn
         OPAPI_SOURCES_EXT                       ${_FFN_OpApiSourcesExt}

@@ -26,70 +26,71 @@
 
 namespace ops::adv::tests::pfa {
 class PfaCase : public ops::adv::tests::utils::Case {
-  using OpInfo = ops::adv::tests::utils::OpInfo;
-  using Context = ops::adv::tests::utils::Context;
-  using Tensor = ops::adv::tests::utils::Tensor;
- public:
-  enum class PseShiftShapeType {
-    NONE,
-    B_1_N_S,
-    _1_N_1_S
-  };
-  enum class AttenMaskShapeType {
-    NONE,
-    B_N_1_S,
-    B_1_S,
-  };
+    using OpInfo = ops::adv::tests::utils::OpInfo;
+    using Context = ops::adv::tests::utils::Context;
+    using Tensor = ops::adv::tests::utils::Tensor;
 
-  enum class QuantShapeType {
-    NONE,
-    PER_1,
-    POST_1,
-    ALL_1,
-  };
+public:
+    enum class PseShiftShapeType {
+        NONE,
+        B_1_N_S,
+        _1_N_1_S
+    };
+    enum class AttenMaskShapeType {
+        NONE,
+        B_N_1_S,
+        B_1_S,
+    };
 
-  class Param {
-   public:
-    int64_t b = 0;
-    int64_t n = 0;
-    int64_t s = 0;
-    int64_t d = 0;
-    std::string layout = "BSH";
-    int64_t numHeads = 1;
-    int64_t kvNumHeads = 0;
-    float scaleValue = 1.0f;
-    int64_t blockSize = 0;
-    int64_t innerPrecise = 1;
-    int64_t sparseMode = 0;
-    int64_t preTokens = 524288;
-    int64_t nextTokens = 0;
-    ge::DataType qDataType = ge::DataType::DT_FLOAT16;
-    ge::DataType kvDataType = ge::DataType::DT_FLOAT16;
-    ge::DataType outDataType = ge::DataType::DT_FLOAT16;
-    PseShiftShapeType pseShiftType = PseShiftShapeType::NONE;
-    AttenMaskShapeType attenMaskType = AttenMaskShapeType::NONE;
-    QuantShapeType quantType = QuantShapeType::NONE;
-    std::vector<int64_t> actualSeqLength = {};
-    std::vector<int64_t> actualSeqLengthKV = {};
-    Param();
-    Param(int64_t b, int64_t n, int64_t s, int64_t d, std::string layout, int64_t numHeads,
-          int64_t kvNumHeads, float scaleValue, int64_t blockSize, int64_t innerPrecise,
-          int64_t sparseMode, int64_t preTokens, int64_t nextTokens);
-  };
+    enum class QuantShapeType {
+        NONE,
+        PER_1,
+        POST_1,
+        ALL_1,
+    };
+
+    class Param {
+    public:
+        int64_t b = 0;
+        int64_t n = 0;
+        int64_t s = 0;
+        int64_t d = 0;
+        std::string layout = "BSH";
+        int64_t numHeads = 1;
+        int64_t kvNumHeads = 0;
+        float scaleValue = 1.0f;
+        int64_t blockSize = 0;
+        int64_t innerPrecise = 1;
+        int64_t sparseMode = 0;
+        int64_t preTokens = 524288;
+        int64_t nextTokens = 0;
+        ge::DataType qDataType = ge::DataType::DT_FLOAT16;
+        ge::DataType kvDataType = ge::DataType::DT_FLOAT16;
+        ge::DataType outDataType = ge::DataType::DT_FLOAT16;
+        PseShiftShapeType pseShiftType = PseShiftShapeType::NONE;
+        AttenMaskShapeType attenMaskType = AttenMaskShapeType::NONE;
+        QuantShapeType quantType = QuantShapeType::NONE;
+        std::vector<int64_t> actualSeqLength = {};
+        std::vector<int64_t> actualSeqLengthKV = {};
+        Param();
+        Param(int64_t pB, int64_t pN, int64_t pS, int64_t pD, std::string pLayout, int64_t pNumHeads,
+              int64_t pKvNumHeads, float pScaleValue, int64_t pBlockSize, int64_t pInnerPrecise, int64_t pSparseMode,
+              int64_t pPreTokens, int64_t pNextTokens);
+    };
 
 
-  int64_t h;
-  Tensor query, key, value, pseShift, attenMask, actualSeqLengths, actualSeqLengthsKV,
-      deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, attentionOut;
-  OpInfo prompt;
-  Context promptCtx;
-  Param param;
-  PfaCase();
-  PfaCase(const char* name, bool enable, const char* dbgInfo, OpInfo prompt, Param param);
-  bool Run() override;
-  bool InitParam() override;
-  bool InitOpInfo() override;
-  bool InitCurrentCasePtr() override;
+    int64_t h;
+    Tensor query, key, value, pseShift, attenMask, actualSeqLengths, actualSeqLengthsKV, deqScale1, quantScale1,
+        deqScale2, quantScale2, quantOffset2, attentionOut;
+    OpInfo mOpInfo;
+    Context mCtx;
+    Param mParam;
+    PfaCase();
+    PfaCase(const char *name, bool enable, const char *dbgInfo, OpInfo mOpInfo, Param param);
+    bool Run() override;
+    bool InitParam() override;
+    bool InitOpInfo() override;
+    bool InitCurrentCasePtr() override;
 };
 
-}  // namespace ops::adv::tests::pfa
+} // namespace ops::adv::tests::pfa

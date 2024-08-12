@@ -19,6 +19,7 @@
 #include "kernel_operator.h"
 
 using AscendC::CopyRepeatParams;
+using AscendC::DataCopyExtParams;
 using AscendC::DataCopyParams;
 using AscendC::GetBlockIdx;
 using AscendC::GlobalTensor;
@@ -44,6 +45,7 @@ public:
     __aicore__ inline void NZVecClc(GlobalTensor<float> srcGm, GlobalTensor<OUT_TYPE> dstGm, uint64_t dataSize,
                                     GM_ADDR seqS, int64_t curG, int64_t &curS, bool needMuls);
     __aicore__ inline void NZProcess();
+    __aicore__ inline void ComputeDataCopyOffset(int64_t curG, int64_t &curS);
 
     constexpr static uint32_t BUFFER_NUM = 1;
     TPipe *pipe;
@@ -106,6 +108,7 @@ public:
     uint64_t dstOffsetBase = 0;
     uint64_t copyInSrcOffset = 0;
     uint64_t copyOutDstOffset = 0;
+    uint64_t copyOutDstStride = 0;
 };
 
 template <typename OUT_TYPE, typename TILING_TYPE, const bool CAST_DV, const uint32_t LAYOUT,
@@ -140,12 +143,12 @@ __aicore__ inline void FlashAttentionScoreGradPost<OUT_TYPE, TILING_TYPE, CAST_D
     kvSizeAlign = tilingData->postTilingData.kvSizeAlign;
 
     if constexpr (INPUT_FORMAT == NZ) {
-        b = tilingData->s1s2BNGS1S2BaseParams.b;
-        n2 = tilingData->s1s2BNGS1S2BaseParams.n2;
-        g = tilingData->s1s2BNGS1S2BaseParams.g;
-        s1 = tilingData->s1s2BNGS1S2BaseParams.s1;
-        s2 = tilingData->s1s2BNGS1S2BaseParams.s2;
-        d = tilingData->s1s2BNGS1S2BaseParams.d;
+        b = tilingData->postTilingData.b;
+        n2 = tilingData->postTilingData.n2;
+        g = tilingData->postTilingData.g;
+        s1 = tilingData->postTilingData.s1;
+        s2 = tilingData->postTilingData.s2;
+        d = tilingData->postTilingData.d;
         dAlign = (d + 15) / 16 * 16;
         actual_seq_qlen_addr = actual_seq_qlen;
         actual_seq_kvlen_addr = actual_seq_kvlen;
@@ -195,10 +198,35 @@ __aicore__ inline void FlashAttentionScoreGradPost<OUT_TYPE, TILING_TYPE, CAST_D
         copyOutDstOffset = dstOffsetBase + (sIdx * n2 * curG + nIdx) * d;
     } else { // 补充offset 计算
         bIdx = startIdx / (n2 * curG * curS * d);
-        uint64_t bTail = startIdx % (n2 * g * curS * d);
-        nIdx = bTail / (s1 * d);
+        uint64_t bTail = startIdx % (n2 * curG * curS * d);
+        nIdx = bTail / (curS * d);
         uint64_t nTail = bTail % (curS * d);
         sIdx = nTail / d;
+        ComputeDataCopyOffset(curG, curS);
+    }
+}
+
+
+template <typename OUT_TYPE, typename TILING_TYPE, const bool CAST_DV, const uint32_t LAYOUT,
+          const uint32_t INPUT_FORMAT>
+__aicore__ inline void FlashAttentionScoreGradPost<OUT_TYPE, TILING_TYPE, CAST_DV, LAYOUT, INPUT_FORMAT>::ComputeDataCopyOffset(int64_t curG, int64_t &curS)
+{
+    // src BNSD
+    scrOffsetBase = bIdx * n2 * curS * curG * dAlign;
+    copyInSrcOffset = scrOffsetBase + nIdx * curS * dAlign + sIdx * C0_SIZE;
+
+    if constexpr (LAYOUT == BSNGD) {
+        // BSND
+        copyOutDstStride = n2 * curG * d - d;
+        copyOutDstOffset = ((bIdx * curS + sIdx ) * n2 * curG + nIdx) * d;
+    } else if constexpr (LAYOUT == SBNGD) {
+        // SBND
+        copyOutDstStride = b * n2 * curG * d - d;
+        copyOutDstOffset = (( sIdx * b + bIdx ) * n2 * curG + nIdx ) * d;
+    } else if constexpr (LAYOUT == BNGSD) {
+        // BNSD
+        copyOutDstStride = 0;
+        copyOutDstOffset = ((bIdx * n2 * curG + nIdx )* curS + sIdx) * d;
     }
 }
 
@@ -242,12 +270,13 @@ __aicore__ inline void FlashAttentionScoreGradPost<OUT_TYPE, TILING_TYPE, CAST_D
     GlobalTensor<float> srcGm, GlobalTensor<OUT_TYPE> dstGm, uint64_t dataSize, GM_ADDR seqS, int64_t curG,
     int64_t &curS, bool needMuls)
 {
-    LocalTensor<float> vecIn = inQueue.AllocTensor<float>();
+    LocalTensor<float> vecIn = inQueue.template AllocTensor<float>();
     LocalTensor<float> tmpTensor = tmpBuf.template Get<float>();
-    LocalTensor<OUT_TYPE> vecOut = outQueue.AllocTensor<OUT_TYPE>();
+    LocalTensor<OUT_TYPE> vecOut = outQueue.template AllocTensor<OUT_TYPE>();
     uint32_t sClcSize = dataSize / d;
 
     uint64_t sLen = (sIdx + sClcSize) > curS ? (curS - sIdx) : sClcSize;
+    sLen = sLen > 255 ? 255 : sLen;
     uint64_t dataLen = sLen * dAlign;
 
     uint64_t ubOffset = 0;
@@ -255,16 +284,17 @@ __aicore__ inline void FlashAttentionScoreGradPost<OUT_TYPE, TILING_TYPE, CAST_D
 
     while (sClcSize > 0) {
         // Nz copy In
-        DataCopyParams intriParams;
+        AscendC::DataCopyExtParams intriParams;
         intriParams.blockCount = dAlign / C0_SIZE;
-        intriParams.blockLen = sLen * C0_SIZE / cal_block_num;
-        intriParams.srcStride = curS * C0_SIZE / cal_block_num - intriParams.blockLen;
+        intriParams.blockLen = sLen * C0_SIZE * sizeof(float);
+        intriParams.srcStride = curS * C0_SIZE * sizeof(float) - intriParams.blockLen;
         intriParams.dstStride = 1; // 间隔一个block，防止bank冲突
-        DataCopy(vecIn[inUbOffset], srcGm[copyInSrcOffset], intriParams);
+        intriParams.rsv = 0;
+        DataCopyPad(vecIn[inUbOffset], srcGm[copyInSrcOffset], intriParams, {false, 0, 0, 0});
         sClcSize = sClcSize - sLen;
 
         inQueue.EnQue(vecIn);
-        inQueue.DeQue<float>();
+        inQueue.template DeQue<float>();
 
         if constexpr (!AscendC::IsSameType<OUT_TYPE, float>::value) {
             NZ2ND(tmpTensor, vecIn, sLen, ubOffset, inUbOffset);
@@ -280,10 +310,10 @@ __aicore__ inline void FlashAttentionScoreGradPost<OUT_TYPE, TILING_TYPE, CAST_D
         if (needMuls) {
 
             if constexpr (!AscendC::IsSameType<OUT_TYPE, float>::value) {
-                Muls(tmpTensor[ubOffset], tmpTensor[ubOffset], (float)tilingData->s1s2BNGS1S2BaseParams.scaleValue,
+                Muls(tmpTensor[ubOffset], tmpTensor[ubOffset], (float)tilingData->postTilingData.scaleValue,
                  sLen * dAlign);
             } else {
-                Muls(vecOut[ubOffset], vecOut[ubOffset], (float)tilingData->s1s2BNGS1S2BaseParams.scaleValue,
+                Muls(vecOut[ubOffset], vecOut[ubOffset], (float)tilingData->postTilingData.scaleValue,
                  sLen * dAlign);
             }
 
@@ -296,29 +326,45 @@ __aicore__ inline void FlashAttentionScoreGradPost<OUT_TYPE, TILING_TYPE, CAST_D
         }
 
         outQueue.EnQue(vecOut);
-        outQueue.DeQue<OUT_TYPE>();
+        outQueue.template DeQue<OUT_TYPE>();
 
-        DataCopyPad(dstGm[copyOutDstOffset], vecOut[ubOffset],
-                    {static_cast<uint16_t>(dataLen / dAlign), static_cast<uint16_t>(d * sizeof(OUT_TYPE)), 0,
-                     static_cast<uint16_t>((n2 * curG * d - d) * sizeof(OUT_TYPE))});
+        if constexpr (LAYOUT == TND) {
+            DataCopyPad(dstGm[copyOutDstOffset], vecOut[ubOffset],
+                    {static_cast<uint16_t>(dataLen / dAlign), static_cast<uint32_t>(d * sizeof(OUT_TYPE)), 0,
+                    static_cast<uint32_t>((n2 * curG * d - d) * sizeof(OUT_TYPE)), 0});
+        } else {
+            DataCopyPad(dstGm[copyOutDstOffset], vecOut[ubOffset],
+                    {static_cast<uint16_t>(dataLen / dAlign), static_cast<uint32_t>(d * sizeof(OUT_TYPE)), 0,
+                    static_cast<uint32_t>(copyOutDstStride * sizeof(OUT_TYPE)), 0});
+        }
+
+
         if (sLen + sIdx < curS) {
             sIdx += sLen;
         } else if (nIdx == n2 * curG - 1) {
             sIdx = 0;
             nIdx = 0;
             bIdx++;
-            scrOffsetBase += curS * n2 * curG * dAlign;
-            dstOffsetBase += curS * n2 * curG * d;
-            curS = ((__gm__ int64_t *)seqS)[bIdx] - ((__gm__ int64_t *)seqS)[bIdx - 1];
+            if constexpr (LAYOUT == TND) {
+                scrOffsetBase += curS * n2 * curG * dAlign;
+                dstOffsetBase += curS * n2 * curG * d;
+                curS = ((__gm__ int64_t *)seqS)[bIdx] - ((__gm__ int64_t *)seqS)[bIdx - 1];
+            }
         } else {
             sIdx = 0;
             nIdx++;
         }
-        copyInSrcOffset = scrOffsetBase + nIdx * curS * dAlign + sIdx * C0_SIZE;
-        copyOutDstOffset = dstOffsetBase + (sIdx * n2 * curG + nIdx) * d;
+        if constexpr (LAYOUT == TND) {
+            copyInSrcOffset = scrOffsetBase + nIdx * curS * dAlign + sIdx * C0_SIZE;
+            copyOutDstOffset = dstOffsetBase + (sIdx * n2 * curG + nIdx) * d;
+        } else {
+            ComputeDataCopyOffset(curG, curS);
+        }
         ubOffset += dataLen;
         inUbOffset += dataLen + dAlign / C0_SIZE * cal_block_num;
         sLen = sClcSize > curS ? curS : sClcSize;
+        sLen = sLen > (curS - sIdx) ? (curS - sIdx) : sLen;
+        sLen = sLen > 255 ? 255 : sLen;
         dataLen = sLen * dAlign;
         if ((sLen > 0) && (inUbOffset + dataLen + dAlign / C0_SIZE * cal_block_num) * sizeof(float) >
                               ubBaseSize * 2 + nzReservedSize) {
@@ -367,6 +413,7 @@ __aicore__ inline void FlashAttentionScoreGradPost<OUT_TYPE, TILING_TYPE, CAST_D
         uint64_t dataSize = i + kvPostBaseNum < kvPostBlockTotal ? kvPostBaseNum : kvPostTailNum;
         NZVecClc(dvWorkSpaceGm, dvGm, dataSize, actual_seq_kvlen_addr, 1, s2, false);
     }
+    pipe_barrier(PIPE_ALL);
 }
 
 template <typename OUT_TYPE, typename TILING_TYPE, const bool CAST_DV, const uint32_t LAYOUT,
@@ -385,23 +432,23 @@ __aicore__ inline void FlashAttentionScoreGradPost<OUT_TYPE, TILING_TYPE, CAST_D
         qEnd = qPostBlockTotal;
     }
     for (uint64_t i = qBegin; i < qEnd; i = i + qPostBaseNum) {
-        AscendC::LocalTensor<float> vecIn = inQueue.AllocTensor<float>();
-        AscendC::LocalTensor<OUT_TYPE> vecOut = outQueue.AllocTensor<OUT_TYPE>();
+        AscendC::LocalTensor<float> vecIn = inQueue.template AllocTensor<float>();
+        AscendC::LocalTensor<OUT_TYPE> vecOut = outQueue.template AllocTensor<OUT_TYPE>();
         uint64_t dataSize = i + qPostBaseNum < qPostBlockTotal ? qPostBaseNum : qPostTailNum;
         DataCopy(vecIn, dqWorkSpaceGm[i], (dataSize + 7) / 8 * 8); // dataSize(fp32) align 32B
         inQueue.EnQue(vecIn);
-        inQueue.DeQue<float>();
+        inQueue.template DeQue<float>();
         if constexpr (AscendC::IsSameType<OUT_TYPE, float>::value) {
             Muls(vecOut, vecIn, (float)tilingData->postTilingData.scaleValue, dataSize);
             outQueue.EnQue(vecOut);
-            outQueue.DeQue<OUT_TYPE>();
+            outQueue.template DeQue<OUT_TYPE>();
             DataCopy(dqGm[i], vecOut, (dataSize + 7) / 8 * 8); // dataSize(fp16) align 32B
         } else {
             Muls(vecIn, vecIn, (float)tilingData->postTilingData.scaleValue, dataSize);
             pipe_barrier(PIPE_V);
             Cast(vecOut, vecIn, AscendC::RoundMode::CAST_ROUND, dataSize);
             outQueue.EnQue(vecOut);
-            outQueue.DeQue<OUT_TYPE>();
+            outQueue.template DeQue<OUT_TYPE>();
             DataCopy(dqGm[i], vecOut, (dataSize + 15) / 16 * 16); // dataSize(fp16) align 32B
         }
         inQueue.FreeTensor(vecIn);
@@ -416,23 +463,23 @@ __aicore__ inline void FlashAttentionScoreGradPost<OUT_TYPE, TILING_TYPE, CAST_D
     }
 
     for (uint64_t i = kvBegin; i < kvEnd; i = i + kvPostBaseNum) {
-        AscendC::LocalTensor<float> vecIn = inQueue.AllocTensor<float>();
-        AscendC::LocalTensor<OUT_TYPE> vecOut = outQueue.AllocTensor<OUT_TYPE>();
+        AscendC::LocalTensor<float> vecIn = inQueue.template AllocTensor<float>();
+        AscendC::LocalTensor<OUT_TYPE> vecOut = outQueue.template AllocTensor<OUT_TYPE>();
         uint64_t dataSize = i + kvPostBaseNum < kvPostBlockTotal ? kvPostBaseNum : kvPostTailNum;
         DataCopy(vecIn, dkWorkSpaceGm[i], (dataSize + 7) / 8 * 8); // dataSize(fp32) align 32B
         inQueue.EnQue(vecIn);
-        inQueue.DeQue<float>();
+        inQueue.template DeQue<float>();
         if constexpr (AscendC::IsSameType<OUT_TYPE, float>::value) {
             Muls(vecOut, vecIn, (float)tilingData->postTilingData.scaleValue, dataSize);
             outQueue.EnQue(vecOut);
-            outQueue.DeQue<OUT_TYPE>();
+            outQueue.template DeQue<OUT_TYPE>();
             DataCopy(dkGm[i], vecOut, (dataSize + 7) / 8 * 8); // dataSize(fp16) align 32B
         } else {
             Muls(vecIn, vecIn, (float)tilingData->postTilingData.scaleValue, dataSize);
             pipe_barrier(PIPE_V);
             Cast(vecOut, vecIn, AscendC::RoundMode::CAST_ROUND, dataSize);
             outQueue.EnQue(vecOut);
-            outQueue.DeQue<OUT_TYPE>();
+            outQueue.template DeQue<OUT_TYPE>();
             DataCopy(dkGm[i], vecOut, (dataSize + 15) / 16 * 16); // dataSize(fp16) align 32B
         }
         inQueue.FreeTensor(vecIn);
@@ -444,15 +491,15 @@ __aicore__ inline void FlashAttentionScoreGradPost<OUT_TYPE, TILING_TYPE, CAST_D
 
     if constexpr (CAST_DV && !AscendC::IsSameType<OUT_TYPE, float>::value) {
         for (uint64_t i = kvBegin; i < kvEnd; i = i + kvPostBaseNum) {
-            AscendC::LocalTensor<float> vecIn = inQueue.AllocTensor<float>();
-            AscendC::LocalTensor<OUT_TYPE> vecOut = outQueue.AllocTensor<OUT_TYPE>();
+            AscendC::LocalTensor<float> vecIn = inQueue.template AllocTensor<float>();
+            AscendC::LocalTensor<OUT_TYPE> vecOut = outQueue.template AllocTensor<OUT_TYPE>();
             uint64_t dataSize = i + kvPostBaseNum < kvPostBlockTotal ? kvPostBaseNum : kvPostTailNum;
             DataCopy(vecIn, dvWorkSpaceGm[i], (dataSize + 7) / 8 * 8); // dataSize(fp32) align 32B
             inQueue.EnQue(vecIn);
-            inQueue.DeQue<float>();
+            inQueue.template DeQue<float>();
             Cast(vecOut, vecIn, AscendC::RoundMode::CAST_ROUND, dataSize);
             outQueue.EnQue(vecOut);
-            outQueue.DeQue<OUT_TYPE>();
+            outQueue.template DeQue<OUT_TYPE>();
             DataCopy(dvGm[i], vecOut, (dataSize + 15) / 16 * 16); // dataSize(fp16) align 32B
             inQueue.FreeTensor(vecIn);
             outQueue.FreeTensor(vecOut);

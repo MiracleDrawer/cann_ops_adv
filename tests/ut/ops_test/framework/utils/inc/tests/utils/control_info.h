@@ -25,7 +25,7 @@ public:
      * \attention
      * 默认值 true, 谨慎修改默认值, 默认 false 会导致未设置该值的用例不执行
      */
-    bool runTiling = true;
+    bool mRunTiling = true;
 
     /**
      * 是否执行 Kernel
@@ -33,12 +33,12 @@ public:
      * \attention
      * 默认值 false, Kernel 执行比较耗时, 如需执行, 需指定开启
      */
-    bool runKernel = false;
+    bool mRunKernel = false;
 
     /**
      * 确定性计算值
      */
-    bool deterministic = false;
+    bool mDeterministic = false;
 
 public:
     ControlInfo() = default;

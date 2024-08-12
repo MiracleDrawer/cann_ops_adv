@@ -83,6 +83,7 @@ constexpr uint32_t WORKSPACE_BUFFER = 20 * 1024 * 1024;
 constexpr uint32_t PSE_ALIBI_S2_LIMIT_SIZE = 1024;
 constexpr uint32_t BIT_NUMS = 8;
 constexpr uint32_t S2_NZ_SIZE = 128;
+constexpr uint32_t S1_NZ_SIZE = 128;
 constexpr uint32_t MM12_ND2NZ_SIZE = 5000;
 constexpr uint32_t ASCENDC_API_TEMP_BUFFER = 32 * 1024 + 1024; // ND2ND NEED ANOTHER 1K
 constexpr uint32_t API_BOOL_ALIGN = 32;                        // ASCEND API ATTENMASK OR DROPOUT LAST DIM ALIGN
@@ -117,8 +118,6 @@ uint64_t FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetTilingKey() const
         inputLayout = LayoutEnum::BSND;                          // 0
     } else if (fBaseParams.layoutType == INPUT_FROAMT_TND) {     // 3
         inputLayout = LayoutEnum::TND;                           // 3
-    } else {
-        OPS_LOG_E(context_, "The layout type is not support!");
     }
 
     auto pseValue = fBaseParams.pseOptional == NORMAL_TENSOR ? OptionEnum::ENABLE : OptionEnum::DISABLE;
@@ -152,9 +151,6 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetPlatformInfo()
     } else {
         auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
         coreNum = ascendcPlatform.GetCoreNumAiv();
-        OPS_ERR_IF(coreNum == 0,
-                   OPS_REPORT_VECTOR_INNER_ERR(context_, "num of coreNum is 0."),
-                   return ge::GRAPH_FAILED);
 
         fBaseParams.coreNum = coreNum;
         fBaseParams.aicNum = ascendcPlatform.GetCoreNumAic();
@@ -163,6 +159,10 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetPlatformInfo()
         ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_A, fBaseParams.l0aSize);
         ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_C, fBaseParams.l0cSize);
     }
+    OPS_ERR_IF((fBaseParams.coreNum == 0) || (fBaseParams.aicNum == 0),
+                OPS_REPORT_VECTOR_INNER_ERR(context_, "num of coreNum(aivNum) is %ld, num of aicNum is %ld.",
+                fBaseParams.coreNum, fBaseParams.aicNum),
+                return ge::GRAPH_FAILED);
 
     fBaseParams.ubSize -= MATMUL_SIZE;
     OPS_ERR_IF(fBaseParams.ubSize <= 0,
@@ -265,8 +265,7 @@ bool FlashAttentionScoreGradTilingS1s2Bn2gs1s2::SetSparseParams()
 
     // 兼容老版本，未配置sparseMode或配置sparseMode为0的处理
     if (fBaseParams.sparseMode == NO_MASK) {
-        if (int64_t(fBaseParams.s1) > fBaseParams.s1Token ||
-            int64_t(fBaseParams.s2) > fBaseParams.s2Token) { // band场景，包含causal
+        if (fBaseParams.s1 > fBaseParams.s1Token || fBaseParams.s2 > fBaseParams.s2Token) { // band场景，包含causal
             OPS_LOG_D(context_, "in the NONE_MASK  and token is band scenario,isSparse is true ");
             return true;
         } else {
@@ -282,7 +281,7 @@ bool FlashAttentionScoreGradTilingS1s2Bn2gs1s2::SetSparseParams()
     }
 
     if (fBaseParams.sparseMode == BAND &&
-        (int64_t(fBaseParams.s1) > fBaseParams.s1Token || int64_t(fBaseParams.s2) > fBaseParams.s2Token)) {
+        (fBaseParams.s1 > fBaseParams.s1Token || fBaseParams.s2 > fBaseParams.s2Token)) {
         OPS_LOG_D(context_, "in the BAND  and token is band scenario,isSparse is true ");
         return true;
     }
@@ -294,11 +293,13 @@ bool FlashAttentionScoreGradTilingS1s2Bn2gs1s2::SetSparseParams()
 ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::ProcessPseNormal(const char *inputLayout)
 {
     auto pseShape = context_->GetOptionalInputShape(PSE_SHIFT);
+    OPS_ERR_IF(pseShape == nullptr,
+               OPS_REPORT_VECTOR_INNER_ERR(context_, "pseShape is nullptr."),
+               return ge::GRAPH_FAILED);
     auto pseShapeDim = pseShape->GetStorageShape().GetDimNum();
-    if (pseShapeDim != PSE_NORMAL_SHAPE_DIM) {
-        OPS_LOG_E(context_, "The shape of pse is not 4 dimensions, got %lu", pseShapeDim);
-        return ge::GRAPH_PARAM_INVALID;
-    }
+    OPS_ERR_IF((pseShapeDim != PSE_NORMAL_SHAPE_DIM),
+               OPS_REPORT_VECTOR_INNER_ERR(context_, "The shape of pse is not 4 dimensions, got %lu", pseShapeDim),
+               return ge::GRAPH_FAILED);
 
     auto dim0 = pseShape->GetStorageShape().GetDim(DIM_0);
     auto dim1 = pseShape->GetStorageShape().GetDim(DIM_1);
@@ -310,9 +311,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::ProcessPseNormal(cons
     bool is1NSS = (dim0 == 1 && dim1 == fBaseParams.n1 && dim2 == fBaseParams.s1 && dim3 == fBaseParams.s2);
     bool isAlibiPse = (dim1 == fBaseParams.n1 && dim2 == MAX_BASIC_BLOCK_SIZE && dim3 == fBaseParams.s2);
     bool isPse = (fBaseParams.s1 == fBaseParams.s2 && fBaseParams.s1 >= MAX_BASIC_BLOCK_SIZE &&
-                    int64_t(fBaseParams.s1) <= fBaseParams.s1Token && fBaseParams.s2Token == 0);
+                  fBaseParams.s1 <= fBaseParams.s1Token && fBaseParams.s2Token == 0);
     bool isTnd = strcmp(inputLayout, "TND") == 0;
-    bool isTndPse = isTnd && int64_t(fBaseParams.s1) <= fBaseParams.s1Token && fBaseParams.s2Token == 0;
+    bool isTndPse = isTnd && fBaseParams.s1 <= fBaseParams.s1Token && fBaseParams.s2Token == 0;
     bool isAlibi1NHS = isPse && isAlibiPse && (dim0 == 1);
     bool isAlibiBNHS = isPse && isAlibiPse && (dim0 == fBaseParams.b);
     bool isTndAlibiPse1NHS = isTndPse && isAlibiPse && (dim0 == 1);
@@ -335,7 +336,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::ProcessPseNormal(cons
     } else {
         OPS_LOG_E(context_, "The shape of pse[%ld,%ld,%ld,%ld] is invalid or tocken[%ld,%ld] not casual", dim0, dim1,
                     dim2, dim3, fBaseParams.s1Token, fBaseParams.s2Token);
-        return ge::GRAPH_PARAM_INVALID;
+        return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -351,6 +352,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::ProcessPseInfo(const 
     }
 
     auto pseShape = context_->GetOptionalInputShape(PSE_SHIFT);
+    // 同样的疑问，这是标量tensor的判断方法
     if (pseShape == nullptr || pseShape->GetStorageShape().GetDimNum() == 0) {
         fBaseParams.pseOptional = EMPTY_TENSOR;
         return ge::GRAPH_SUCCESS;
@@ -358,6 +360,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::ProcessPseInfo(const 
 
     fBaseParams.pseOptional = NORMAL_TENSOR;
     auto pse = context_->GetOptionalInputDesc(PSE_SHIFT);
+    OPS_ERR_IF(pse == nullptr,
+               OPS_REPORT_VECTOR_INNER_ERR(context_, "InputDesc of pse is nullptr."),
+               return ge::GRAPH_FAILED);
     if (fBaseParams.pseType == PSE_OUTER_MUL_ADD_TYPE || fBaseParams.pseType == PSE_OUTER_ADD_MUL_TYPE) {
         OPS_ERR_IF(pse->GetDataType() != context_->GetInputDesc(QUERY)->GetDataType(),
                    OPS_REPORT_VECTOR_INNER_ERR(context_,
@@ -495,7 +500,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::ProcessSparseModeInfo
         }
     }
 
-    if ((fBaseParams.layoutType != INPUT_FROAMT_TND) && 
+    if ((fBaseParams.layoutType != INPUT_FROAMT_TND) &&
         (fBaseParams.sparseMode == RIGHT_DOWN_CASUAL_BAND || fBaseParams.sparseMode == BAND_LEFT_UP_CASUAL)) {
         OPS_LOG_E(context_, " layout %u not support sparsemode %u", fBaseParams.layoutType, fBaseParams.sparseMode);
         return ge::GRAPH_FAILED;
@@ -503,6 +508,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::ProcessSparseModeInfo
 
     fBaseParams.attenMaskCompressMode = 0;
     auto attenMaskShape = context_->GetOptionalInputShape(ATTEN_MASK);
+    // 此处的GetDimNum是为了判断是否为空tensor？这个条件不能作为是否是空tensor的判断标准（这是标量tensor）
     if (attenMaskShape == nullptr || attenMaskShape->GetStorageShape().GetDimNum() == 0) {
         fBaseParams.attenMaskOptional = EMPTY_TENSOR;
         return ge::GRAPH_SUCCESS;
@@ -564,6 +570,10 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetBaseShapeInfo() {
                OPS_REPORT_VECTOR_INNER_ERR(context_, "queryShape is nullptr."),
                return ge::GRAPH_FAILED);
 
+    OPS_ERR_IF(keyShape == nullptr,
+               OPS_REPORT_VECTOR_INNER_ERR(context_, "keyShape is nullptr."),
+               return ge::GRAPH_FAILED);
+
     uint32_t dimSize = queryShape->GetStorageShape().GetDimNum();
     OPS_ERR_IF(static_cast<size_t>(dimSize) != strlen(inputLayout),
                OPS_REPORT_VECTOR_INNER_ERR(context_, "layout dims is not inputLayout's length."),
@@ -573,6 +583,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetBaseShapeInfo() {
         OPS_LOG_D(context_, "inputLayout == SBH queryShape");
         fBaseParams.layoutType = INPUT_FROAMT_S2BN2GD;
         fBaseParams.b = queryShape->GetStorageShape().GetDim(DIM_1);
+        OPS_ERR_IF(keyShape->GetStorageShape().GetDim(DIM_2) == 0,
+                  OPS_REPORT_VECTOR_INNER_ERR(context_, "dim N2 is 0."),
+                  return ge::GRAPH_FAILED);
         fBaseParams.g =
             queryShape->GetStorageShape().GetDim(DIM_2) / keyShape->GetStorageShape().GetDim(DIM_2);
         OPS_ERR_IF(fBaseParams.g == 0,
@@ -586,6 +599,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetBaseShapeInfo() {
         OPS_LOG_D(context_, "inputLayout == BSH queryShape");
         fBaseParams.layoutType = INPUT_FROAMT_BS2N2GD;
         fBaseParams.b = queryShape->GetStorageShape().GetDim(DIM_0);
+        OPS_ERR_IF(keyShape->GetStorageShape().GetDim(DIM_2) == 0,
+                  OPS_REPORT_VECTOR_INNER_ERR(context_, "dim N2 is 0."),
+                  return ge::GRAPH_FAILED);
         fBaseParams.g =
             queryShape->GetStorageShape().GetDim(DIM_2) / keyShape->GetStorageShape().GetDim(DIM_2);
         OPS_ERR_IF(fBaseParams.g == 0,
@@ -600,6 +616,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetBaseShapeInfo() {
         fBaseParams.layoutType = INPUT_FROAMT_BN2GS2D;
         fBaseParams.b = queryShape->GetStorageShape().GetDim(DIM_0);
         fBaseParams.n2 = keyShape->GetStorageShape().GetDim(DIM_1);
+        OPS_ERR_IF(keyShape->GetStorageShape().GetDim(DIM_1) == 0,
+                  OPS_REPORT_VECTOR_INNER_ERR(context_, "dim N2 is 0."),
+                  return ge::GRAPH_FAILED);
         fBaseParams.g =
             queryShape->GetStorageShape().GetDim(DIM_1) / keyShape->GetStorageShape().GetDim(DIM_1);
         OPS_ERR_IF(fBaseParams.g == 0,
@@ -612,20 +631,19 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetBaseShapeInfo() {
                   queryShape->GetStorageShape().GetDim(DIM_0), queryShape->GetStorageShape().GetDim(DIM_1),
                   queryShape->GetStorageShape().GetDim(DIM_2), queryShape->GetStorageShape().GetDim(DIM_3));
     } else if (strcmp(inputLayout, "TND") == 0) {
-        OPS_LOG_D("inputLayout == TND");
+        OPS_LOG_D(context_, "inputLayout is TND");
         fBaseParams.layoutType = INPUT_FROAMT_TND;
         auto actualSeqQlenTensor = context_->GetOptionalInputTensor(ACTUAL_SEQ_Q_LEN);
         auto actualSeqKvlenTensor = context_->GetOptionalInputTensor(ACTUAL_SEQ_KV_LEN);
         if (actualSeqQlenTensor == nullptr || actualSeqKvlenTensor == nullptr) {
             OPS_LOG_E(context_, "actualSeqQlenTensor or actualSeqKvlenTensor is nullptr");
-            return ge::GRAPH_PARAM_INVALID;
+            return ge::GRAPH_FAILED;
         }
         const size_t seqQShapeSize = actualSeqQlenTensor->GetShapeSize();
         const size_t kvSeqShapeSize = actualSeqKvlenTensor->GetShapeSize();
-        if (seqQShapeSize != kvSeqShapeSize) {
-            OPS_LOG_E(context_, "actualSeqQlenTensor shapeSize is not equal actualSeqKvlenTensor");
-            return ge::GRAPH_PARAM_INVALID;
-        }
+        OPS_ERR_IF((seqQShapeSize != kvSeqShapeSize),
+            OPS_REPORT_VECTOR_INNER_ERR(context_, "actualSeqQlenTensor shapeSize is not equal actualSeqKvlenTensor"),
+            return ge::GRAPH_FAILED);
 
         const int64_t *qValue = actualSeqQlenTensor->GetData<int64_t>();
         const int64_t *kvValue = actualSeqKvlenTensor->GetData<int64_t>();
@@ -650,6 +668,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetBaseShapeInfo() {
         fBaseParams.s1 = *std::max_element(fBaseParams.actualSeqQlen.begin(), fBaseParams.actualSeqQlen.end());
         fBaseParams.s2 = *std::max_element(fBaseParams.actualSeqKvlen.begin(), fBaseParams.actualSeqKvlen.end());
         fBaseParams.n2 = keyShape->GetStorageShape().GetDim(DIM_1);
+        OPS_ERR_IF(keyShape->GetStorageShape().GetDim(DIM_1) == 0,
+                  OPS_REPORT_VECTOR_INNER_ERR(context_, "dim N2 is 0."),
+                  return ge::GRAPH_FAILED);
         fBaseParams.g =
             queryShape->GetStorageShape().GetDim(DIM_1) / keyShape->GetStorageShape().GetDim(DIM_1);
         OPS_ERR_IF(fBaseParams.g == 0,
@@ -662,6 +683,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetBaseShapeInfo() {
         fBaseParams.layoutType = INPUT_FROAMT_BS2N2GD;
         fBaseParams.b = queryShape->GetStorageShape().GetDim(DIM_0);
         fBaseParams.n2 = keyShape->GetStorageShape().GetDim(DIM_2);
+        OPS_ERR_IF(keyShape->GetStorageShape().GetDim(DIM_2) == 0,
+                  OPS_REPORT_VECTOR_INNER_ERR(context_, "dim N2 is 0."),
+                  return ge::GRAPH_FAILED);
         fBaseParams.g =
             queryShape->GetStorageShape().GetDim(DIM_2) / keyShape->GetStorageShape().GetDim(DIM_2);
         OPS_ERR_IF(fBaseParams.g == 0,
@@ -674,6 +698,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetBaseShapeInfo() {
         OPS_LOG_E(context_, "FAG inputLayout is invalid");
         return ge::GRAPH_FAILED;
     }
+    OPS_ERR_IF(fBaseParams.n2 == 0,
+            OPS_REPORT_VECTOR_INNER_ERR(context_, "n2 is 0."),
+            return ge::GRAPH_FAILED);
 
     auto ret = IsSameShape(queryShape, dyShape);
     OPS_ERR_IF(!ret,
@@ -683,7 +710,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetBaseShapeInfo() {
     OPS_ERR_IF(!ret,
                 OPS_REPORT_VECTOR_INNER_ERR(context_, "FAG different shape keyShape and valueShape"),
                 return ge::GRAPH_FAILED);
-    
+
     return ge::GRAPH_SUCCESS;
 }
 
@@ -737,6 +764,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::ProcessDropInfo(const
 
 ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetShapeAttrsInfo()
 {
+    OPS_ERR_IF(context_ == nullptr,
+               OPS_REPORT_VECTOR_INNER_ERR(context_, "context is nullptr."),
+               return ge::GRAPH_FAILED);
     OPS_ERR_IF(context_->GetAttrs() == nullptr,
                OPS_REPORT_VECTOR_INNER_ERR(context_, "GetAttrs is nullptr."),
                return ge::GRAPH_FAILED);
@@ -764,6 +794,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetShapeAttrsInfo()
     }
 
     // mBaseParams is used for matmal tiling module
+    OPS_ERR_IF(context_->GetInputDesc(QUERY) == nullptr,
+               OPS_REPORT_VECTOR_INNER_ERR(context_, "InputDesc of query is nullptr."),
+               return ge::GRAPH_FAILED);
     auto queryType = context_->GetInputDesc(QUERY)->GetDataType();
     fBaseParams.queryType = queryType;
     fBaseParams.isBf16 = queryType == ge::DT_BF16 ? true : false;
@@ -779,9 +812,10 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetShapeAttrsInfo()
         fBaseParams.calBlockNum = FP32_BLOCK_NUMS;
     }
 
-    fBaseParams.mm1IsNZOut = (fBaseParams.s2 % S2_NZ_SIZE != 0 && fBaseParams.s2 < MM12_ND2NZ_SIZE && queryType != ge::DT_FLOAT);
-    fBaseParams.mm2IsNZOut =
-        (strcmp(inputLayout, "TND") == 0) && queryType != ge::DT_FLOAT && ((fBaseParams.d == 80) || (fBaseParams.d == 96)); // d为80或96时支持NZ输出
+    fBaseParams.mm1IsNZOut = (fBaseParams.s2 % S2_NZ_SIZE != 0 && fBaseParams.s2 < MM12_ND2NZ_SIZE
+            && queryType != ge::DT_FLOAT);
+    fBaseParams.mm2IsNZOut =  queryType != ge::DT_FLOAT && ((fBaseParams.d == 72) || (fBaseParams.d == 80)
+        || (fBaseParams.d == 88) || (fBaseParams.d == 96)) && (fBaseParams.s1 >= S1_NZ_SIZE);  // d为72, 80, 88, 96时支持NZ输出
     fBaseParams.dataBlockNum = BYTE_BLOCK / fBaseParams.dataTypeSize;
     fBaseParams.calBlockNum = BYTE_BLOCK / fBaseParams.calTypeSize;
 
@@ -810,7 +844,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetShapeAttrsInfo()
             return ret;
         }
     }
-    
+
     // token_info
     fBaseParams.s1Token = *(context_->GetAttrs()->GetAttrPointer<int64_t>(PRE_TOKENS));
     fBaseParams.s2Token = *(context_->GetAttrs()->GetAttrPointer<int64_t>(NEXT_TOKENS));
@@ -849,15 +883,26 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetShapeAttrsInfo()
 
 ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::DoOpTiling()
 {
-    if (DoSplit() == ge::GRAPH_FAILED) {
-        return ge::GRAPH_FAILED;
-    }
-    DoSparse();
-    DoPreTiling();
+    auto ret = DoSplit();
+    OPS_ERR_IF(ret != ge::GRAPH_SUCCESS,
+               OPS_LOG_W(context_, "get DoSplit fail."),
+               return ret);
+
+    ret = DoSparse();
+    OPS_ERR_IF(ret != ge::GRAPH_SUCCESS,
+               OPS_LOG_W(context_, "get DoSparse fail."),
+               return ret);
+
+    ret = DoPreTiling();
+    OPS_ERR_IF(ret != ge::GRAPH_SUCCESS,
+               OPS_LOG_W(context_, "get DoPreTiling fail."),
+               return ret);
+
     SetQKVStartIdx();
-    if (DoPostTiling() == ge::GRAPH_FAILED) {
-        return ge::GRAPH_FAILED;
-    }
+    ret = DoPostTiling();
+    OPS_ERR_IF(ret != ge::GRAPH_SUCCESS,
+               OPS_LOG_W(context_, "get DoPostTiling fail."),
+               return ret);
     DetermineMode();
 
     return ge::GRAPH_SUCCESS;
@@ -925,16 +970,22 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::DoSplit()
     return ge::GRAPH_SUCCESS;
 }
 
-void FlashAttentionScoreGradTilingS1s2Bn2gs1s2::DoSparse()
+ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::DoSparse()
 {
     if (fBaseParams.isSparse) {
         if (fBaseParams.layoutType == INPUT_FROAMT_TND) {
-            GetSparseUnpadBlockInfo();
+            OPS_ERR_IF((GetSparseUnpadBlockInfo() != ge::GRAPH_SUCCESS),
+                      OPS_REPORT_VECTOR_INNER_ERR(context_, "get SparseUnpadBlockInfo fail."),
+                      return ge::GRAPH_FAILED);
         } else {
             if (fBaseParams.sparseMode == PREFIX || fBaseParams.sparseMode == PREFIX_COMPRESS) {
-                GetSparsePrefixBlockInfo();
+                OPS_ERR_IF((GetSparsePrefixBlockInfo() != ge::GRAPH_SUCCESS),
+                          OPS_REPORT_VECTOR_INNER_ERR(context_, "get SparsePrefixBlockInfo fail."),
+                          return ge::GRAPH_FAILED);
             } else {
-                GetSparseBlockInfo();
+                OPS_ERR_IF((GetSparseBlockInfo() != ge::GRAPH_SUCCESS),
+                          OPS_REPORT_VECTOR_INNER_ERR(context_, "get SparseBlockInfo fail."),
+                          return ge::GRAPH_FAILED);
             }
         }
     } else {
@@ -943,8 +994,17 @@ void FlashAttentionScoreGradTilingS1s2Bn2gs1s2::DoSparse()
         // block split
         int64_t fusedOuter = static_cast<int64_t>(fBaseParams.b) * fBaseParams.n2 * fBaseParams.g *
                              fBaseParams.s1Outer * fBaseParams.s2Outer;                     // 总块数
+        // coreNum前面已做非0校验
         int64_t blockFactor = (fusedOuter + fBaseParams.coreNum - 1) / fBaseParams.coreNum; // 单核块数
+        // 除0校验
+        OPS_ERR_IF(blockFactor == 0,
+                  OPS_REPORT_VECTOR_INNER_ERR(context_, "divisor blockFactor is 0."),
+                  return ge::GRAPH_FAILED);
         int64_t blockOuter = (fusedOuter + blockFactor - 1) / blockFactor;                  // 实际核数
+        // 防止下标越界
+        OPS_ERR_IF(blockOuter > CORE_LIST_NUM,
+                  OPS_REPORT_VECTOR_INNER_ERR(context_, "blockStarts and blockEnds array bound."),
+                  return ge::GRAPH_FAILED);
 
         fBaseParams.blockOuter = blockOuter;
         fBaseParams.blockFactor = blockFactor;
@@ -961,6 +1021,7 @@ void FlashAttentionScoreGradTilingS1s2Bn2gs1s2::DoSparse()
         std::copy(std::begin(blockStarts), std::end(blockStarts), std::begin(fBaseParams.blockStarts));
         std::copy(std::begin(blockEnds), std::end(blockEnds), std::begin(fBaseParams.blockEnds));
     }
+    return ge::GRAPH_SUCCESS;
 }
 
 std::tuple<uint32_t, uint32_t, uint32_t> FlashAttentionScoreGradTilingS1s2Bn2gs1s2::FuzzyForBestSplit()
@@ -1101,9 +1162,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::DoLibApiTiling()
     } else {
         mm1.SetFixSplit(-1, -1, -1);
     }
-    if (mm1.GetTiling(tilingData.mm1TilingData) != 0) {
-        return ge::GRAPH_PARAM_INVALID;
-    }
+    OPS_ERR_IF(mm1.GetTiling(tilingData.mm1TilingData) != 0,
+              OPS_REPORT_VECTOR_INNER_ERR(context_, "matmul1 tilingData get fail."),
+              return ge::GRAPH_FAILED);
     SetMatmulTilingBufferInfo(tilingData.mm1TilingData);
 
     // format left[B, N2, G, S1, S2] right[B, N2, G, S1, D] result[B, N2, G, S2, D]
@@ -1129,9 +1190,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::DoLibApiTiling()
                  fBaseParams.s1Inner * fBaseParams.s1CvRatio);
     mm2.SetBias(false);
     mm2.SetFixSplit(-1, -1, -1);
-    if (mm2.GetTiling(tilingData.mm2TilingData) != 0) {
-        return ge::GRAPH_PARAM_INVALID;
-    }
+    OPS_ERR_IF(mm2.GetTiling(tilingData.mm2TilingData) != 0,
+              OPS_REPORT_VECTOR_INNER_ERR(context_, "matmul2 tilingData get fail."),
+              return ge::GRAPH_FAILED);
     SetMatmulTilingBufferInfo(tilingData.mm2TilingData);
 
     // format left[B, N2, G, S1, S2] right[B, N2, 1, S2, D] result[B, N2, G, S1, D]
@@ -1154,9 +1215,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::DoLibApiTiling()
                  fBaseParams.s2Inner * fBaseParams.s2CvRatio);
     mm3.SetBias(false);
     mm3.SetFixSplit(-1, -1, -1);
-    if (mm3.GetTiling(tilingData.mm3TilingData) != 0) {
-        return ge::GRAPH_PARAM_INVALID;
-    }
+    OPS_ERR_IF(mm3.GetTiling(tilingData.mm3TilingData) != 0,
+              OPS_REPORT_VECTOR_INNER_ERR(context_, "matmul3 tilingData get fail."),
+              return ge::GRAPH_FAILED);
     SetMatmulTilingBufferInfo(tilingData.mm3TilingData);
 
     uint32_t cvS2Inner = fBaseParams.s2Inner * fBaseParams.s2CvRatio;
@@ -1335,14 +1396,11 @@ void FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetParseS1S2OuterInfo(int64_t (*
     for (int64_t i = 0; i < fBaseParams.s2Outer; i++) {
         parseInfo[i][BEGIN_IDX] =
             int64_t(std::min(std::max(0L, int64_t(fBaseParams.cvS2Inner * i) - fBaseParams.s2Token),
-                             int64_t(fBaseParams.s1))) /
-            fBaseParams.s1CvInner;
+                             fBaseParams.s1)) / fBaseParams.s1CvInner;
         int64_t cvBlockTail = i == fBaseParams.s2Outer - 1 ? fBaseParams.s2CvTail : fBaseParams.cvS2Inner;
         parseInfo[i][END_IDX] =
             int64_t(std::min(std::max(0L, int64_t(fBaseParams.cvS2Inner * i + cvBlockTail) + fBaseParams.s1Token),
-                             int64_t(fBaseParams.s1)) +
-                    fBaseParams.s1CvInner - 1) /
-            fBaseParams.s1CvInner;
+                             fBaseParams.s1) + fBaseParams.s1CvInner - 1) / fBaseParams.s1CvInner;
         int64_t tmpSize =
             (parseInfo[i][END_IDX] > parseInfo[i][BEGIN_IDX]) ? parseInfo[i][END_IDX] - parseInfo[i][BEGIN_IDX] : 0;
         if (i == 0) {
@@ -1392,9 +1450,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::ProcessTokensInfo()
 
     // 校验pad场景token是否合法
     if (fBaseParams.layoutType != INPUT_FROAMT_TND &&
-        (-fBaseParams.s1Token > int64_t(fBaseParams.s2) || -fBaseParams.s2Token > int64_t(fBaseParams.s1) ||
+        (-fBaseParams.s1Token > fBaseParams.s2 || -fBaseParams.s2Token > fBaseParams.s1 ||
          (fBaseParams.s1Token + fBaseParams.s2Token) < 0)) {
-        OPS_LOG_E(context_, 
+        OPS_LOG_E(context_,
                   "pre_token and next_token is invalid in the pad scene, got s1 %ld, s2 %ld,  "
                   "pre_token %ld, next_token %ld",
                   fBaseParams.s1, fBaseParams.s2, fBaseParams.s1Token, fBaseParams.s2Token);
@@ -1466,10 +1524,13 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetSparseBlockInfo()
 
     // block split
     int64_t fusedOuter = static_cast<int64_t>(fBaseParams.b) * fBaseParams.n2 * fBaseParams.g * s1s2oCount;
+    // coreNum前面已做非0校验
     int64_t blockFactor = (fusedOuter + fBaseParams.coreNum - 1) / fBaseParams.coreNum;
-    OPS_ERR_IF(blockFactor == 0,
-               OPS_REPORT_VECTOR_INNER_ERR(context_, "divisor blockFactor is 0."),
-               return ge::GRAPH_FAILED);
+    if (blockFactor == 0) {
+        OPS_LOG_E(context_, "divisor blockFactor is 0.");
+        delete[] parseInfo;
+        return ge::GRAPH_FAILED;
+    }
     int64_t blockOuter = (fusedOuter + blockFactor - 1) / blockFactor;
     int64_t blockTailTmp = fusedOuter % blockFactor;
     int64_t blockTail = blockTailTmp == 0 ? blockFactor : blockTailTmp;
@@ -1487,23 +1548,32 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetSparseBlockInfo()
     int64_t s1oIdx = 0;
     int64_t s2oIdx = 0;
 
+    if (s1s2oCount == 0) {
+        OPS_LOG_E(context_, "divisor s1s2oCount is 0.");
+        // free tensor
+        delete[] parseInfo;
+        return ge::GRAPH_FAILED;
+    }
+
     int64_t n2gs1s2o = fBaseParams.n2 * fBaseParams.g * s1s2oCount;
     int64_t gs1s2o = fBaseParams.g * s1s2oCount;
 
     int64_t blockStarts[CORE_LIST_NUM];
     int64_t blockEnds[CORE_LIST_NUM];
     blockStarts[0] = 0;
-    OPS_ERR_IF(blockOuter > CORE_LIST_NUM,
-               OPS_REPORT_VECTOR_INNER_ERR(context_, "blockEnds array bound."),
-               return ge::GRAPH_FAILED);
+    if (blockOuter > CORE_LIST_NUM) {
+        OPS_LOG_E(context_, "blockEnds array bound.");
+        // free tensor
+        delete[] parseInfo;
+        return ge::GRAPH_FAILED;
+    }
     blockEnds[blockOuter - 1] = static_cast<int64_t>(fBaseParams.b) * fBaseParams.n2 * fBaseParams.g *
                                 fBaseParams.s1Outer * fBaseParams.s2Outer;
-    OPS_ERR_IF(gs1s2o == 0,
-               OPS_REPORT_VECTOR_INNER_ERR(context_, "divisor gs1s2o is 0."),
-               return ge::GRAPH_FAILED);
+
     for (int64_t c = 1; c < blockOuter; c++) {
         // cal indx for total bngs1os2o(sparse)
         int64_t currentIdx = std::min(blockFactor * c, fusedOuter);
+        // 除数为0已判断
         bIdx = currentIdx / n2gs1s2o;
         bTail = currentIdx % n2gs1s2o;
         n2Idx = bTail / gs1s2o;
@@ -1728,13 +1798,13 @@ void FlashAttentionScoreGradTilingS1s2Bn2gs1s2::FillBlockInfo(
             } else {
                 calculatedBlockInfo[i][j][BEGIN_IDX] =
                     int64_t(
-                        std::min(std::max(fBaseParams.cvS2Inner * j - actualCalcS2Token, 0L), int64_t(actualS1Len))) /
+                        std::min(std::max(fBaseParams.cvS2Inner * j - actualCalcS2Token, 0L), actualS1Len)) /
                     fBaseParams.s1CvInner;
                 int64_t cvBlockTail = fBaseParams.cvS2Inner * (j + 1) > actualS2Len ?
                                           actualS2Len - fBaseParams.cvS2Inner * j :
                                           fBaseParams.cvS2Inner;
                 calculatedBlockInfo[i][j][END_IDX] =
-                    int64_t(std::min(int64_t(actualS1Len),
+                    int64_t(std::min(actualS1Len,
                                      std::max(fBaseParams.cvS2Inner * j + cvBlockTail + actualCalcS1Token, 0L)) +
                             fBaseParams.s1CvInner - 1) /
                     fBaseParams.s1CvInner;
@@ -1821,6 +1891,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetSparseUnpadBlockIn
             if (calculatedBlockInfo[b][0][SUM_ALL] > currentIdx) {
                 bIdx = b;
                 auto s1os2o = calculatedBlockInfo[b][fBaseParams.s2Outer - 1][SUM_S1S2];
+                OPS_ERR_IF(s1os2o == 0,
+                          OPS_REPORT_VECTOR_INNER_ERR(context_, "divisor s1os2o is 0."),
+                          return ge::GRAPH_FAILED);
                 auto gs1os2o = s1os2o * fBaseParams.g;
                 bTail = (b == 0) ? currentIdx : currentIdx - calculatedBlockInfo[b - 1][0][SUM_ALL];
                 n2Idx = bTail / gs1os2o;
@@ -1865,7 +1938,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetSparseUnpadBlockIn
     return ge::GRAPH_SUCCESS;
 }
 
-void FlashAttentionScoreGradTilingS1s2Bn2gs1s2::DoPreTiling()
+ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::DoPreTiling()
 {
     uint32_t castBufferLen = 60 * 1024;
     uint32_t outputBufferLen = 30 * 1024;
@@ -1899,11 +1972,11 @@ void FlashAttentionScoreGradTilingS1s2Bn2gs1s2::DoPreTiling()
 
     OPS_ERR_IF(maskUsedCoreNum == 0,
                OPS_REPORT_VECTOR_INNER_ERR(context_, "divisor maskUsedCoreNumis 0."),
-               return);
+               return ge::GRAPH_FAILED);
     int64_t qPreBlockFactor = (fBaseParams.qSizeAlign + maskUsedCoreNum - 1) / maskUsedCoreNum;
     OPS_ERR_IF(qPreBlockFactor == 0,
                OPS_REPORT_VECTOR_INNER_ERR(context_, "divisor qPreBlockFactor is 0."),
-               return);
+               return ge::GRAPH_FAILED);
     int64_t qPreBlockTotal = (fBaseParams.qSizeAlign + qPreBlockFactor - 1) / qPreBlockFactor;
     int64_t qPreTailNumTmp = fBaseParams.qSizeAlign % qPreBlockFactor;
     int64_t qPreTailNum = qPreTailNumTmp == 0 ? qPreBlockFactor : qPreTailNumTmp;
@@ -1911,7 +1984,7 @@ void FlashAttentionScoreGradTilingS1s2Bn2gs1s2::DoPreTiling()
     int64_t kvPreBlockFactor = (fBaseParams.kvSizeAlign + maskUsedCoreNum - 1) / maskUsedCoreNum;
     OPS_ERR_IF(kvPreBlockFactor == 0,
                OPS_REPORT_VECTOR_INNER_ERR(context_, "divisor kvPreBlockFactor is 0."),
-               return);
+               return ge::GRAPH_FAILED);
     int64_t kvPreBlockTotal = (fBaseParams.kvSizeAlign + kvPreBlockFactor - 1) / kvPreBlockFactor;
     int64_t kvPreTailNumTmp = fBaseParams.kvSizeAlign % kvPreBlockFactor;
     int64_t kvPreTailNum = kvPreTailNumTmp == 0 ? kvPreBlockFactor : kvPreTailNumTmp;
@@ -1934,6 +2007,7 @@ void FlashAttentionScoreGradTilingS1s2Bn2gs1s2::DoPreTiling()
     dropBeginAddr =
         (dropBeginAddr + (fBaseParams.kvSize) * sizeof(float) + ADDR_ALIGN_SIZE) / ADDR_ALIGN_SIZE * ADDR_ALIGN_SIZE;
     tilingData.preTilingData.set_dropBeginAddr(dropBeginAddr);
+    return ge::GRAPH_SUCCESS;
 }
 
 ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::DoPostTiling()
@@ -1945,7 +2019,8 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::DoPostTiling()
                              WORKSPACE_NUM_ALIGN * WORKSPACE_NUM_ALIGN;
 
     int64_t qPostBaseNum =
-        fBaseParams.mm2IsNZOut ? (postUbBaseSize / fBaseParams.dataTypeSize / dAlign * fBaseParams.d) : (postUbBaseSize / fBaseParams.dataTypeSize);
+        fBaseParams.mm2IsNZOut ? (postUbBaseSize / fBaseParams.dataTypeSize / dAlign * fBaseParams.d)
+        : (postUbBaseSize / fBaseParams.dataTypeSize);
     OPS_ERR_IF(qPostBaseNum == 0,
                OPS_REPORT_VECTOR_INNER_ERR(context_, "divisor qPostBaseNum is 0."),
                return ge::GRAPH_FAILED);
@@ -1992,6 +2067,14 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::DoPostTiling()
 
     workspaceOffsets = (workspaceOffsets + fBaseParams.kvSizeAlign * sizeof(float) + GM_ALIGN) / GM_ALIGN * GM_ALIGN;
     tilingData.postTilingData.set_dvWorkSpaceOffset(workspaceOffsets);
+
+    tilingData.postTilingData.set_b(fBaseParams.b);
+    tilingData.postTilingData.set_n2(fBaseParams.n2);
+    tilingData.postTilingData.set_g(fBaseParams.g);
+    tilingData.postTilingData.set_s1(fBaseParams.s1);
+    tilingData.postTilingData.set_s2(fBaseParams.s2);
+    tilingData.postTilingData.set_d(fBaseParams.d);
+
     return ge::GRAPH_SUCCESS;
 }
 

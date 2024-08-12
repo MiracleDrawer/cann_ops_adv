@@ -25,10 +25,10 @@ using namespace ops::adv::tests::ffn;
 bool FFNTilingRunCbf(void *curCase, uint64_t *workSpaceSize, aclOpExecutor **opExecutor)
 {
     auto *cs = static_cast<AclnnFFNCase *>(curCase);
-    auto *aclnnParam = &cs->aclnnParam;
+    auto *aclnnParam = &cs->mAclnnParam;
 
-    aclnnStatus ret;
-    if (aclnnParam->aclnnFFNVersion == AclnnFFNVersion::V1) {
+    aclnnStatus ret = ACL_SUCCESS;
+    if (aclnnParam->mAclnnFFNVersion == AclnnFFNVersion::V1) {
         ret = aclnnFFNGetWorkspaceSize(
             aclnnParam->aclnnX.GetAclTensor(), aclnnParam->aclnnWeight1.GetAclTensor(),
             aclnnParam->aclnnWeight2.GetAclTensor(), aclnnParam->aclnnExpertTokensIntAry,
@@ -37,9 +37,9 @@ bool FFNTilingRunCbf(void *curCase, uint64_t *workSpaceSize, aclOpExecutor **opE
             aclnnParam->aclnnDeqScale1.GetAclTensor(), aclnnParam->aclnnDeqScale2.GetAclTensor(),
             aclnnParam->aclnnAntiquantScale1.GetAclTensor(), aclnnParam->aclnnAntiquantScale2.GetAclTensor(),
             aclnnParam->aclnnAntiquantOffset1.GetAclTensor(), aclnnParam->aclnnAntiquantOffset2.GetAclTensor(),
-            aclnnParam->activation.c_str(), aclnnParam->innerPrecise, aclnnParam->aclnnY.GetAclTensor(), workSpaceSize,
-            opExecutor);
-    } else if (aclnnParam->aclnnFFNVersion == AclnnFFNVersion::V2) {
+            aclnnParam->mActivation.c_str(), aclnnParam->mInnerPrecise, aclnnParam->aclnnY.GetAclTensor(),
+            workSpaceSize, opExecutor);
+    } else if (aclnnParam->mAclnnFFNVersion == AclnnFFNVersion::V2) {
         ret = aclnnFFNV2GetWorkspaceSize(
             aclnnParam->aclnnX.GetAclTensor(), aclnnParam->aclnnWeight1.GetAclTensor(),
             aclnnParam->aclnnWeight2.GetAclTensor(), aclnnParam->aclnnExpertTokensIntAry,
@@ -48,9 +48,9 @@ bool FFNTilingRunCbf(void *curCase, uint64_t *workSpaceSize, aclOpExecutor **opE
             aclnnParam->aclnnDeqScale1.GetAclTensor(), aclnnParam->aclnnDeqScale2.GetAclTensor(),
             aclnnParam->aclnnAntiquantScale1.GetAclTensor(), aclnnParam->aclnnAntiquantScale2.GetAclTensor(),
             aclnnParam->aclnnAntiquantOffset1.GetAclTensor(), aclnnParam->aclnnAntiquantOffset2.GetAclTensor(),
-            aclnnParam->activation.c_str(), aclnnParam->innerPrecise, aclnnParam->tokensIndexFlag,
+            aclnnParam->mActivation.c_str(), aclnnParam->mInnerPrecise, aclnnParam->mTokensIndexFlag,
             aclnnParam->aclnnY.GetAclTensor(), workSpaceSize, opExecutor);
-    } else if (aclnnParam->aclnnFFNVersion == AclnnFFNVersion::V3) {
+    } else if (aclnnParam->mAclnnFFNVersion == AclnnFFNVersion::V3) {
         ret = aclnnFFNV3GetWorkspaceSize(
             aclnnParam->aclnnX.GetAclTensor(), aclnnParam->aclnnWeight1.GetAclTensor(),
             aclnnParam->aclnnWeight2.GetAclTensor(), aclnnParam->aclnnExpertTokens.GetAclTensor(),
@@ -59,7 +59,7 @@ bool FFNTilingRunCbf(void *curCase, uint64_t *workSpaceSize, aclOpExecutor **opE
             aclnnParam->aclnnDeqScale1.GetAclTensor(), aclnnParam->aclnnDeqScale2.GetAclTensor(),
             aclnnParam->aclnnAntiquantScale1.GetAclTensor(), aclnnParam->aclnnAntiquantScale2.GetAclTensor(),
             aclnnParam->aclnnAntiquantOffset1.GetAclTensor(), aclnnParam->aclnnAntiquantOffset2.GetAclTensor(),
-            aclnnParam->activation.c_str(), aclnnParam->innerPrecise, aclnnParam->tokensIndexFlag,
+            aclnnParam->mActivation.c_str(), aclnnParam->mInnerPrecise, aclnnParam->mTokensIndexFlag,
             aclnnParam->aclnnY.GetAclTensor(), workSpaceSize, opExecutor);
     }
 
@@ -71,17 +71,17 @@ bool FFNTilingRunCbf(void *curCase, uint64_t *workSpaceSize, aclOpExecutor **opE
 bool FFNKernelRunCbf(void *curCase)
 {
     auto *cs = static_cast<AclnnFFNCase *>(curCase);
-    auto *aclnnParam = &cs->aclnnParam;
-    auto *aclnnCtx = &cs->aclnnCtx;
+    auto *aclnnParam = &cs->mAclnnParam;
+    auto *aclnnCtx = &cs->mAclnnCtx;
 
-    aclnnStatus ret;
-    if (aclnnParam->aclnnFFNVersion == AclnnFFNVersion::V1) {
+    aclnnStatus ret = ACL_SUCCESS;
+    if (aclnnParam->mAclnnFFNVersion == AclnnFFNVersion::V1) {
         ret = aclnnFFN(aclnnCtx->GetWorkspacePtr(), aclnnCtx->GetWorkspaceSize(), aclnnCtx->GetAclOpExecutor(),
                        aclnnCtx->GetAclRtStream());
-    } else if (aclnnParam->aclnnFFNVersion == AclnnFFNVersion::V2) {
+    } else if (aclnnParam->mAclnnFFNVersion == AclnnFFNVersion::V2) {
         ret = aclnnFFNV2(aclnnCtx->GetWorkspacePtr(), aclnnCtx->GetWorkspaceSize(), aclnnCtx->GetAclOpExecutor(),
                          aclnnCtx->GetAclRtStream());
-    } else if (aclnnParam->aclnnFFNVersion == AclnnFFNVersion::V3) {
+    } else if (aclnnParam->mAclnnFFNVersion == AclnnFFNVersion::V3) {
         ret = aclnnFFNV3(aclnnCtx->GetWorkspacePtr(), aclnnCtx->GetWorkspaceSize(), aclnnCtx->GetAclOpExecutor(),
                          aclnnCtx->GetAclRtStream());
     }
@@ -90,20 +90,20 @@ bool FFNKernelRunCbf(void *curCase)
     return ret == ACL_SUCCESS;
 }
 
-AclnnFFNCase::AclnnFFNCase() : FFNCase(), aclnnCtx(AclnnContext()), aclnnParam(AclnnFFNParam())
+AclnnFFNCase::AclnnFFNCase() : FFNCase(), mAclnnCtx(AclnnContext()), mAclnnParam(AclnnFFNParam())
 {
 }
 
 AclnnFFNCase::AclnnFFNCase(const char *name, bool enable, const char *dbgInfo, OpInfo opInfo, AclnnFFNParam aclnnParam,
                            int32_t tilingTemplatePriority)
     : FFNCase(name, enable, dbgInfo, std::move(opInfo), Param(), tilingTemplatePriority),
-      aclnnParam(std::move(aclnnParam))
+      mAclnnParam(std::move(aclnnParam))
 {
 }
 
 bool AclnnFFNCase::InitParam()
 {
-    return aclnnParam.Init();
+    return mAclnnParam.Init();
 }
 
 bool AclnnFFNCase::InitOpInfo()
@@ -112,29 +112,29 @@ bool AclnnFFNCase::InitOpInfo()
         return false;
     }
 
-    auto rst = aclnnCtx.SetOpName(this->opInfo.name.c_str());
-    rst = rst && aclnnCtx.SetTilingRunCbf(FFNTilingRunCbf);
-    rst = rst && aclnnCtx.SetKernelRunCbf(FFNKernelRunCbf);
-    rst = rst && aclnnCtx.SetOutputs({&aclnnParam.aclnnY});
-    rst = rst && opInfo.SetContext(&aclnnCtx);
+    auto rst = mAclnnCtx.SetOpName(this->mOpInfo.mName.c_str());
+    rst = rst && mAclnnCtx.SetTilingRunCbf(FFNTilingRunCbf);
+    rst = rst && mAclnnCtx.SetKernelRunCbf(FFNKernelRunCbf);
+    rst = rst && mAclnnCtx.SetOutputs({&mAclnnParam.aclnnY});
+    rst = rst && mOpInfo.SetContext(&mAclnnCtx);
     return rst;
 }
 
 bool AclnnFFNCase::InitCurrentCasePtr()
 {
-    Case::currentCasePtr = this;
+    Case::mCurrentCasePtr = this;
     return true;
 }
 
 bool AclnnFFNCase::Run()
 {
-    if (!enable) {
+    if (!mEnable) {
         return true;
     }
-    if (!opInfo.ProcessTiling(name)) {
+    if (!mOpInfo.ProcessTiling(mName)) {
         return false;
     }
-    if (!opInfo.ProcessKernel(name)) {
+    if (!mOpInfo.ProcessKernel(mName)) {
         return false;
     }
     return true;

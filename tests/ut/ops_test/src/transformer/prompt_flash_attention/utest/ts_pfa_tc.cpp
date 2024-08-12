@@ -18,17 +18,21 @@ class Ts_Pfa_Ascend910B2_Case : public Ts_Pfa_WithParam_Ascend910B2 {};
 class Ts_Pfa_Ascend310P3_Case : public Ts_Pfa_WithParam_Ascend310P3 {};
 
 
-TEST_F(Ts_Pfa_Ascend910B2, case_empty_query) {
-  PfaCase cs;
-  cs.param.b = 1;
-  cs.param.n = 40;
-  cs.param.s = 1000;
-  cs.param.d = 128;
-  cs.param.layout = "BNSD";
-  cs.param.numHeads = 40;
-  cs.param.scaleValue = 1.0f;
-  cs.prompt.exp.success = false;
-  ASSERT_TRUE(cs.Init());
-  cs.query = Tensor("query", {cs.param.b, cs.param.n, 0, cs.param.d}, "BNSD", cs.param.qDataType, ge::FORMAT_ND);
-  ASSERT_EQ(cs.Run(), cs.prompt.exp.success);
+
+TEST_F(Ts_Pfa_Ascend910B2, case_empty_query)
+{
+    PfaCase cs;
+    cs.mParam.b = 1;
+    cs.mParam.n = 40;
+    cs.mParam.s = 1000;
+    cs.mParam.d = 128;
+    cs.mParam.layout = "BNSD";
+    cs.mParam.numHeads = 40;
+    cs.mParam.scaleValue = 1.0f;
+    cs.mOpInfo.mExp.mSuccess = false;
+    ASSERT_TRUE(cs.Init());
+    cs.query = Tensor("query", {cs.mParam.b, cs.mParam.n, 0, cs.mParam.d}, "BNSD", cs.mParam.qDataType, ge::FORMAT_ND);
+    ASSERT_EQ(cs.Run(), cs.mOpInfo.mExp.mSuccess);
 }
+
+

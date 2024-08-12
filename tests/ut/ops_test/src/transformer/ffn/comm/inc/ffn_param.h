@@ -25,12 +25,12 @@ using ops::adv::tests::utils::Tensor;
 
 class Param {
 public:
-    std::map<std::string, Tensor> tensors;
-    std::vector<int64_t> expertTokensData = {};
-    std::string activation;
-    int32_t innerPrecise = 0;
-    int32_t outputDtype = -1;
-    bool tokensIndexFlag = false;
+    std::map<std::string, Tensor> mTensors;
+    std::vector<int64_t> mExpertTokensData = {};
+    std::string mActivation;
+    int32_t mInnerPrecise = 0;
+    int32_t mOutputDtype = -1;
+    bool mTokensIndexFlag = false;
 
 public:
     Param() = default;

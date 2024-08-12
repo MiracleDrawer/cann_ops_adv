@@ -36,7 +36,7 @@
      __gm__ uint8_t * valueSharedPrefix, __gm__ uint8_t * actualSharedPrefixLen, __gm__ uint8_t * attentionOut,        \
      __gm__ uint8_t * softmaxLse, __gm__ uint8_t * workspace, __gm__ uint8_t * tiling)
 
-typedef void (*FiaKernelFunc) FIA_KERNEL_PARAM;
+typedef void(*FiaKernelFunc) FIA_KERNEL_PARAM;
 
 extern "C" __global__ __aicore__ void fused_infer_attention_score FIA_KERNEL_PARAM;
 
@@ -45,101 +45,129 @@ using TensorIntf = ops::adv::tests::utils::TensorIntf;
 using Case = ops::adv::tests::utils::Case;
 using Platform = ops::adv::tests::utils::Platform;
 
-bool RunFusedInferAttentionScore(void* func, uint64_t tilingKey, int64_t blockDim, std::vector<TensorIntf*>& inputs,
-                                 std::vector<TensorIntf*>& outputs, uint8_t* workspace, uint8_t* tilingData) {
-  // Kernel 运行
-  auto kernelFunc = (FiaKernelFunc)func;
-  ICPU_SET_TILING_KEY(tilingKey);
-  ICPU_RUN_KF(kernelFunc, blockDim, inputs[0]->GetDevData(), inputs[1]->GetDevData(), inputs[2]->GetDevData(),
-              inputs[3]->GetDevData(), inputs[4]->GetDevData(), inputs[5]->GetDevData(), inputs[6]->GetDevData(),
-              inputs[7]->GetDevData(), inputs[8]->GetDevData(), inputs[9]->GetDevData(), inputs[10]->GetDevData(),
-              inputs[11]->GetDevData(), inputs[12]->GetDevData(), inputs[13]->GetDevData(), inputs[14]->GetDevData(),
-              inputs[15]->GetDevData(), inputs[16]->GetDevData(), inputs[17]->GetDevData(), inputs[18]->GetDevData(),
-              inputs[19]->GetDevData(), inputs[20]->GetDevData(), inputs[21]->GetDevData(), inputs[22]->GetDevData(),
-              inputs[23]->GetDevData(), outputs[0]->GetDevData(), outputs[1]->GetDevData(), workspace, tilingData);
-  return true;
-}
-
-bool FiaCase::InitParam() {
-  h = param.n * param.d;
-  int64_t kvNum = param.n;
-  if (param.kvNumHeads != 0) {
-    kvNum = param.kvNumHeads;
-  }
-  int64_t kvH = kvNum * param.d;
-
-  if (param.layout == "BSH") {
-    query = Tensor("query", {param.b, 1, h}, "BSH", param.qDataType, ge::FORMAT_ND);
-    key = Tensor("key", {param.b, param.s, kvH}, "BSH", param.kvDataType, ge::FORMAT_ND);
-    value = Tensor("value", {param.b, param.s, kvH}, "BSH", param.kvDataType, ge::FORMAT_ND);
-    attentionOut = Tensor("attentionOut", {param.b, 1, h}, "BSH", param.outDataType, ge::FORMAT_ND);
-  } else if (param.layout == "BNSD") {
-    query = Tensor("query", {param.b, param.n, 1, param.d}, "BNSD", param.qDataType, ge::FORMAT_ND);
-    key = Tensor("key", {param.b, kvNum, param.s, param.d}, "BNSD", param.kvDataType, ge::FORMAT_ND);
-    value = Tensor("value", {param.b, kvNum, param.s, param.d}, "BNSD", param.kvDataType, ge::FORMAT_ND);
-    attentionOut = Tensor("attentionOut", {param.b, param.n, 1, param.d}, "BNSD", param.outDataType, ge::FORMAT_ND);
-  } else if (param.layout == "BSND") {
-    query = Tensor("query", {param.b, 1, param.n, param.d}, "BSND", param.qDataType, ge::FORMAT_ND);
-    key = Tensor("key", {param.b, param.s, kvNum, param.d}, "BSND", param.kvDataType, ge::FORMAT_ND);
-    value = Tensor("value", {param.b, param.s, kvNum, param.d}, "BSND", param.kvDataType, ge::FORMAT_ND);
-    attentionOut = Tensor("attentionOut", {param.b, 1, param.n, param.d}, "BSND", param.outDataType, ge::FORMAT_ND);
-  }
-  return true;
-}
-
-bool FiaCase::InitOpInfo() {
-  bool rst = fiaCtx.SetOpName("FusedInferAttentionScore");
-  rst = rst && fiaCtx.SetDeterministic(false);
-  rst = rst && fiaCtx.SetInputs({&query, &key, &value, &pseShift, &attenMask, &actualSeqLengths, &actualSeqLengthsKV,
-                                 &deqScale1, &quantScale1, &deqScale2, &quantScale2, &quantOffset2, &antiquantScale,
-                                 &antiquantOffset, &blocktable, &queryPaddinSize, &kvPaddingSize, &keyAntiquantScale,
-                                 &keyAntiquantOffset, &valueAntiquantScale, &valueAntiquantOffset, &keySharedPrefix,
-                                 &valueSharedPrefix, &actualSharedPrefixLen});
-
-  rst = rst && fiaCtx.SetOutputs({&attentionOut, &softmaxLse});
-  rst = rst && fiaCtx.SetAttrs({{"num_head", param.numHeads},
-                                {"scale_value", param.scaleValue},
-                                {"pre_tokens", param.pre_tokens},
-                                {"next_tokens", param.next_tokens},
-                                {"input_layout", param.layout},
-                                {"num_key_value_heads", param.kvNumHeads},
-                                {"sparse_mode", param.sparse_mode},
-                                {"inner_precise", param.innerPrecise},
-                                {"antiquant_mode", param.antiquant_mode},
-                                {"softmax_lse_flag", param.softmax_lse_flag},
-                                {"key_antiquant_mode", param.key_antiquant_mode},
-                                {"value_antiquant_mode", param.value_antiquant_mode}});
-  rst = rst && fiaCtx.SetKernelRunCbf(RunFusedInferAttentionScore);
-  rst = rst && fiaCtx.SetKernelMainFunc((void *)fused_infer_attention_score);
-  rst = rst && fia.SetContext(&fiaCtx);
-  return rst;
-}
-
-bool FiaCase::InitCurrentCasePtr() {
-  Case::currentCasePtr = this;
-  return true;
-}
-
-bool FiaCase::Run() {
-  if (!enable) {
+bool RunFusedInferAttentionScore(void *func, uint64_t tilingKey, int64_t blockDim, std::vector<TensorIntf *> &inputs,
+                                 std::vector<TensorIntf *> &outputs, uint8_t *workspace, uint8_t *tilingData)
+{
+    // Kernel 运行
+    auto kernelFunc = (FiaKernelFunc)func;
+    ICPU_SET_TILING_KEY(tilingKey);
+    ICPU_RUN_KF(kernelFunc, blockDim, inputs[0]->GetDevData(), inputs[1]->GetDevData(), inputs[2]->GetDevData(),
+                inputs[3]->GetDevData(), inputs[4]->GetDevData(), inputs[5]->GetDevData(), inputs[6]->GetDevData(),
+                inputs[7]->GetDevData(), inputs[8]->GetDevData(), inputs[9]->GetDevData(), inputs[10]->GetDevData(),
+                inputs[11]->GetDevData(), inputs[12]->GetDevData(), inputs[13]->GetDevData(), inputs[14]->GetDevData(),
+                inputs[15]->GetDevData(), inputs[16]->GetDevData(), inputs[17]->GetDevData(), inputs[18]->GetDevData(),
+                inputs[19]->GetDevData(), inputs[20]->GetDevData(), inputs[21]->GetDevData(), inputs[22]->GetDevData(),
+                inputs[23]->GetDevData(), outputs[0]->GetDevData(), outputs[1]->GetDevData(), workspace, tilingData);
     return true;
-  }
-  if (!fia.ProcessTiling(name)) {
-    return false;
-  }
-  if (!fia.ProcessKernel(name)) {
-    return false;
-  }
-  return true;
 }
 
-FiaCase::FiaCase(const char* name, bool enable, const char* dbgInfo, OpInfo fia, Param param)
-    : Case(name, enable, dbgInfo), fia(std::move(fia)), param(std::move(param)) {
-  this->fia.name = "FusedInferAttentionScore";
+bool FiaCase::InitParam()
+{
+    h = mParam.n * mParam.d;
+    int64_t kvNum = mParam.n;
+    if (mParam.kvNumHeads != 0) {
+        kvNum = mParam.kvNumHeads;
+    }
+    int64_t kvH = kvNum * mParam.d;
+
+    if (mParam.layout == "BSH") {
+        query = Tensor("query", {mParam.b, 1, h}, "BSH", mParam.qDataType, ge::FORMAT_ND);
+        key = Tensor("key", {mParam.b, mParam.s, kvH}, "BSH", mParam.kvDataType, ge::FORMAT_ND);
+        value = Tensor("value", {mParam.b, mParam.s, kvH}, "BSH", mParam.kvDataType, ge::FORMAT_ND);
+        attentionOut = Tensor("attentionOut", {mParam.b, 1, h}, "BSH", mParam.outDataType, ge::FORMAT_ND);
+    } else if (mParam.layout == "BNSD") {
+        query = Tensor("query", {mParam.b, mParam.n, 1, mParam.d}, "BNSD", mParam.qDataType, ge::FORMAT_ND);
+        key = Tensor("key", {mParam.b, kvNum, mParam.s, mParam.d}, "BNSD", mParam.kvDataType, ge::FORMAT_ND);
+        value = Tensor("value", {mParam.b, kvNum, mParam.s, mParam.d}, "BNSD", mParam.kvDataType, ge::FORMAT_ND);
+        attentionOut =
+            Tensor("attentionOut", {mParam.b, mParam.n, 1, mParam.d}, "BNSD", mParam.outDataType, ge::FORMAT_ND);
+    } else if (mParam.layout == "BSND") {
+        query = Tensor("query", {mParam.b, 1, mParam.n, mParam.d}, "BSND", mParam.qDataType, ge::FORMAT_ND);
+        key = Tensor("key", {mParam.b, mParam.s, kvNum, mParam.d}, "BSND", mParam.kvDataType, ge::FORMAT_ND);
+        value = Tensor("value", {mParam.b, mParam.s, kvNum, mParam.d}, "BSND", mParam.kvDataType, ge::FORMAT_ND);
+        attentionOut =
+            Tensor("attentionOut", {mParam.b, 1, mParam.n, mParam.d}, "BSND", mParam.outDataType, ge::FORMAT_ND);
+    }
+    return true;
 }
 
-FiaCase::FiaCase() {
-}
-FiaCase::Param::Param() {
+bool FiaCase::InitOpInfo()
+{
+    bool rst = mCtx.SetOpName("FusedInferAttentionScore");
+    rst = rst && mCtx.SetDeterministic(false);
+    rst = rst && mCtx.SetInputs({&query,
+                                 &key,
+                                 &value,
+                                 &pseShift,
+                                 &attenMask,
+                                 &actualSeqLengths,
+                                 &actualSeqLengthsKV,
+                                 &deqScale1,
+                                 &quantScale1,
+                                 &deqScale2,
+                                 &quantScale2,
+                                 &quantOffset2,
+                                 &antiquantScale,
+                                 &antiquantOffset,
+                                 &blocktable,
+                                 &queryPaddinSize,
+                                 &kvPaddingSize,
+                                 &keyAntiquantScale,
+                                 &keyAntiquantOffset,
+                                 &valueAntiquantScale,
+                                 &valueAntiquantOffset,
+                                 &keySharedPrefix,
+                                 &valueSharedPrefix,
+                                 &actualSharedPrefixLen});
+
+    rst = rst && mCtx.SetOutputs({&attentionOut, &softmaxLse});
+    rst = rst && mCtx.SetAttrs({{"num_head", mParam.numHeads},
+                                {"scale_value", mParam.scaleValue},
+                                {"pre_tokens", mParam.pre_tokens},
+                                {"next_tokens", mParam.next_tokens},
+                                {"input_layout", mParam.layout},
+                                {"num_key_value_heads", mParam.kvNumHeads},
+                                {"sparse_mode", mParam.sparse_mode},
+                                {"inner_precise", mParam.innerPrecise},
+                                {"antiquant_mode", mParam.antiquant_mode},
+                                {"softmax_lse_flag", mParam.softmax_lse_flag},
+                                {"key_antiquant_mode", mParam.key_antiquant_mode},
+                                {"value_antiquant_mode", mParam.value_antiquant_mode}});
+    rst = rst && mCtx.SetKernelRunCbf(RunFusedInferAttentionScore);
+    rst = rst && mCtx.SetKernelMainFunc((void *)fused_infer_attention_score);
+    rst = rst && mOpInfo.SetContext(&mCtx);
+    return rst;
 }
 
+bool FiaCase::InitCurrentCasePtr()
+{
+    Case::mCurrentCasePtr = this;
+    return true;
+}
+
+bool FiaCase::Run()
+{
+    if (!mEnable) {
+        return true;
+    }
+    if (!mOpInfo.ProcessTiling(mName)) {
+        return false;
+    }
+    if (!mOpInfo.ProcessKernel(mName)) {
+        return false;
+    }
+    return true;
+}
+
+FiaCase::FiaCase(const char *name, bool enable, const char *dbgInfo, OpInfo fia, Param param)
+    : Case(name, enable, dbgInfo), mOpInfo(std::move(fia)), mParam(std::move(param))
+{
+    this->mOpInfo.mName = "FusedInferAttentionScore";
+}
+
+FiaCase::FiaCase()
+{
+}
+FiaCase::Param::Param()
+{
+}

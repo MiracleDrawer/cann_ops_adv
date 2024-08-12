@@ -169,10 +169,10 @@ public:
             .Float(1.0);
         this->Attr("pre_tockens")
             .AttrType(OPTIONAL)
-            .Int(65536);
+            .Int(2147483647);
         this->Attr("next_tockens")
             .AttrType(OPTIONAL)
-            .Int(65536);
+            .Int(2147483647);
         this->Attr("head_num")
             .AttrType(REQUIRED)
             .Int();

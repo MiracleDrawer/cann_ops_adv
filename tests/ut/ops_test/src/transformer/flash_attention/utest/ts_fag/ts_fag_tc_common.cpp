@@ -21,35 +21,35 @@ TEST_F(Ts_Fag_Ascend910B3, Tc_Common_InvalidShape_001)
      * 用例信息
      */
     // 用例 Shape 和 Attrs 信息
-    case_->param.b = 2;
-    case_->param.n2 = 16;
-    case_->param.g = 1;
-    case_->param.s1 = 2048;
-    case_->param.s2 = 2048;
-    case_->param.d = 32;
-    case_->param.dtype = ge::DataType::DT_FLOAT16;
-    case_->param.layoutType = LayoutType::BSH;
-    case_->param.scale = 1.0f;
-    case_->param.keepProb = 0.9f;
-    case_->param.preTokens = 65536;
-    case_->param.nxtTokens = 65536;
-    case_->param.innerPrecise = 0;
-    case_->param.sparseMode = 0;
-    case_->param.pseShapeType = PseShapeType::NONE;
-    case_->param.dropMaskShapeType = DropMaskShapeType::NONE;
-    case_->param.paddingMaskShapeType = PaddingMaskShapeType::NONE;
-    case_->param.attenMaskShapeType = AttenMaskShapeType::NONE;
-    case_->param.attenMaskDtype = ge::DataType::DT_BOOL;
-    case_->param.prefixShapeType = PrefixShapeType::NONE;
+    case_->mParam.b = 2;
+    case_->mParam.n2 = 16;
+    case_->mParam.g = 1;
+    case_->mParam.s1 = 2048;
+    case_->mParam.s2 = 2048;
+    case_->mParam.d = 32;
+    case_->mParam.dtype = ge::DataType::DT_FLOAT16;
+    case_->mParam.layoutType = LayoutType::BSH;
+    case_->mParam.scale = 1.0f;
+    case_->mParam.keepProb = 0.9f;
+    case_->mParam.preTokens = 65536;
+    case_->mParam.nxtTokens = 65536;
+    case_->mParam.innerPrecise = 0;
+    case_->mParam.sparseMode = 0;
+    case_->mParam.pseShapeType = PseShapeType::NONE;
+    case_->mParam.dropMaskShapeType = DropMaskShapeType::NONE;
+    case_->mParam.paddingMaskShapeType = PaddingMaskShapeType::NONE;
+    case_->mParam.attenMaskShapeType = AttenMaskShapeType::NONE;
+    case_->mParam.attenMaskDtype = ge::DataType::DT_BOOL;
+    case_->mParam.prefixShapeType = PrefixShapeType::NONE;
 
     // 用例 期望信息
-    case_->reverse.exp.success = false;
+    case_->mReverse.mExp.mSuccess = false;
 
     // 用例 信息初始化及修正
     ASSERT_TRUE(case_->Init());
-    case_->param.attenRes = Tensor("atten_res", {case_->param.b + 1, case_->param.s1, case_->param.h1},
-                                   case_->param.layout.c_str(), case_->param.dtype, ge::FORMAT_ND);
+    case_->mParam.attenRes = Tensor("atten_res", {case_->mParam.b + 1, case_->mParam.s1, case_->mParam.h1},
+                                    case_->mParam.layout.c_str(), case_->mParam.dtype, ge::FORMAT_ND);
 
     // 用例 执行
-    ASSERT_EQ(case_->Run(), case_->reverse.exp.success);
+    ASSERT_EQ(case_->Run(), case_->mReverse.mExp.mSuccess);
 }

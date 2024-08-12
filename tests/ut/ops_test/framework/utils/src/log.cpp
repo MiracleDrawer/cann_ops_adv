@@ -9,15 +9,27 @@
  */
 
 /*!
- * \file control_info.cpp
- * \brief 测试用例控制信息.
+ * \file log.cpp
+ * \brief
  */
 
-#include "tests/utils/control_info.h"
+#include "tests/utils/log.h"
 
-using namespace ops::adv::tests::utils;
+namespace {
+uint32_t g_LogErrCnt = 0;
+}
 
-ControlInfo::ControlInfo(bool runTiling, bool runKernel, bool deterministic)
-    : mRunTiling(runTiling), mRunKernel(runKernel), mDeterministic(deterministic)
+void ops::adv::tests::utils::AddLogErrCnt()
 {
+    g_LogErrCnt++;
+}
+
+bool ops::adv::tests::utils::ChkLogErrCnt()
+{
+    auto rst = g_LogErrCnt == 0;
+    if (!rst) {
+        fprintf(stdout, "%s:%d [ERROR] There have %u error log in current case.\n", __FILE__, __LINE__, g_LogErrCnt);
+        g_LogErrCnt = 0;
+    }
+    return rst;
 }

@@ -46,7 +46,7 @@ __aicore__ inline void DataCopyOut(const __gm__ void *gm, const LocalTensor<int8
 
 template <typename T1, typename T2, const uint32_t IS_ATTEN_MASK = 0, const uint32_t IS_PSE = 1,
           const uint32_t IS_DROP = 1, const CubeFormat MM_OUT_FORMAT = CubeFormat::ND, const uint32_t INPUT_LAYOUT = 0,
-          const CubeFormat MM2_OUT_FORMAT = CubeFormat::ND>
+          const CubeFormat MM2_OUT_FORMAT = CubeFormat::NZ>
 class FlashAttentionScoreGradS1s2Bn2gs1s2 {
 public:
     __aicore__ inline FlashAttentionScoreGradS1s2Bn2gs1s2(){};
@@ -113,7 +113,12 @@ public:
         Matmul<aType2, bType2, cType2, biasType2, NORM_DISABLE_INIT>>::type;
     modeTypeMm mm3;
 
-    Matmul<aType2, bType2, cType2, biasType2, NORM_DISABLE_INIT> mm4;
+    using modeTypeMm4 = typename AscendC::Conditional<
+        (MM_OUT_FORMAT == CubeFormat::NZ && MM2_OUT_FORMAT == CubeFormat::NZ),
+        Matmul<aType2, bType2, cType2, biasType2, NORM_DISABLE_INIT, MatmulCallBackFunc<DataCopyOut>>,
+        Matmul<aType2, bType2, cType2, biasType2, NORM_DISABLE_INIT>>::type;
+
+    modeTypeMm4 mm4;
 
     __aicore__ inline void NZCopyIn(int64_t mmAddr, GlobalTensor<T2> &mmWspGm, LocalTensor<T2> &mmTensorCurr,
                                     uint32_t s1VecSize, uint32_t s2VecSize);
@@ -858,7 +863,8 @@ FlashAttentionScoreGradS1s2Bn2gs1s2<T1, T2, IS_ATTEN_MASK, IS_PSE, IS_DROP, MM_O
                                     MM2_OUT_FORMAT>::IsCubeBlockNeedCompute(int64_t baseIdx)
 {
     if constexpr (INPUT_LAYOUT == TND) {
-        int64_t resbaseIdx = baseIdx;
+        // 安全防护，baseIdx不可小于0，防止gDimTail、s2oCvDimIdx等出现除0
+        int64_t resbaseIdx = baseIdx < 0 ? 0 : baseIdx;
         int64_t actualS1Len;
         int64_t actualS2Len;
         for (int64_t bIdx = 0; bIdx < b; bIdx++) {
@@ -1257,7 +1263,8 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2<T1, T2, IS_ATTEN_MASK
                                                            INPUT_LAYOUT, MM2_OUT_FORMAT>::InitIndex(int64_t index)
 {
     if constexpr (INPUT_LAYOUT == TND) {
-        int64_t resbaseIdx = index;
+        // 安全防护，index不可小于0，防止n2DimIdx、gDimIdx等出现除0
+        int64_t resbaseIdx = index < 0 ? 0 : index;
         int64_t actualS1Len;
         int64_t actualS2Len;
         for (uint32_t bIdx = 0; bIdx < b; bIdx++) {
@@ -1863,6 +1870,10 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2<T1, T2, IS_ATTEN_MASK
             s1StrideSize = n2 * g * d;
             s2StrideSize = n2 * d;
         }
+        if constexpr (MM2_OUT_FORMAT == CubeFormat::NZ) {
+            dqOffset = (((static_cast<int64_t>(bDimIdx) * n2 + n2DimIdx) * g + gDimIdx) * s1) * dAlign + s1oDimIdx * s1CvInner * C0_SIZE;
+            dkvOffset = ((static_cast<int64_t>(bDimIdx) * n2 + n2DimIdx) * s2) * dAlign + preS2CvBegin * C0_SIZE;
+        }
     }
     if constexpr (MM2_OUT_FORMAT == CubeFormat::ND) {
         dqOffset = mm1aTensorOffsetCv;
@@ -2082,13 +2093,28 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2<T1, T2, IS_ATTEN_MASK
     // Matmal4 dq
     ///////////////////////////////////////////////////////////////
     // left [B, N2, G, S1, s2] right [B, N2, 1, S2, D] output [B, N2, G, S1, D]
+    if (MM_OUT_FORMAT == CubeFormat::NZ && MM2_OUT_FORMAT == CubeFormat::NZ && INPUT_LAYOUT != TND) {
+        mm4.SetSelfDefineData(s1);
+    }
     if constexpr (INPUT_LAYOUT == BNGSD) {
-        mm4.SetOrgShape(s1_size, d, s2CvExtendAlign);
+        if (MM2_OUT_FORMAT == CubeFormat::NZ) {
+            mm4.SetOrgShape(s1_size, d, s2CvExtendAlign);
+        } else {
+            mm4.SetOrgShape(s1_size, d, s2CvExtendAlign);
+        }
     } else if constexpr (INPUT_LAYOUT == SBNGD) {
-        mm4.SetOrgShape(s1_size, static_cast<int64_t>(b) * n2 * d, s2CvExtendAlign, s2,
+        if (MM2_OUT_FORMAT == CubeFormat::NZ) {
+            mm4.SetOrgShape(s1_size, static_cast<int64_t>(b) * n2 * d, s2CvExtendAlign, s2, d);
+        } else {
+            mm4.SetOrgShape(s1_size, static_cast<int64_t>(b) * n2 * d, s2CvExtendAlign, s2,
                         static_cast<int64_t>(b) * n2 * g * d);
+        }
     } else if constexpr (INPUT_LAYOUT == BSNGD) {
-        mm4.SetOrgShape(s1_size, n2 * d, s2CvExtendAlign, s2, n2 * g * d);
+        if (MM2_OUT_FORMAT == CubeFormat::NZ) {
+            mm4.SetOrgShape(s1_size, n2 * d, s2CvExtendAlign, s2, d);
+        } else {
+            mm4.SetOrgShape(s1_size, n2 * d, s2CvExtendAlign, s2, n2 * g * d);
+        }
     } else if constexpr (INPUT_LAYOUT == TND) {
         GetSeqQlenKvlenByBidx(bDimIdxTmp, actualS1Len, actualS2Len);
         if constexpr (MM2_OUT_FORMAT == CubeFormat::NZ) {
@@ -2108,12 +2134,27 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2<T1, T2, IS_ATTEN_MASK
     ///////////////////////////////////////////////////////////////
     // left [B, N2, G, S1, S2] right [B, N2, 1, S1, D] output [B, N2, G, S2, D]
     if constexpr (INPUT_LAYOUT == BNGSD) {
-        mm3.SetOrgShape(s2CvExtendAlign, d, s1_size);
+        if constexpr (MM2_OUT_FORMAT == CubeFormat::NZ) {
+            mm3.SetOrgShape(s2CvExtendAlign, d, s1_size);
+            mm3.SetSelfDefineData(s2);
+        } else {
+            mm3.SetOrgShape(s2CvExtendAlign, d, s1_size);
+        }
     } else if constexpr (INPUT_LAYOUT == SBNGD) {
-        mm3.SetOrgShape(s2CvExtendAlign, static_cast<int64_t>(b) * n2 * g * d, s1_size, s1,
+        if constexpr (MM2_OUT_FORMAT == CubeFormat::NZ) {
+            mm3.SetOrgShape(s2CvExtendAlign, static_cast<int64_t>(b) * n2 * g * d, s1_size, s1, d);
+            mm3.SetSelfDefineData(s2);
+        } else {
+            mm3.SetOrgShape(s2CvExtendAlign, static_cast<int64_t>(b) * n2 * g * d, s1_size, s1,
                         static_cast<int64_t>(b) * n2 * d);
+        }
     } else if constexpr (INPUT_LAYOUT == BSNGD) {
-        mm3.SetOrgShape(s2CvExtendAlign, n2 * g * d, s1_size, s1, n2 * d);
+        if constexpr (MM2_OUT_FORMAT == CubeFormat::NZ) {
+            mm3.SetOrgShape(s2CvExtendAlign, n2 * g * d, s1_size, s1, d);
+            mm3.SetSelfDefineData(s2);
+        } else {
+            mm3.SetOrgShape(s2CvExtendAlign, n2 * g * d, s1_size, s1, n2 * d);
+        }
     } else if constexpr (INPUT_LAYOUT == TND) {
         GetSeqQlenKvlenByBidx(bDimIdxTmp, actualS1Len, actualS2Len);
         if constexpr (MM2_OUT_FORMAT == CubeFormat::NZ) {

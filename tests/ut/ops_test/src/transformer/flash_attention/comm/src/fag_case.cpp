@@ -30,13 +30,13 @@ FagCase::FagCase(const char *name, bool enable, const char *dbgInfo, OpInfo reve
 
 bool FagCase::Run()
 {
-    if (!enable) {
+    if (!mEnable) {
         return true;
     }
-    if (!reverse.ProcessTiling(name)) {
+    if (!mReverse.ProcessTiling(mName)) {
         return false;
     }
-    if (!reverse.ProcessKernel(name)) {
+    if (!mReverse.ProcessKernel(mName)) {
         return false;
     }
     return true;

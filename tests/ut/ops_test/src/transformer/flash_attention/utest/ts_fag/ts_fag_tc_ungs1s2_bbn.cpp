@@ -20,7 +20,7 @@ class Ts_Fag_Ascend910B2_Ungs1s2Bbn : public Ts_Fag_WithParam_Ascend910B2 {};
 TEST_P(Ts_Fag_Ascend910B2_Ungs1s2Bbn, Tc_BatchCase)
 {
     ASSERT_TRUE(case_->Init());
-    ASSERT_EQ(case_->Run(), case_->reverse.exp.success);
+    ASSERT_EQ(case_->Run(), case_->mReverse.mExp.mSuccess);
 }
 
 const auto Tc_Fag_Ungs1s2Bbn_BatchCase = ::testing::Values(

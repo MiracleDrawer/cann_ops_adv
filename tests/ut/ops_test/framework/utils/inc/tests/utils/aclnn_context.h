@@ -40,7 +40,7 @@ public:
     aclOpExecutor *GetAclOpExecutor() const;
 
     /* Tiling */
-    bool RunTiling() override;
+    bool RunTiling(std::string &caseName) override;
 
 protected:
     TilingRunCbf tilingRunCbf_ = nullptr;
@@ -49,7 +49,7 @@ protected:
     aclOpExecutor *aclOpExecutor_ = nullptr;
 
 protected:
-    bool RunKernelProcess() override;
+    bool RunKernelProcess(std::string &caseName) override;
     uint8_t *AllocWorkspaceImpl(uint64_t size) override;
     void FreeWorkspaceImpl(uint8_t *ptr) override;
 

@@ -24,6 +24,7 @@ static const uint64_t DIM_NUM_2 = 2;
 
 ge::graphStatus InferShape4FlashAttentionScoreGrad(gert::InferShapeContext *context)
 {
+    OPS_LOG_E_IF_NULL("context", context, return ge::GRAPH_FAILED);
     OPS_LOG_I(context, "Enter FlashAttentionScoreGrad runtime infershape impl.");
     const gert::Shape *queryShape = context->GetInputShape(0);
     OPS_LOG_E_IF_NULL(context, queryShape, return ge::GRAPH_FAILED)
@@ -36,7 +37,9 @@ ge::graphStatus InferShape4FlashAttentionScoreGrad(gert::InferShapeContext *cont
     OPS_LOG_E_IF_NULL(context, attrs, return ge::GRAPH_FAILED)
 
     auto headNum = attrs->GetInt(4); // N1
+    OPS_LOG_E_IF_NULL(context, headNum, return ge::GRAPH_FAILED)
     const char *inputLayout = attrs->GetAttrPointer<char>(5);
+    OPS_LOG_E_IF_NULL(context, inputLayout, return ge::GRAPH_FAILED)
     std::string inputLayoutStr = std::string(inputLayout);
     for (auto &c : inputLayoutStr) {
         c = toupper(c);
@@ -102,7 +105,9 @@ ge::graphStatus InferShape4FlashAttentionScoreGrad(gert::InferShapeContext *cont
 
 ge::graphStatus InferDataType4FlashAttentionScoreGrad(gert::InferDataTypeContext *context)
 {
+    OPS_LOG_E_IF_NULL("context", context, return ge::GRAPH_FAILED);
     OPS_LOG_I(context, "Enter FlashAttentionScoreGrad infer data type impl.");
+
     auto dtype = context->GetInputDataType(0);
     // dq, outidx:0
     context->SetOutputDataType(0, dtype);
@@ -111,6 +116,7 @@ ge::graphStatus InferDataType4FlashAttentionScoreGrad(gert::InferDataTypeContext
     // dv, outidx:2
     context->SetOutputDataType(2, dtype);
     // dpse, outidx:3
+    // 后续针对pse内部生成的场景，Dtype就不能跟随qkv了
     context->SetOutputDataType(3, dtype);
     return GRAPH_SUCCESS;
 }

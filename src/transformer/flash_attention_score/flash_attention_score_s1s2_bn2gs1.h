@@ -334,15 +334,15 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
     this->pseGm.SetGlobalBuffer((__gm__ INPUT_T *)pse);
     this->pseSlope = pse;
     this->prefixNAddr = prefix;
-
     this->dropMaskUnAligned = this->tilingData->inputParams.needDropMaskOp == 1;
     if (this->dropMaskUnAligned) {
         this->dropMaskGm.SetGlobalBuffer(workspace);
-        workspace += this->tilingData->dropmaskParams.shapeTotalSize;
+        if constexpr (hasDrop == true) {
+            workspace += CeilDiv(this->tilingData->dropmaskParams.shapeTotalSize, 512) * 512;
+        }
     } else {
         this->dropMaskGm.SetGlobalBuffer((__gm__ uint8_t *)dropMask);
     }
-
     this->attenMaskGmInt.SetGlobalBuffer((__gm__ uint8_t *)attenMask);
     this->softmaxMaxGm.SetGlobalBuffer((__gm__ float *)softmaxMax);
     this->softmaxSumGm.SetGlobalBuffer((__gm__ float *)softmaxSum);
@@ -359,10 +359,16 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
 
     // NZND场景，stage1Result不与bmm1Result共用空间，需要占用1倍mmNRatioOffset空间
     if constexpr (bmm1Format == CubeFormat::NZ) {
-        if (this->tilingData->inputParams.s2Size % 64 != 0) {
+        if constexpr (layOutType == LayOutTypeEnum::LAYOUT_TND) {
             vector1OffsetPing = mmNRatioOffset * GM_DOUBLE_BUFFER;
             vector1OffsetPong = vector1OffsetPing + mmNRatioOffset / 2;
             bmm1AndVec1Ratio = GM_DOUBLE_BUFFER + 1;
+        } else {
+            if (this->tilingData->inputParams.s2Size % 64 != 0) {
+                vector1OffsetPing = mmNRatioOffset * GM_DOUBLE_BUFFER;
+                vector1OffsetPong = vector1OffsetPing + mmNRatioOffset / 2;
+                bmm1AndVec1Ratio = GM_DOUBLE_BUFFER + 1;
+            }
         }
     }
 
@@ -443,13 +449,8 @@ __aicore__ inline void FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPs
     uint64_t maskTBufPongSize = 16 * 1024;
 
     // 可选输入的buffer空间，保持和stage1处理的size一致
-    if constexpr (layOutType != LayOutTypeEnum::LAYOUT_TND) {
-        this->pipe->InitBuffer(this->maskTBufPing, stage1AttenSize); // 可以给attenmask 9k
-        this->pipe->InitBuffer(this->maskTBufPong, maskTBufPongSize); // 可以给dropoutmask 16k
-    } else {
-        this->pipe->InitBuffer(this->maskTBufPing, 10752); // 可以给attenmask 10.5k
-        this->pipe->InitBuffer(this->maskTBufPong, maskTBufPongSize); // 可以给dropoutmask 16k
-    }
+    this->pipe->InitBuffer(this->maskTBufPing, stage1AttenSize); // 可以给attenmask 9k
+    this->pipe->InitBuffer(this->maskTBufPong, maskTBufPongSize); // 可以给dropoutmask 16k
     this->pipe->InitBuffer(this->pseTBuf, 16384); // pse 16k
 
     this->pipe->InitBuffer(this->stage1PingBuf, stage2Size * sizeof(T)); // t.a 32k
@@ -1003,7 +1004,7 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
             this->lastS2RealSize = extraInfo.s2RealSize;
         }
     } else {
-        bmm1.SetOrgShape(extraInfo.s1Size, this->mm1Kb, this->mm1Ka, this->mm1Kb, extraInfo.s2RealSize);
+        bmm1.SetOrgShape(extraInfo.s1RealSize, this->mm1Kb, this->mm1Ka, this->mm1Kb, extraInfo.s2RealSize);
     }
 
     this->Bmm1SetTensorA(extraInfo, bmm1);

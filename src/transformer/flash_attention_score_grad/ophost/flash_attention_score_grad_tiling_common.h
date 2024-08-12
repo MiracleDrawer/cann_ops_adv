@@ -236,15 +236,15 @@ template <typename T> static T AlignUp(T num1, T num2)
     }
     return (num1 + num2 - 1) / num2 * num2;
 }
-ge::graphStatus CheckSoftmaxMaxShape(gert::TilingContext *context, uint32_t b, uint32_t n1, uint32_t s1);
-ge::graphStatus CheckTndSoftmaxMaxShape(gert::TilingContext *context, uint32_t t1, uint32_t n1);
-ge::graphStatus CheckSoftmaxSumShape(gert::TilingContext *context, uint32_t b, uint32_t n1, uint32_t s1);
-ge::graphStatus CheckTndSoftmaxSumShape(gert::TilingContext *context, uint32_t t1, uint32_t n1);
+ge::graphStatus CheckSoftmaxMaxShape(gert::TilingContext *context, int64_t b, int64_t n1, int64_t s1);
+ge::graphStatus CheckTndSoftmaxMaxShape(gert::TilingContext *context, int64_t t1, int64_t n1);
+ge::graphStatus CheckSoftmaxSumShape(gert::TilingContext *context, int64_t b, int64_t n1, int64_t s1);
+ge::graphStatus CheckTndSoftmaxSumShape(gert::TilingContext *context, int64_t t1, int64_t n1);
 ge::graphStatus CheckAttentionInShape(gert::TilingContext *context);
 ge::graphStatus CheckSoftmaxDtype(gert::TilingContext *context);
 ge::graphStatus CheckAttentionInDtype(gert::TilingContext *context);
-ge::graphStatus CheckShapeValid(gert::TilingContext *context, uint32_t b, uint32_t n1, uint32_t s1, uint32_t d);
-ge::graphStatus CheckTndShapeValid(gert::TilingContext *context, uint32_t t1, uint32_t n1, uint32_t d);
+ge::graphStatus CheckShapeValid(gert::TilingContext *context, int64_t b, int64_t n1, int64_t s1, int64_t d);
+ge::graphStatus CheckTndShapeValid(gert::TilingContext *context, int64_t t1, int64_t n1, int64_t d);
 ge::graphStatus CheckDtypeValid(gert::TilingContext *context);
 bool IsSameShape(const gert::StorageShape *aShape, const gert::StorageShape *bShape);
 
@@ -272,6 +272,23 @@ TILING_DATA_FIELD_DEF(uint64_t, dropBeginAddr);
 END_TILING_DATA_DEF;
 REGISTER_TILING_DATA_CLASS(PreParamsOp, PreParams)
 
+// sfmg pre
+BEGIN_TILING_DATA_DEF(PreSfmgParams)
+TILING_DATA_FIELD_DEF(uint32_t, usedCoreNum);
+TILING_DATA_FIELD_DEF(uint32_t, inputBufferLen);
+TILING_DATA_FIELD_DEF(uint32_t, castBufferLen);
+TILING_DATA_FIELD_DEF(uint32_t, outputBufferLen);
+TILING_DATA_FIELD_DEF(uint32_t, tempBufferLen);
+TILING_DATA_FIELD_DEF(int64_t, singleLoopNBurstNum);
+TILING_DATA_FIELD_DEF(int64_t, normalCoreLoopTimes);
+TILING_DATA_FIELD_DEF(int64_t, tailCoreLoopTimes);
+TILING_DATA_FIELD_DEF(int64_t, normalCoreLastLoopNBurstNum);
+TILING_DATA_FIELD_DEF(int64_t, tailCoreLastLoopNBurstNum);
+TILING_DATA_FIELD_DEF(int64_t, normalCoreNBurstNums);
+TILING_DATA_FIELD_DEF(int64_t, sfmgPreBeginAddr);
+END_TILING_DATA_DEF;
+REGISTER_TILING_DATA_CLASS(PreSfmgParamsOp, PreSfmgParams)
+
 // dq/dv/dk cast fp322T1
 BEGIN_TILING_DATA_DEF(PostParams)
 TILING_DATA_FIELD_DEF(uint32_t, coreNum);
@@ -291,6 +308,12 @@ TILING_DATA_FIELD_DEF(uint64_t, kvSizeAlign);
 TILING_DATA_FIELD_DEF(uint64_t, dqWorkSpaceOffset);
 TILING_DATA_FIELD_DEF(uint64_t, dkWorkSpaceOffset);
 TILING_DATA_FIELD_DEF(uint64_t, dvWorkSpaceOffset);
+TILING_DATA_FIELD_DEF(int64_t, b);
+TILING_DATA_FIELD_DEF(int64_t, n2);
+TILING_DATA_FIELD_DEF(int64_t, g);
+TILING_DATA_FIELD_DEF(int64_t, s1);
+TILING_DATA_FIELD_DEF(int64_t, s2);
+TILING_DATA_FIELD_DEF(int64_t, d);
 
 END_TILING_DATA_DEF;
 REGISTER_TILING_DATA_CLASS(PostParamsOp, PostParams)

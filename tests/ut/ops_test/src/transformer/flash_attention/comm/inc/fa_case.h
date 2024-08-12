@@ -54,17 +54,17 @@ public:
 
 public:
     /* 算子控制信息 */
-    OpInfo forward;
-    OpInfo reverse;
-    Context forwardCtx;
-    Context reverseCtx;
+    OpInfo mForward;
+    OpInfo mReverse;
+    Context mForwardCtx;
+    Context mReverseCtx;
 
     /* 输入/输出 参数 */
-    FaParam param;
+    FaParam mParam;
 
-    gert::OpImplKernelRegistry::TilingKernelFunc fasOriginTilingFunc = nullptr;
-    gert::OpImplKernelRegistry::TilingKernelFunc fagOriginTilingFunc = nullptr;
-    PreTilingRunCbf preTilingRunCbf = nullptr;
+    gert::OpImplKernelRegistry::TilingKernelFunc mFasOriginTilingFunc = nullptr;
+    gert::OpImplKernelRegistry::TilingKernelFunc mFagOriginTilingFunc = nullptr;
+    PreTilingRunCbf mPreTilingRunCbf = nullptr;
 
 public:
     FaCase();

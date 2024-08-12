@@ -24,7 +24,6 @@ constexpr uint32_t HALF_PRECISION_SIZE = 2;
 constexpr uint32_t FLOAT_PRECISION_SIZE = 4;
 constexpr uint32_t MASK_FLOAT_VALUE = 64;
 constexpr uint32_t MASK_HALF_VALUE = 128;
-constexpr uint32_t USED_UB_BLOCK = 5;
 constexpr uint32_t WORK_SPACE_BASE_CAL = 32 * 1024 * 1024; // 100MB系统预留
 constexpr uint32_t BLOCK = 32;                             // 32B
 constexpr uint32_t B32 = 4;                                // 4B
@@ -36,8 +35,6 @@ constexpr uint32_t BASE_LEN_256 = 256;
 constexpr uint32_t BASE_LEN_512 = 512;
 constexpr uint32_t BASE_LEN_64 = 64;
 constexpr uint32_t BASE_LEN_32 = 32;
-constexpr uint32_t INPUT_BUFFER_LEN = 60 * 1024;
-constexpr uint32_t OUTPUT_BUFFER_LEN = 30 * 1024;
 constexpr uint32_t NUMBER_2 = 2;
 constexpr uint32_t BITNUM = 8;
 constexpr int64_t GM_ALIGN = 512;
@@ -125,8 +122,11 @@ uint64_t FlashAttentionScoreGradTilingS1s2Bn2::GetTilingKey() const
         layout = LayoutEnum::TND;
         mmOutFormat = CubeFormatEnum::ND;
     }
+
+    auto mm345IsNZOut = tmpData_.queryType != ge::DT_FLOAT && !isTnd && (tmpData_.d == 72 || tmpData_.d == 88)
+        ? OptionEnum::ENABLE : OptionEnum::DISABLE;
     tilingKey = GET_TILINGKEY(AxisEnum::S2, AxisEnum::S1, AxisEnum::N2, inDtype, layout, SparseEnum::ALL, mmConfig,
-                              mmOutFormat, tmpData_.pse_cfg, tmpData_.atten_mask_cfg, tmpData_.drop_out_cfg);
+                mmOutFormat, tmpData_.pse_cfg, tmpData_.atten_mask_cfg, tmpData_.drop_out_cfg, mm345IsNZOut);
 
     OPS_LOG_I(context_, "FAGTiling S1s2Bn2 DoTiling success, tilingkey is %lu.", tilingKey);
     return tilingKey;
@@ -137,7 +137,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::GetPlatformInfo()
     auto platformInfoPtr = context_->GetPlatformInfo();
     if (platformInfoPtr == nullptr) {
         auto compileInfoPtr = reinterpret_cast<const FlashAttentionScoreGradCompileInfo *>(context_->GetCompileInfo());
-        OPS_ERR_IF(compileInfoPtr == nullptr, OPS_REPORT_CUBE_INNER_ERR(context_, "compile_info is null"),
+        OPS_ERR_IF(compileInfoPtr == nullptr, OPS_REPORT_VECTOR_INNER_ERR(context_, "compile_info is null"),
                    return ge::GRAPH_FAILED);
 
         aicoreParams_.blockDim = compileInfoPtr->aivNum;
@@ -157,6 +157,16 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::GetPlatformInfo()
         ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_B, aicoreParams_.l0bSize);
         ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_C, aicoreParams_.l0cSize);
     }
+
+    OPS_ERR_IF((aicoreParams_.blockDim == 0) || (aicoreParams_.aicNum == 0),
+                OPS_REPORT_VECTOR_INNER_ERR(context_, "num of coreNum(aivNum) is %ld, num of aicNum is %ld.",
+                aicoreParams_.blockDim, aicoreParams_.aicNum),
+                return ge::GRAPH_FAILED);
+
+    OPS_ERR_IF(aicoreParams_.ubSize <= 0,
+                OPS_REPORT_VECTOR_INNER_ERR(context_, "ubSize is invalid."),
+                return ge::GRAPH_FAILED);
+
     return ge::GRAPH_SUCCESS;
 }
 
@@ -620,6 +630,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::GetShapeAttrsInfo()
     /*
     Get all shape info and attr
     */
+    OPS_ERR_IF(context_ == nullptr,
+            OPS_REPORT_VECTOR_INNER_ERR(context_, "context is nullptr."),
+            return ge::GRAPH_FAILED);
     OPS_ERR_IF(context_->GetAttrs() == nullptr,
             OPS_REPORT_VECTOR_INNER_ERR(context_, "GetAttrs is nullptr."),
             return ge::GRAPH_FAILED);
@@ -673,9 +686,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::GetShapeAttrsInfo()
     td_.opInfo.set_nextTokens(*context_->GetAttrs()->GetAttrPointer<int>(NEXT_TOKENS));
     if (attrs->GetAttrNum() > static_cast<size_t>(PSETYPE)) {
         tmpData_.pseType = *(context_->GetAttrs()->GetAttrPointer<int64_t>(PSETYPE)); //8
-        if (tmpData_.pseType < 0 || tmpData_.pseType >= PSE_INVALID_TYPE) {
-            return ge::GRAPH_FAILED;
-        }
+        OPS_ERR_IF((tmpData_.pseType < 0 || tmpData_.pseType >= PSE_INVALID_TYPE),
+                    OPS_REPORT_VECTOR_INNER_ERR(context_, "pseType is invalid."),
+                    return ge::GRAPH_FAILED);
     }
     td_.opInfo.set_pseType(tmpData_.pseType);
 
@@ -1068,39 +1081,59 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::DoLibApiTiling()
 ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::DoCastTiling()
 {
     // query
+    int64_t dAlign = (td_.opInfo.get_D() + 15) / 16 * 16;
     int64_t allNumQuery =
-        td_.opInfo.get_B() * td_.opInfo.get_N2() * td_.opInfo.get_G() * td_.opInfo.get_S1() * td_.opInfo.get_D();
+        td_.opInfo.get_B() * td_.opInfo.get_N2() * td_.opInfo.get_G() * td_.opInfo.get_S1() * dAlign;
     // TND时候要按照真实的query的num数计算
     if (td_.opInfo.get_layout() == static_cast<uint32_t>(InputLayout::TND)) {
         allNumQuery = tmpData_.t1 * td_.opInfo.get_N2() * td_.opInfo.get_G() * td_.opInfo.get_D();
     }
 
     // K V
-    int64_t allNumKv = td_.opInfo.get_B() * td_.opInfo.get_N2() * td_.opInfo.get_S2() * td_.opInfo.get_D();
+    int64_t allNumKv = td_.opInfo.get_B() * td_.opInfo.get_N2() * td_.opInfo.get_S2() * dAlign;
     // TND时候要按照真实的k，v的num数计算
     if (td_.opInfo.get_layout() == static_cast<uint32_t>(InputLayout::TND)) {
         allNumKv = tmpData_.t2 * td_.opInfo.get_N2() * 1 * td_.opInfo.get_D();
     }
     uint32_t typeSize = tmpData_.queryType == ge::DT_FLOAT ? B32 : B16;
     uint32_t usedCoreNum = td_.opInfo.get_castUsedCoreNum();
+    constexpr uint32_t POST_NZ_COEX_NODE = 5;
+    constexpr uint32_t BLOCK_SIZE = 32;
+    constexpr uint32_t POST_NZ_RESERVED_N = 1;
+    auto mm345IsNZOut = tmpData_.queryType != ge::DT_FLOAT &&
+        td_.opInfo.get_layout() != static_cast<uint32_t>(InputLayout::TND) && (tmpData_.d == 72 || tmpData_.d == 88);
+    uint32_t postUbBaseSize = 0;
+    uint32_t qPostBaseNum = 0;
+    int64_t nzReservedSize = 0;
+    if (!mm345IsNZOut) {
+        postUbBaseSize = (aicoreParams_.ubSize) / POST_COEX_NODE / BUFFER_NUM / BASE_LEN_256 * BASE_LEN_256;
+        qPostBaseNum = postUbBaseSize / typeSize;
+    } else {
+        int64_t curPostCoexNode = POST_NZ_COEX_NODE;
+        nzReservedSize = dAlign / 16 * BLOCK_SIZE * POST_NZ_RESERVED_N; // 16为一个单元长度
+        postUbBaseSize = (aicoreParams_.ubSize - nzReservedSize) / curPostCoexNode / BUFFER_NUM /
+                             BASE_LEN_256 * BASE_LEN_256;
+        qPostBaseNum = postUbBaseSize / typeSize / dAlign * td_.opInfo.get_D();
+    }
 
-    uint32_t postUbBaseSize = (aicoreParams_.ubSize) / POST_COEX_NODE / BUFFER_NUM / BASE_LEN_256 * BASE_LEN_256;
-    uint32_t qPostBaseNum = postUbBaseSize / typeSize;
     OPS_ERR_IF(qPostBaseNum == 0,
                OPS_REPORT_VECTOR_INNER_ERR(context_, "qPostBaseNum is 0."),
                return ge::GRAPH_FAILED);
-    int64_t qPostBlockTotal = allNumQuery;
+    OPS_ERR_IF(usedCoreNum == 0,
+               OPS_REPORT_VECTOR_INNER_ERR(context_, "castUsedCoreNum is 0."),
+               return ge::GRAPH_FAILED);
+    int64_t qPostBlockTotal = allNumQuery / dAlign * td_.opInfo.get_D();
     int64_t qSizeAlign = (qPostBlockTotal + BASE_LEN_256 - 1) / GM_ALIGN * GM_ALIGN * typeSize;
     int64_t qPostTailNumTmp = qPostBlockTotal % qPostBaseNum;
     int64_t qPostTailNum = qPostTailNumTmp == 0 ? qPostBaseNum : qPostTailNumTmp;
     int64_t qPostBlockOuterTotal = (qPostBlockTotal + qPostBaseNum - 1) / qPostBaseNum;
     int64_t qPostBlockFactor = (qPostBlockOuterTotal + usedCoreNum - 1) / usedCoreNum;
 
-    int64_t kvPostBaseNum = postUbBaseSize / typeSize;
+    int64_t kvPostBaseNum = qPostBaseNum;
     OPS_ERR_IF(kvPostBaseNum == 0,
                OPS_REPORT_VECTOR_INNER_ERR(context_, "kvPostBaseNum is 0."),
                return ge::GRAPH_FAILED);
-    int64_t kvPostBlockTotal = allNumKv;
+    int64_t kvPostBlockTotal = allNumKv / dAlign * td_.opInfo.get_D();
     int64_t kvSizeAlign = (kvPostBlockTotal + GM_ALIGN - 1) / GM_ALIGN * GM_ALIGN * typeSize;
     int64_t kvPostTailNumTmp = kvPostBlockTotal % kvPostBaseNum;
     int64_t kvPostTailNum = kvPostTailNumTmp == 0 ? kvPostBaseNum : kvPostTailNumTmp;
@@ -1121,11 +1154,18 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::DoCastTiling()
     td_.postTilingData.set_kvPostBaseNum(kvPostBaseNum);
     td_.postTilingData.set_kvPostTailNum(kvPostTailNum);
     td_.postTilingData.set_kvSizeAlign(kvSizeAlign);
-    td_.postTilingData.set_nzReservedSize(0);
+    td_.postTilingData.set_nzReservedSize(nzReservedSize);
 
     td_.opInfo.set_dqWorkspaceLen((allNumQuery * B32 + GM_ALIGN - 1) / GM_ALIGN * GM_ALIGN);
     td_.opInfo.set_dkWorkspaceLen((allNumKv * B32 + GM_ALIGN - 1) / GM_ALIGN * GM_ALIGN);
     td_.opInfo.set_dvWorkspaceLen((allNumKv * B32 + GM_ALIGN - 1) / GM_ALIGN * GM_ALIGN);
+
+    td_.postTilingData.set_b(td_.opInfo.get_B());
+    td_.postTilingData.set_n2(td_.opInfo.get_N2());
+    td_.postTilingData.set_g(td_.opInfo.get_G());
+    td_.postTilingData.set_s1(td_.opInfo.get_S1());
+    td_.postTilingData.set_s2(td_.opInfo.get_S2());
+    td_.postTilingData.set_d(td_.opInfo.get_D());
 
     return ge::GRAPH_SUCCESS;
 }
@@ -1210,9 +1250,7 @@ void FlashAttentionScoreGradTilingS1s2Bn2::DoPreTiling()
         dropoutWorkspaceLen = (dropoutWorkspaceLen + GM_ALIGN - 1) / GM_ALIGN * GM_ALIGN;
     }
     td_.opInfo.set_dropoutWorkspaceLen(dropoutWorkspaceLen);
-
     td_.preTilingData.set_dropoutIsDivisibleBy8(dropoutIsDivisibleBy8);
-
     td_.preTilingData.set_dropBeginAddr(0);
 }
 
@@ -1306,6 +1344,18 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::GetWorkspaceSize()
 
 ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::PostTiling()
 {
+    // 判断如果GetDataSize > GetCapacity的异常情况,其中确定性计算下终止流程，非确定性计算流入下一个模板判断
+    OPS_ERR_IF((td_.GetDataSize() > context_->GetRawTilingData()->GetCapacity()) && (context_->GetDeterministic() == 1),
+               OPS_LOG_E(context_,
+                         "The size of TilingDataSize[%zu] is larger than the size of MaxDataCapacity[%zu].",
+                         td_.GetDataSize(), context_->GetRawTilingData()->GetCapacity()),
+               return ge::GRAPH_FAILED);
+    OPS_ERR_IF((td_.GetDataSize() > context_->GetRawTilingData()->GetCapacity()) && (context_->GetDeterministic() != 1),
+               OPS_LOG_W(context_,
+                         "The size of TilingDataSize[%zu] is larger than the size of MaxDataCapacity[%zu].",
+                         td_.GetDataSize(), context_->GetRawTilingData()->GetCapacity()),
+               return ge::GRAPH_PARAM_INVALID);
+
     td_.SaveToBuffer(context_->GetRawTilingData()->GetData(), context_->GetRawTilingData()->GetCapacity());
     context_->GetRawTilingData()->SetDataSize(td_.GetDataSize());
 
@@ -1326,7 +1376,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::GetLayoutInfo()
     } else if (strcmp(inputLayout, TND_STR) == 0 && context_->GetDeterministic() == 1) {
         td_.opInfo.set_layout(static_cast<uint32_t>(InputLayout::TND));
     } else {
-        OPS_LOG_I(context_, "FlashAttentionScoreGradTilingS1s2Bn2 unsupported layout");
+        OPS_LOG_W(context_, "FlashAttentionScoreGradTilingS1s2Bn2 unsupported layout");
         return ge::GRAPH_PARAM_INVALID;
     }
     tmpData_.layout = td_.opInfo.get_layout();
@@ -1336,60 +1386,78 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::GetLayoutInfo()
 ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::SetBaseInfo(const gert::Shape &queryShape,
                                                                   const gert::Shape &keyShape, int64_t dimN1)
 {
-    OPS_ERR_IF(dimN1 == 0, OPS_REPORT_VECTOR_INNER_ERR(context_, "headNum is 0."),
-               return ge::GRAPH_FAILED);
+    OPS_ERR_IF(dimN1 == 0, OPS_LOG_W(context_, "headNum is 0."),
+               return ge::GRAPH_PARAM_INVALID);
 
     uint32_t dimSize = queryShape.GetDimNum();
     const char *inputLayout = context_->GetAttrs()->GetAttrPointer<char>(INPUT_LAYOUT);
     OPS_ERR_IF(static_cast<size_t>(dimSize) != strlen(inputLayout),
-                   OPS_REPORT_VECTOR_INNER_ERR(context_, "layout dims is not inputLayout's length."),
-                   return ge::GRAPH_FAILED);
+               OPS_LOG_W(context_, "layout dims is not inputLayout's length."),
+               return ge::GRAPH_PARAM_INVALID);
     if (td_.opInfo.get_layout() == static_cast<uint32_t>(InputLayout::BNSD)) {
         td_.opInfo.set_B(queryShape.GetDim(DIM_0));
+        OPS_ERR_IF(keyShape.GetDim(DIM_1) == 0,
+                  OPS_LOG_W(context_, "dim 1 of key is 0."),
+                  return ge::GRAPH_PARAM_INVALID);
         td_.opInfo.set_G(queryShape.GetDim(DIM_1) / keyShape.GetDim(DIM_1));
         OPS_ERR_IF(td_.opInfo.get_G() == 0,
-                   OPS_REPORT_VECTOR_INNER_ERR(context_, "g is 0"),
-                   return ge::GRAPH_FAILED);
+                   OPS_LOG_W(context_, "g is 0"),
+                   return ge::GRAPH_PARAM_INVALID);
         td_.opInfo.set_N2(keyShape.GetDim(DIM_1));
         td_.opInfo.set_S1(queryShape.GetDim(DIM_2));
         td_.opInfo.set_S2(keyShape.GetDim(DIM_2));
         td_.opInfo.set_D(queryShape.GetDim(DIM_3));
     } else if (td_.opInfo.get_layout() == static_cast<uint32_t>(InputLayout::BSND)) {
-        if (queryShape.GetDimNum() != DIMS_FOUR || keyShape.GetDimNum() != DIMS_FOUR) {
-            return ge::GRAPH_PARAM_INVALID;
-        }
+        OPS_ERR_IF((queryShape.GetDimNum() != DIMS_FOUR || keyShape.GetDimNum() != DIMS_FOUR),
+                   OPS_LOG_W(context_, "the dim of query or key is not 4."),
+                   return ge::GRAPH_PARAM_INVALID);
         td_.opInfo.set_B(queryShape.GetDim(DIM_0));
+        OPS_ERR_IF(keyShape.GetDim(DIM_2) == 0,
+                  OPS_LOG_W(context_, "dim 2 of key is 0."),
+                  return ge::GRAPH_PARAM_INVALID);
         td_.opInfo.set_G(queryShape.GetDim(DIM_2) / keyShape.GetDim(DIM_2));
         OPS_ERR_IF(td_.opInfo.get_G() == 0,
-                   OPS_REPORT_VECTOR_INNER_ERR(context_, "g is 0"),
-                   return ge::GRAPH_FAILED);
+                   OPS_LOG_W(context_, "g is 0"),
+                   return ge::GRAPH_PARAM_INVALID);
         td_.opInfo.set_N2(keyShape.GetDim(DIM_2));
         td_.opInfo.set_S1(queryShape.GetDim(DIM_1));
         td_.opInfo.set_S2(keyShape.GetDim(DIM_1));
         td_.opInfo.set_D(queryShape.GetDim(DIM_3));
     } else if (td_.opInfo.get_layout() == static_cast<uint32_t>(InputLayout::BSH)) {
-        if (queryShape.GetDimNum() != DIMS_THREE || keyShape.GetDimNum() != DIMS_THREE) {
-            return ge::GRAPH_PARAM_INVALID;
-        }
+        OPS_ERR_IF((queryShape.GetDimNum() != DIMS_THREE || keyShape.GetDimNum() != DIMS_THREE),
+                   OPS_LOG_W(context_, "the dim of query or key is not 3."),
+                   return ge::GRAPH_PARAM_INVALID);
         int64_t tempDimD = queryShape.GetDim(DIM_2) / dimN1;
+        OPS_ERR_IF(tempDimD == 0,
+                  OPS_LOG_W(context_, "tempDimD is 0."),
+                  return ge::GRAPH_PARAM_INVALID);
         int64_t dimN2 = keyShape.GetDim(DIM_2) / tempDimD;
+        OPS_ERR_IF(dimN2 == 0,
+                  OPS_LOG_W(context_, "dimN2 is 0."),
+                  return ge::GRAPH_PARAM_INVALID);
         td_.opInfo.set_B(queryShape.GetDim(DIM_0));
         td_.opInfo.set_G(dimN1 / dimN2);
         OPS_ERR_IF(td_.opInfo.get_G() == 0,
-                   OPS_REPORT_VECTOR_INNER_ERR(context_, "g is 0"),
-                   return ge::GRAPH_FAILED);
+                   OPS_LOG_W(context_, "g is 0"),
+                   return ge::GRAPH_PARAM_INVALID);
         td_.opInfo.set_N2(dimN2);
         td_.opInfo.set_S1(queryShape.GetDim(DIM_1));
         td_.opInfo.set_S2(keyShape.GetDim(DIM_1));
         td_.opInfo.set_D(tempDimD);
     } else if (td_.opInfo.get_layout() == static_cast<uint32_t>(InputLayout::SBH)) {
         int64_t tempDimD = queryShape.GetDim(DIM_2) / dimN1;
+        OPS_ERR_IF(tempDimD == 0,
+                  OPS_LOG_W(context_, "tempDimD is 0."),
+                  return ge::GRAPH_PARAM_INVALID);
         int64_t dimN2 = keyShape.GetDim(DIM_2) / tempDimD;
+        OPS_ERR_IF(dimN2 == 0,
+                  OPS_LOG_W(context_, "dimN2 is 0."),
+                  return ge::GRAPH_PARAM_INVALID);
         td_.opInfo.set_B(queryShape.GetDim(DIM_1));
         td_.opInfo.set_G(dimN1 / dimN2);
         OPS_ERR_IF(td_.opInfo.get_G() == 0,
-                   OPS_REPORT_VECTOR_INNER_ERR(context_, "g is 0"),
-                   return ge::GRAPH_FAILED);
+                   OPS_LOG_W(context_, "g is 0"),
+                   return ge::GRAPH_PARAM_INVALID);
         td_.opInfo.set_N2(dimN2);
         td_.opInfo.set_S1(queryShape.GetDim(DIM_0));
         td_.opInfo.set_S2(keyShape.GetDim(DIM_0));
@@ -1397,17 +1465,15 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::SetBaseInfo(const gert::Sh
     } else if (td_.opInfo.get_layout() == static_cast<uint32_t>(InputLayout::TND)) {
         auto actualSeqQlenTensor = context_->GetOptionalInputTensor(ACTUAL_SEQ_Q_LEN);
         auto actualSeqKvlenTensor = context_->GetOptionalInputTensor(ACTUAL_SEQ_KV_LEN);
-        if (actualSeqQlenTensor == nullptr || actualSeqKvlenTensor == nullptr) {
-            OPS_LOG_D(context_, "actualSeqQlenTensor or actualSeqKvlenTensor is nullptr");
-            return ge::GRAPH_PARAM_INVALID;
-        }
+        OPS_ERR_IF((actualSeqQlenTensor == nullptr || actualSeqKvlenTensor == nullptr),
+                   OPS_LOG_W(context_, "actualSeqQlenTensor or actualSeqKvlenTensor is nullptr."),
+                   return ge::GRAPH_PARAM_INVALID);
 
         const size_t seqQShapeSize = actualSeqQlenTensor->GetShapeSize();
         const size_t kvSeqShapeSize = actualSeqKvlenTensor->GetShapeSize();
-        if (seqQShapeSize != kvSeqShapeSize) {
-            OPS_LOG_D(context_, "actualSeqQlenTensor shapeSize is not equal actualSeqKvlenTensor");
-            return ge::GRAPH_PARAM_INVALID;
-        }
+        OPS_ERR_IF((seqQShapeSize != kvSeqShapeSize),
+                   OPS_LOG_W(context_, "actualSeqQlenTensor shapeSize is not equal actualSeqKvlenTensor."),
+                   return ge::GRAPH_PARAM_INVALID);
 
         std::vector<int64_t> actualSeqQlen;
         std::vector<int64_t> actualSeqKvlen;
@@ -1433,16 +1499,19 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::SetBaseInfo(const gert::Sh
         td_.opInfo.set_B(seqQShapeSize);
 
         // query [t1, n1, d]   kv [t2, n2, d]   dy [t1, n1, d]
+        OPS_ERR_IF(keyShape.GetDim(DIM_1) == 0,
+                  OPS_LOG_W(context_, "dim 1 of key is 0."),
+                  return ge::GRAPH_PARAM_INVALID);
         td_.opInfo.set_G(queryShape.GetDim(DIM_1) / keyShape.GetDim(DIM_1));
         OPS_ERR_IF(td_.opInfo.get_G() == 0,
-                OPS_REPORT_VECTOR_INNER_ERR(context_, "g is 0"),
-                return ge::GRAPH_FAILED);
+                OPS_LOG_W(context_, "g is 0"),
+                return ge::GRAPH_PARAM_INVALID);
         td_.opInfo.set_N2(keyShape.GetDim(DIM_1));
         td_.opInfo.set_S1(*std::max_element(tmpData_.actualSeqQlen.begin(), tmpData_.actualSeqQlen.end()));
         td_.opInfo.set_S2(*std::max_element(tmpData_.actualSeqKvlen.begin(), tmpData_.actualSeqKvlen.end()));
         td_.opInfo.set_D(queryShape.GetDim(DIM_2));
     } else {
-        OPS_LOG_E(context_, "inputLayout is invalid");
+        OPS_LOG_W(context_, "inputLayout is invalid");
         return ge::GRAPH_PARAM_INVALID;
     }
     tmpData_.b = td_.opInfo.get_B();
@@ -1454,8 +1523,8 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::SetBaseInfo(const gert::Sh
 
     auto ret = CheckDtypeValid(context_);
     OPS_ERR_IF(ret != ge::GRAPH_SUCCESS,
-               OPS_REPORT_VECTOR_INNER_ERR(context_, "dtype is invalid."),
-               return ge::GRAPH_FAILED);
+               OPS_LOG_W(context_, "dtype is invalid."),
+               return ret);
 
     return td_.opInfo.get_layout() == static_cast<uint32_t>(InputLayout::TND) ?
                CheckTndShapeValid(context_, tmpData_.t1, dimN1, tmpData_.d) :
@@ -1464,11 +1533,15 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::SetBaseInfo(const gert::Sh
 
 ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::GetBaseShapeInfo()
 {
+    OPS_ERR_IF(((context_->GetInputShape(QUERY) == nullptr) || (context_->GetInputShape(KEY) == nullptr)),
+                OPS_REPORT_VECTOR_INNER_ERR(context_, "InputShape of query or key is nullptr."),
+                return ge::GRAPH_FAILED);
     const gert::Shape &queryShape = context_->GetInputShape(QUERY)->GetStorageShape();
     const gert::Shape &keyShape = context_->GetInputShape(KEY)->GetStorageShape();
     int64_t dimN1 = *context_->GetAttrs()->GetAttrPointer<int>(HEAD_NUM); // headNum is as same as N1
-    if (SetBaseInfo(queryShape, keyShape, dimN1) != ge::GRAPH_SUCCESS) {
-        return ge::GRAPH_PARAM_INVALID;
+    auto shapeStatus = SetBaseInfo(queryShape, keyShape, dimN1);
+    if (shapeStatus != ge::GRAPH_SUCCESS) {
+        return shapeStatus;
     }
 
     const gert::StorageShape *qShape = context_->GetInputShape(QUERY);
@@ -1582,10 +1655,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::SetBmm1TilingData(uint32_t
     mm1.SetBias(false);
     mm1.SetBufferSpace(l1SizeRemain, aicoreParams_.l0cSize);
     mm1.SetFixSplit(sOut, sFla, -1);
-    if (mm1.GetTiling(td_.mm1TilingData) == -1) {
-        OPS_LOG_I(context_, "FlashAttentionScoreGradTilingS1s2Bn2 mm1 GetTiling Failed");
-        return ge::GRAPH_PARAM_INVALID;
-    }
+    OPS_ERR_IF((mm1.GetTiling(td_.mm1TilingData) != 0),
+                OPS_LOG_W(context_, "FlashAttentionScoreGradTilingS1s2Bn2 mm1 GetTiling Failed."),
+                return ge::GRAPH_PARAM_INVALID);
     td_.mm1TilingData.set_shareMode(0);
     td_.mm1TilingData.set_shareL1Size(l1SizeRemain);
     td_.mm1TilingData.set_shareL0CSize(aicoreParams_.l0cSize);
@@ -1657,10 +1729,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::SetBmm31TilingData(uint32_
     mm31.SetOrgShape(m, n, ka, kb);
     mm31.SetBias(false);
     mm31.SetBufferSpace(l1SizeRemain, aicoreParams_.l0cSize);
-    if (mm31.GetTiling(td_.mm31TilingData) == -1) {
-        OPS_LOG_I(context_, "FlashAttentionScoreGradTilingS1s2Bn2 mm31 GetTiling Failed");
-        return ge::GRAPH_PARAM_INVALID;
-    }
+    OPS_ERR_IF((mm31.GetTiling(td_.mm31TilingData) != 0),
+                OPS_LOG_W(context_, "FlashAttentionScoreGradTilingS1s2Bn2 mm31 GetTiling Failed."),
+                return ge::GRAPH_PARAM_INVALID);
     td_.mm31TilingData.set_shareMode(0);
     td_.mm31TilingData.set_shareL1Size(l1SizeRemain);
     td_.mm31TilingData.set_shareL0CSize(aicoreParams_.l0cSize);
@@ -1734,10 +1805,9 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::SetBmm4TilingData(uint32_t
     mm4.SetOrgShape(m, n, ka, kb);
     mm4.SetBias(false);
     mm4.SetBufferSpace(l1SizeRemain, aicoreParams_.l0cSize);
-    if (mm4.GetTiling(td_.mm4TilingData) == -1) {
-        OPS_LOG_I(context_, "FlashAttentionScoreGradTilingS1s2Bn2 mm4 GetTiling Failed");
-        return ge::GRAPH_PARAM_INVALID;
-    }
+    OPS_ERR_IF((mm4.GetTiling(td_.mm4TilingData) != 0),
+                OPS_LOG_W(context_, "FlashAttentionScoreGradTilingS1s2Bn2 mm4 GetTiling Failed."),
+                return ge::GRAPH_PARAM_INVALID);
     td_.mm4TilingData.set_shareMode(0);
     td_.mm4TilingData.set_shareL1Size(l1SizeRemain);
     td_.mm4TilingData.set_shareL0CSize(aicoreParams_.l0cSize);

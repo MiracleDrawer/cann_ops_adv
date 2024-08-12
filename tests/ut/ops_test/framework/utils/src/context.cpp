@@ -15,6 +15,8 @@
 
 #include "tests/utils/context.h"
 #include <utility>
+#include <iostream>
+#include <fstream>
 #include <tikicpulib.h>
 #include "tests/utils/log.h"
 #include "tests/utils/platform.h"
@@ -59,7 +61,7 @@ bool Context::MdfAttrs(const std::pair<std::string, std::any> &attr)
     return false;
 }
 
-bool Context::SetTilingMaxDataSize(uint32_t size)
+bool Context::SetTilingDataMaxSize(uint32_t size)
 {
     tilingDataMaxLen_ = size;
     return true;
@@ -85,9 +87,9 @@ int32_t Context::GetTilingDataNum() const
     return tilingDataNum_;
 }
 
-void *Context::GetTilingData() const
+const void *Context::GetTilingData() const
 {
-    return (void *)tilingData_.data();
+    return (const void *)tilingData_.data();
 }
 
 const std::string &Context::GetTilingDataStr() const
@@ -100,7 +102,7 @@ const std::string &Context::GetTilingResult() const
     return tilingResult_;
 }
 
-bool Context::RunTiling()
+bool Context::RunTiling(std::string &caseName)
 {
     if (!this->InitTilingJsonStr()) {
         return false;
@@ -111,34 +113,74 @@ bool Context::RunTiling()
                                         outputsJson_.c_str(), attrsJson_.c_str(), tilingResult_.data(),
                                         tilingResult_.size(), nullptr, extraInfoJson_.c_str());
     if (tilingDataNum_ != 1) {
-        LOG_DBG("%s TilingDataNum = %d != 1", opName_.c_str(), tilingDataNum_);
+        LOG_DBG("[%s:%s] TilingDataNum = %d != 1", opName_.c_str(), caseName.c_str(), tilingDataNum_);
         return false;
     }
     /* Tiling 结果解析 */
     return this->ParseTilingResult();
 }
 
-bool Context::RunKernelProcess()
+bool Context::RunKernelProcess(std::string &caseName)
 {
     if (kernelRunCbf_ == nullptr) {
+        LOG_ERR("[%s:%s] Can't get kernelRunCbf_", opName_.c_str(), caseName.c_str());
         return false;
     }
-
     if (kernelMainFunc_ == nullptr) {
-        LOG_ERR("Can't get KernelMainFunc");
+        LOG_ERR("[%s:%s] Can't get KernelMainFunc", opName_.c_str(), caseName.c_str());
         return false;
     }
-    // 调用回调函数, 触发具体算子 Kernel 执行
+    LOG_DBG("[BGN] Run %s:%s Kernel async, TilingKey=%lu, BlockDim=%ld", opName_.c_str(), caseName.c_str(), tilingKey_,
+            tilingBlockDim_);
+
+    /* 重定向 std err/out/log 到同一个文件 */
+    std::string filePath = std::string(platform_->GetExeAbsPath()) + "/" + opName_ + "_" + caseName + "_kernel.log";
+    std::ofstream oFileHdl(filePath);
+    std::streambuf *stdErr = std::cerr.rdbuf(oFileHdl.rdbuf());
+    std::streambuf *stdLog = std::clog.rdbuf(oFileHdl.rdbuf());
+    std::streambuf *stdOut = std::cout.rdbuf(oFileHdl.rdbuf());
+
+    /* 调用回调函数, 触发具体算子 Kernel 执行 */
     ICPU_SET_TILING_KEY(tilingKey_);
-    LOG_DBG("[BGN] Run %s Kernel async, TilingKey=%lu, BlockDim=%ld", opName_.c_str(), tilingKey_, tilingBlockDim_);
-    return kernelRunCbf_(kernelMainFunc_, tilingKey_, tilingBlockDim_, inputs_, outputs_, workspacePtr_,
-                         tilingData_.data());
+    auto ret = kernelRunCbf_(kernelMainFunc_, tilingKey_, tilingBlockDim_, inputs_, outputs_, workspacePtr_,
+                             tilingData_.data());
+
+    /* 恢复 std err/out/log */
+    std::cout.rdbuf(stdOut);
+    std::clog.rdbuf(stdLog);
+    std::cerr.rdbuf(stdErr);
+    oFileHdl.close();
+
+    /* Kernel 执行日志结果获取 */
+    std::ifstream iFile;
+    iFile.open(filePath, std::ios::in);
+    if (!iFile.is_open()) {
+        LOG_ERR("[%s:%s] Can't open KernelRstLogFile(%s).", opName_.c_str(), caseName.c_str(), filePath.c_str());
+        return false;
+    }
+    std::stringstream iFileStrStream;
+    iFileStrStream << iFile.rdbuf();
+    std::string iFileStr(iFileStrStream.str());
+    iFile.close();
+
+    /* Kernel 执行日志结果校验 */
+    ret = ret && CheckKernelResultStr(iFileStr);
+
+    if (std::remove(filePath.c_str()) != 0) {
+        LOG_ERR("[%s:%s] Can't remove KernelRstLogFile(%s)", opName_.c_str(), caseName.c_str(), filePath.c_str());
+    }
+    if (!ret) {
+        LOG_ERR("[%s:%s] Run kernel failed, details:\n%s\n", opName_.c_str(), caseName.c_str(), iFileStr.c_str());
+    } else {
+        fprintf(stdout, "Run kernel finish, details:\n%s", iFileStr.c_str());
+    }
+    return ret;
 }
 
 uint8_t *Context::AllocWorkspaceImpl(uint64_t size)
 {
     auto *ptr = (uint8_t *)AscendC::GmAlloc(size);
-    LOG_IF(ptr == nullptr, LOG_ERR("AscendC::GmAlloc failed, Size(%ld)", size));
+    LOG_IF(ptr == nullptr, LOG_ERR("AscendC::GmAlloc failed, Size(%lu)", size));
     return ptr;
 }
 
@@ -255,6 +297,17 @@ bool Context::ParseTilingResult()
     LOG_DBG("%s tiling success, TilingKey=%lu, TilingBlockDim=%ld, TilingWorkspaceSize=%zu, TilingDataSize=%u",
             opName_.c_str(), tilingKey_, tilingBlockDim_, workspaceSize_, tilingDataLen);
     return true;
+}
+
+bool Context::CheckKernelResultStr(std::string &kernelLog)
+{
+    /* 不存在 Ascend C 框架感知的错误 */
+    auto rst = kernelLog.find("error happened! =========") == std::string::npos;
+    /* 不存在 AddressSanitizer 感知的错误 */
+    rst = rst && kernelLog.find("AddressSanitizer") == std::string::npos;
+    /* 必需存在 Ascend C 框架感知的正常退出消息 */
+    rst = rst && kernelLog.find("exit success!") != std::string::npos;
+    return rst;
 }
 
 bool Context::DetectPosit(char **bgn, char **end, const char *fPrefix, const char *fSuffix)

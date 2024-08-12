@@ -35,8 +35,8 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_Layout_Case)
                        PrefixShapeType::NONE)                          /* PrefixShapeType */
     );
     ASSERT_TRUE(cs.Init());
-    ASSERT_TRUE(cs.forwardCtx.MdfAttrs({"input_layout", std::string("BND")}));
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    ASSERT_TRUE(cs.mForwardCtx.MdfAttrs({"input_layout", std::string("BND")}));
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_HeadNum_Case_001)
@@ -59,8 +59,8 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_HeadNum_Case_001)
                        PrefixShapeType::NONE)                          /* PrefixShapeType */
     );
     ASSERT_TRUE(cs.Init());
-    ASSERT_TRUE(cs.forwardCtx.MdfAttrs({"head_num", std::int64_t(0)}));
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    ASSERT_TRUE(cs.mForwardCtx.MdfAttrs({"head_num", std::int64_t(0)}));
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_HeadNum_Case_002)
@@ -83,8 +83,8 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_HeadNum_Case_002)
                        PrefixShapeType::NONE)                          /* PrefixShapeType */
     );
     ASSERT_TRUE(cs.Init());
-    ASSERT_TRUE(cs.forwardCtx.MdfAttrs({"head_num", std::int64_t(5)}));
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    ASSERT_TRUE(cs.mForwardCtx.MdfAttrs({"head_num", std::int64_t(5)}));
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_QKVShape_Case_001)
@@ -107,9 +107,9 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_QKVShape_Case_001)
                        PrefixShapeType::NONE)                          /* PrefixShapeType */
     );
     ASSERT_TRUE(cs.Init());
-    cs.param.query = Tensor("query", {cs.param.b, cs.param.s2, cs.param.n2 * cs.param.g * cs.param.d},
-                            "QueryInvalidShape", cs.param.dtype, ge::FORMAT_ND);
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    cs.mParam.query = Tensor("query", {cs.mParam.b, cs.mParam.s2, cs.mParam.n2 * cs.mParam.g * cs.mParam.d},
+                             "QueryInvalidShape", cs.mParam.dtype, ge::FORMAT_ND);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_QKVShape_Case_002)
@@ -132,9 +132,9 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_QKVShape_Case_002)
                        PrefixShapeType::NONE)                          /* PrefixShapeType */
     );
     ASSERT_TRUE(cs.Init());
-    cs.param.key = Tensor("key", {cs.param.b, cs.param.s2, cs.param.n2 * cs.param.d}, "KeyInvalidShape", cs.param.dtype,
-                          ge::FORMAT_ND);
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    cs.mParam.key = Tensor("key", {cs.mParam.b, cs.mParam.s2, cs.mParam.n2 * cs.mParam.d}, "KeyInvalidShape",
+                           cs.mParam.dtype, ge::FORMAT_ND);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_QKVShape_Case_003)
@@ -157,9 +157,9 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_QKVShape_Case_003)
                        PrefixShapeType::NONE)                          /* PrefixShapeType */
     );
     ASSERT_TRUE(cs.Init());
-    cs.param.key = Tensor("key", {cs.param.b + 1, cs.param.n2, cs.param.s2, cs.param.d}, "KeyInvalidShape",
-                          cs.param.dtype, ge::FORMAT_ND);
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    cs.mParam.key = Tensor("key", {cs.mParam.b + 1, cs.mParam.n2, cs.mParam.s2, cs.mParam.d}, "KeyInvalidShape",
+                           cs.mParam.dtype, ge::FORMAT_ND);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_QKVShape_Case_004)
@@ -182,9 +182,9 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_QKVShape_Case_004)
                        PrefixShapeType::NONE)                          /* PrefixShapeType */
     );
     ASSERT_TRUE(cs.Init());
-    cs.param.key = Tensor("key", {cs.param.b, cs.param.n2, cs.param.s2, cs.param.d + 1}, "KeyInvalidShape",
-                          cs.param.dtype, ge::FORMAT_ND);
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    cs.mParam.key = Tensor("key", {cs.mParam.b, cs.mParam.n2, cs.mParam.s2, cs.mParam.d + 1}, "KeyInvalidShape",
+                           cs.mParam.dtype, ge::FORMAT_ND);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_QKVShape_Case_005)
@@ -207,8 +207,8 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_QKVShape_Case_005)
                        PrefixShapeType::NONE)                          /* PrefixShapeType */
     );
     ASSERT_TRUE(cs.Init());
-    ASSERT_TRUE(cs.forwardCtx.MdfAttrs({"head_num", std::int64_t(1000)}));
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    ASSERT_TRUE(cs.mForwardCtx.MdfAttrs({"head_num", std::int64_t(1000)}));
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_QKVShape_Case_006)
@@ -231,11 +231,11 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_QKVShape_Case_006)
                        PrefixShapeType::NONE)                          /* PrefixShapeType */
     );
     ASSERT_TRUE(cs.Init());
-    cs.param.key = Tensor("key", {cs.param.b, cs.param.n2 - 1, cs.param.s2, cs.param.d}, "KeyInvalidShape",
-                          cs.param.dtype, ge::FORMAT_ND);
-    cs.param.value = Tensor("value", {cs.param.b, cs.param.n2 - 1, cs.param.s2, cs.param.d}, "ValueInvalidShape",
-                            cs.param.dtype, ge::FORMAT_ND);
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    cs.mParam.key = Tensor("key", {cs.mParam.b, cs.mParam.n2 - 1, cs.mParam.s2, cs.mParam.d}, "KeyInvalidShape",
+                           cs.mParam.dtype, ge::FORMAT_ND);
+    cs.mParam.value = Tensor("value", {cs.mParam.b, cs.mParam.n2 - 1, cs.mParam.s2, cs.mParam.d}, "ValueInvalidShape",
+                             cs.mParam.dtype, ge::FORMAT_ND);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_AttenMask_Case_001)
@@ -259,9 +259,9 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_AttenMask_Case_001)
     );
 
     ASSERT_TRUE(cs.Init());
-    cs.param.attenMask = Tensor("atten_mask", {2, 2, cs.param.s1, cs.param.s2}, "AttenMaskInvalidShape",
-                                cs.param.attenMaskDtype, ge::FORMAT_ND);
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    cs.mParam.attenMask = Tensor("atten_mask", {2, 2, cs.mParam.s1, cs.mParam.s2}, "AttenMaskInvalidShape",
+                                 cs.mParam.attenMaskDtype, ge::FORMAT_ND);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_AttenMask_Case_002)
@@ -285,9 +285,9 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_AttenMask_Case_002)
     );
 
     ASSERT_TRUE(cs.Init());
-    cs.param.attenMask =
-        Tensor("atten_mask", {1000, 1000}, "AttenMaskInvalidShape", cs.param.attenMaskDtype, ge::FORMAT_ND);
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    cs.mParam.attenMask =
+        Tensor("atten_mask", {1000, 1000}, "AttenMaskInvalidShape", cs.mParam.attenMaskDtype, ge::FORMAT_ND);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_AttenMask_Case_003)
@@ -311,9 +311,9 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_AttenMask_Case_003)
     );
 
     ASSERT_TRUE(cs.Init());
-    cs.param.attenMask = Tensor("atten_mask", {cs.param.s1, cs.param.s2}, "AttenMaskInvalidShape",
-                                cs.param.attenMaskDtype, ge::FORMAT_ND);
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    cs.mParam.attenMask = Tensor("atten_mask", {cs.mParam.s1, cs.mParam.s2}, "AttenMaskInvalidShape",
+                                 cs.mParam.attenMaskDtype, ge::FORMAT_ND);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_AttenMask_Case_004)
@@ -337,9 +337,9 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_AttenMask_Case_004)
     );
 
     ASSERT_TRUE(cs.Init());
-    cs.param.attenMask = Tensor("atten_mask", {cs.param.s1, cs.param.s2}, "AttenMaskInvalidShape",
-                                cs.param.attenMaskDtype, ge::FORMAT_ND);
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    cs.mParam.attenMask = Tensor("atten_mask", {cs.mParam.s1, cs.mParam.s2}, "AttenMaskInvalidShape",
+                                 cs.mParam.attenMaskDtype, ge::FORMAT_ND);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_Pse_Case_001)
@@ -363,9 +363,9 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_Pse_Case_001)
     );
 
     ASSERT_TRUE(cs.Init());
-    cs.param.pse = Tensor("pse", {cs.param.b, cs.param.n2 * cs.param.g, 10, cs.param.s2}, "PseInvalidShape",
-                          cs.param.dtype, ge::FORMAT_ND);
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    cs.mParam.pse = Tensor("pse", {cs.mParam.b, cs.mParam.n2 * cs.mParam.g, 10, cs.mParam.s2}, "PseInvalidShape",
+                           cs.mParam.dtype, ge::FORMAT_ND);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_Pse_Case_002)
@@ -392,9 +392,9 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_Pse_Case_002)
     );
 
     ASSERT_TRUE(cs.Init());
-    cs.param.pse = Tensor("pse", {cs.param.b, cs.param.n2 * cs.param.g, 1, cs.param.s2}, "PseInvalidShape",
-                          cs.param.dtype, ge::FORMAT_ND);
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    cs.mParam.pse = Tensor("pse", {cs.mParam.b, cs.mParam.n2 * cs.mParam.g, 1, cs.mParam.s2}, "PseInvalidShape",
+                           cs.mParam.dtype, ge::FORMAT_ND);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_Pse_Case_003)
@@ -418,7 +418,7 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_Pse_Case_003)
     );
 
     ASSERT_TRUE(cs.Init());
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_Pse_Case_004)
@@ -445,7 +445,7 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_Pse_Case_004)
     );
 
     ASSERT_TRUE(cs.Init());
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_Pse_Case_005)
@@ -472,7 +472,7 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_Pse_Case_005)
     );
 
     ASSERT_TRUE(cs.Init());
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_Pse_Case_006)
@@ -483,14 +483,14 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_Pse_Case_006)
                       ExpectInfo(false,                                /* ExpectSuccess */
                                  ExpectInfo::kInvalidTilingKey,        /* ExpectTilingKey */
                                  ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
-               FaParam(3, 40, 1, 512, 512, 128,                      /* B, N2, G, S1, S2, D */
-                       ge::DataType::DT_FLOAT16, LayoutType::BSND,      /* Dtype, Layout */
-                       0.08838f, 0.9f, 65535, 0,                   /* Scale, KeepProb, PreTokens, NxtTokens */
+               FaParam(3, 40, 1, 512, 512, 128,                        /* B, N2, G, S1, S2, D */
+                       ge::DataType::DT_FLOAT16, LayoutType::BSND,     /* Dtype, Layout */
+                       0.08838f, 0.9f, 65535, 0,                       /* Scale, KeepProb, PreTokens, NxtTokens */
                        0, 0,                                           /* InnerPrecise, SparseMode */
                        PseShapeType::B_N1_ALIBI_S1_S2,                 /* PseShapeType */
                        DropMaskShapeType::NONE,                        /* DropMaskShapeType */
                        PaddingMaskShapeType::NONE,                     /* PaddingMaskShapeType */
-                       AttenMaskShapeType::S1_S2,                     /* AttentionMaskShapeType */
+                       AttenMaskShapeType::S1_S2,                      /* AttentionMaskShapeType */
                        ge::DataType::DT_BOOL,                          /* AttentionMaskDtype */
                        PrefixShapeType::NONE,                          /* PrefixShapeType */
                        {},                                             /* PrefixTensorData */
@@ -499,7 +499,7 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_Pse_Case_006)
     );
 
     ASSERT_TRUE(cs.Init());
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_Prefix_Case_001)
@@ -526,8 +526,8 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_Prefix_Case_001)
     );
 
     ASSERT_TRUE(cs.Init());
-    cs.param.prefix = Tensor("prefix", {cs.param.b - 1}, "PrefixInvalidShape", cs.param.dtype, ge::FORMAT_ND);
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    cs.mParam.prefix = Tensor("prefix", {cs.mParam.b - 1}, "PrefixInvalidShape", cs.mParam.dtype, ge::FORMAT_ND);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_Prefix_Case_002)
@@ -554,8 +554,8 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_Prefix_Case_002)
     );
 
     ASSERT_TRUE(cs.Init());
-    cs.param.prefix = Tensor("prefix", {33}, "PrefixInvalidShape", cs.param.dtype, ge::FORMAT_ND);
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    cs.mParam.prefix = Tensor("prefix", {33}, "PrefixInvalidShape", cs.mParam.dtype, ge::FORMAT_ND);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_Prefix_Case_003)
@@ -582,7 +582,7 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_Prefix_Case_003)
     );
 
     ASSERT_TRUE(cs.Init());
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_Prefix_Case_004)
@@ -609,7 +609,7 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_Prefix_Case_004)
     );
 
     ASSERT_TRUE(cs.Init());
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_Prefix_Case_005)
@@ -636,7 +636,7 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_Prefix_Case_005)
     );
 
     ASSERT_TRUE(cs.Init());
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_Prefix_Case_006)
@@ -663,7 +663,7 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_Prefix_Case_006)
     );
 
     ASSERT_TRUE(cs.Init());
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_Prefix_Case_007)
@@ -690,7 +690,7 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_Prefix_Case_007)
     );
 
     ASSERT_TRUE(cs.Init());
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_KeepProb_Case)
@@ -714,7 +714,7 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_KeepProb_Case)
     );
 
     ASSERT_TRUE(cs.Init());
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_PreTokens_NextTokens_Case001)
@@ -738,7 +738,7 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_PreTokens_NextTokens_Case001)
     );
 
     ASSERT_TRUE(cs.Init());
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_PreTokens_NextTokens_Case002)
@@ -762,7 +762,7 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_PreTokens_NextTokens_Case002)
     );
 
     ASSERT_TRUE(cs.Init());
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_PreTokens_NextTokens_Case003)
@@ -786,7 +786,7 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_PreTokens_NextTokens_Case003)
     );
 
     ASSERT_TRUE(cs.Init());
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_PreTokens_NextTokens_Case004)
@@ -813,7 +813,7 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_PreTokens_NextTokens_Case004)
     );
 
     ASSERT_TRUE(cs.Init());
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_PreTokens_NextTokens_Case005)
@@ -840,7 +840,7 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_PreTokens_NextTokens_Case005)
     );
 
     ASSERT_TRUE(cs.Init());
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_PreTokens_NextTokens_Case006)
@@ -867,7 +867,7 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_PreTokens_NextTokens_Case006)
     );
 
     ASSERT_TRUE(cs.Init());
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_PreTokens_NextTokens_Case007)
@@ -894,7 +894,7 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_PreTokens_NextTokens_Case007)
     );
 
     ASSERT_TRUE(cs.Init());
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_PreTokens_NextTokens_Case008)
@@ -921,7 +921,7 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_PreTokens_NextTokens_Case008)
     );
 
     ASSERT_TRUE(cs.Init());
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_PreTokens_NextTokens_Case009)
@@ -948,7 +948,7 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_PreTokens_NextTokens_Case009)
     );
 
     ASSERT_TRUE(cs.Init());
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_PreTokens_NextTokens_Case010)
@@ -975,7 +975,7 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_PreTokens_NextTokens_Case010)
     );
 
     ASSERT_TRUE(cs.Init());
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_PreTokens_NextTokens_Case011)
@@ -1002,7 +1002,7 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_PreTokens_NextTokens_Case011)
     );
 
     ASSERT_TRUE(cs.Init());
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_PreTokens_NextTokens_Case012)
@@ -1029,7 +1029,7 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_PreTokens_NextTokens_Case012)
     );
 
     ASSERT_TRUE(cs.Init());
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_PreTokens_NextTokens_Case013)
@@ -1056,7 +1056,7 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_PreTokens_NextTokens_Case013)
     );
 
     ASSERT_TRUE(cs.Init());
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_PreTokens_NextTokens_Case014)
@@ -1083,5 +1083,5 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Invalid_PreTokens_NextTokens_Case014)
     );
 
     ASSERT_TRUE(cs.Init());
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }

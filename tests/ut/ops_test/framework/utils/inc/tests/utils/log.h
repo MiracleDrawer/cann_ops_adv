@@ -19,7 +19,18 @@
 #include <type_traits>
 #include <toolchain/slog.h>
 
-#define LOG_ERR(fmt, args...) fprintf(stdout, "%s:%d [ERROR] " fmt "\n", __FILE__, __LINE__, ##args)
+namespace ops::adv::tests::utils {
+
+void AddLogErrCnt();
+
+bool ChkLogErrCnt();
+
+#define LOG_ERR(fmt, args...)                                                                                          \
+    do {                                                                                                               \
+        fprintf(stdout, "%s:%d [ERROR] " fmt "\n", __FILE__, __LINE__, ##args);                                        \
+        ops::adv::tests::utils::AddLogErrCnt();                                                                        \
+    } while (0)
+
 #define LOG_DBG(fmt, args...)                                                                                          \
     do {                                                                                                               \
         if (CheckLogLevel(OP, DLOG_DEBUG) == 1) {                                                                      \
@@ -51,3 +62,5 @@
             EXPR;                                                                                                      \
         }                                                                                                              \
     } while (0)
+
+} // namespace ops::adv::tests::utils

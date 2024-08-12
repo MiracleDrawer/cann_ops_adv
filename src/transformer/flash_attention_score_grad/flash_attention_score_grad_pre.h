@@ -144,11 +144,15 @@ __aicore__ inline void FlashAttentionScoreGradPre<T1, T2, TILING_TYPE, INIT_OUTP
 template <typename T1, typename T2, typename TILING_TYPE, const bool INIT_OUTPUT>
 __aicore__ inline void FlashAttentionScoreGradPre<T1, T2, TILING_TYPE, INIT_OUTPUT>::Process()
 {
-    // process
-    if (g_coreType == AIV && cBlockIdx < TilingData->preTilingData.maskCoreNum) {
-        // // clear dq dk dv workspace
+    // process clear dq dk dv workspace
+    if (g_coreType == AIV && cBlockIdx < TilingData->preTilingData.qPreBlockTotal) {
         if constexpr (INIT_OUTPUT) {
             InitOutput<float>(dqWorkSpaceGm[dqOffset], initdqSize, 0);
+        }
+    }
+
+    if (g_coreType == AIV && cBlockIdx < TilingData->preTilingData.kvPreBlockTotal) {
+        if constexpr (INIT_OUTPUT) {
             InitOutput<float>(dkWorkSpaceGm[dkvOffset], initdkSize, 0);
             if constexpr (IsSameType<T1, float>::value) {
                 InitOutput<float>(dvGm[dkvOffset], initdkSize, 0);
@@ -156,7 +160,9 @@ __aicore__ inline void FlashAttentionScoreGradPre<T1, T2, TILING_TYPE, INIT_OUTP
                 InitOutput<float>(dvWorkSpaceGm[dkvOffset], initdkSize, 0);
             }
         }
+    }
 
+    if (g_coreType == AIV && cBlockIdx < TilingData->preTilingData.maskCoreNum) {
         if (!isDropBoolMode) {
             return;
         }

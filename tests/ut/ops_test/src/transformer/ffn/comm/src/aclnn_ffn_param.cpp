@@ -51,7 +51,7 @@ AclnnFFNParam::AclnnFFNParam(std::vector<Tensor> inputs, std::vector<int64_t> ex
                              int32_t innerPrecise, int32_t outputDtype, FunctionType functionType,
                              AclnnFFNVersion aclnnFFNVersion, bool tokensIndexFlag)
     : Param(std::move(inputs), std::move(expertTokensData), activation, innerPrecise, outputDtype, tokensIndexFlag),
-      functionType(functionType), aclnnFFNVersion(aclnnFFNVersion)
+      mFunctionType(functionType), mAclnnFFNVersion(aclnnFFNVersion)
 {
 }
 
@@ -67,39 +67,40 @@ AclnnFFNParam::~AclnnFFNParam()
 
 bool AclnnFFNParam::Init()
 {
-    aclnnX = ops::adv::tests::utils::AclnnTensor(tensors["x"]);
-    aclnnWeight1 = ops::adv::tests::utils::AclnnTensor(tensors["weight1"]);
-    aclnnWeight2 = ops::adv::tests::utils::AclnnTensor(tensors["weight2"]);
-    auto iter = tensors.find("bias1");
-    if (iter != tensors.end()) {
-        aclnnBias1 = ops::adv::tests::utils::AclnnTensor(tensors["bias1"]);
+    aclnnX = ops::adv::tests::utils::AclnnTensor(mTensors["x"]);
+    aclnnWeight1 = ops::adv::tests::utils::AclnnTensor(mTensors["weight1"]);
+    aclnnWeight2 = ops::adv::tests::utils::AclnnTensor(mTensors["weight2"]);
+    auto iter = mTensors.find("bias1");
+    if (iter != mTensors.end()) {
+        aclnnBias1 = ops::adv::tests::utils::AclnnTensor(mTensors["bias1"]);
     }
-    iter = tensors.find("bias2");
-    if (iter != tensors.end()) {
-        aclnnBias2 = ops::adv::tests::utils::AclnnTensor(tensors["bias2"]);
+    iter = mTensors.find("bias2");
+    if (iter != mTensors.end()) {
+        aclnnBias2 = ops::adv::tests::utils::AclnnTensor(mTensors["bias2"]);
     }
-    aclnnY = ops::adv::tests::utils::AclnnTensor(tensors["y"]);
+    aclnnY = ops::adv::tests::utils::AclnnTensor(mTensors["y"]);
 
-    if (functionType == FunctionType::QUANT) {
-        aclnnScale = ops::adv::tests::utils::AclnnTensor(tensors["scale"]);
-        aclnnOffset = ops::adv::tests::utils::AclnnTensor(tensors["offset"]);
-        aclnnDeqScale1 = ops::adv::tests::utils::AclnnTensor(tensors["deqScale1"]);
-        aclnnDeqScale2 = ops::adv::tests::utils::AclnnTensor(tensors["deqScale2"]);
-    } else if (functionType == FunctionType::ANTIQUANT) {
-        aclnnAntiquantScale1 = ops::adv::tests::utils::AclnnTensor(tensors["antiquant_scale1"]);
-        aclnnAntiquantScale2 = ops::adv::tests::utils::AclnnTensor(tensors["antiquant_scale2"]);
-        aclnnAntiquantOffset1 = ops::adv::tests::utils::AclnnTensor(tensors["antiquant_offset1"]);
-        aclnnAntiquantOffset2 = ops::adv::tests::utils::AclnnTensor(tensors["antiquant_offset2"]);
+    if (mFunctionType == FunctionType::QUANT) {
+        aclnnScale = ops::adv::tests::utils::AclnnTensor(mTensors["scale"]);
+        aclnnOffset = ops::adv::tests::utils::AclnnTensor(mTensors["offset"]);
+        aclnnDeqScale1 = ops::adv::tests::utils::AclnnTensor(mTensors["deqScale1"]);
+        aclnnDeqScale2 = ops::adv::tests::utils::AclnnTensor(mTensors["deqScale2"]);
+    } else if (mFunctionType == FunctionType::ANTIQUANT) {
+        aclnnAntiquantScale1 = ops::adv::tests::utils::AclnnTensor(mTensors["antiquant_scale1"]);
+        aclnnAntiquantScale2 = ops::adv::tests::utils::AclnnTensor(mTensors["antiquant_scale2"]);
+        aclnnAntiquantOffset1 = ops::adv::tests::utils::AclnnTensor(mTensors["antiquant_offset1"]);
+        aclnnAntiquantOffset2 = ops::adv::tests::utils::AclnnTensor(mTensors["antiquant_offset2"]);
     }
     auto ret = InitExpertTokens();
     LOG_IF_EXPR(ret == false, LOG_ERR("InitExpertTokens faild"), return false);
 
-    auto *cs = static_cast< ops::adv::tests::utils::Case *>( ops::adv::tests::utils::Case::GetCurrentCase());
+    auto *cs = static_cast<ops::adv::tests::utils::Case *>(ops::adv::tests::utils::Case::GetCurrentCase());
     LOG_IF_EXPR(cs == nullptr, LOG_ERR("Can't get current case"), return false);
 
-    for (auto *t : {&aclnnX, &aclnnWeight1, &aclnnWeight2, &aclnnBias1, &aclnnBias2, &aclnnScale, &aclnnOffset,
-                    &aclnnDeqScale1, &aclnnDeqScale2, &aclnnAntiquantScale1, &aclnnAntiquantScale2, &aclnnAntiquantOffset1,
-                    &aclnnAntiquantOffset1, &aclnnAntiquantOffset2, &aclnnY, &aclnnExpertTokens}) {
+    for (auto *t :
+         {&aclnnX, &aclnnWeight1, &aclnnWeight2, &aclnnBias1, &aclnnBias2, &aclnnScale, &aclnnOffset, &aclnnDeqScale1,
+          &aclnnDeqScale2, &aclnnAntiquantScale1, &aclnnAntiquantScale2, &aclnnAntiquantOffset1, &aclnnAntiquantOffset1,
+          &aclnnAntiquantOffset2, &aclnnY, &aclnnExpertTokens}) {
         t->FreeDevData();
         if (t->GetExpDataSize() <= 0) {
             continue;
@@ -108,7 +109,7 @@ bool AclnnFFNParam::Init()
         if (devData == nullptr) {
             return false;
         }
-        std::string filePath = cs->rootPath + t->Name() + ".bin";
+        std::string filePath = std::string(cs->GetRootPath()) + t->Name() + ".bin";
         if (ops::adv::tests::utils::FileExist(filePath)) {
             if (!t->LoadFileToDevData(filePath)) {
                 return false;
@@ -120,22 +121,22 @@ bool AclnnFFNParam::Init()
 
 bool AclnnFFNParam::InitExpertTokens()
 {
-    auto iter = tensors.find("expertTokens");
-    if (iter == tensors.end()) {
+    auto iter = mTensors.find("expertTokens");
+    if (iter == mTensors.end()) {
         return true;
     }
 
-    if (aclnnFFNVersion == AclnnFFNVersion::V3) {
-        if (expertTokensData.size() > 0) {
-            size_t dataSize = expertTokensData.size() * sizeof(int64_t);
+    if (mAclnnFFNVersion == AclnnFFNVersion::V3) {
+        if (mExpertTokensData.size() > 0) {
+            size_t dataSize = mExpertTokensData.size() * sizeof(int64_t);
             std::string fileName = "expertToken.bin";
-            if (!WriteFile(fileName, expertTokensData.data(), dataSize)) {
+            if (!WriteFile(fileName, mExpertTokensData.data(), dataSize)) {
                 LOG_ERR("Write expertToken data to file[%s] failed", fileName.c_str());
                 return false;
             }
         }
-        aclnnExpertTokens = ops::adv::tests::utils::AclnnTensor(tensors["expertTokens"]);
-    } else if (!InitAclIntArray(&aclnnExpertTokensIntAry, expertTokensData)) {
+        aclnnExpertTokens = ops::adv::tests::utils::AclnnTensor(mTensors["expertTokens"]);
+    } else if (!InitAclIntArray(&aclnnExpertTokensIntAry, mExpertTokensData)) {
         return false;
     }
 

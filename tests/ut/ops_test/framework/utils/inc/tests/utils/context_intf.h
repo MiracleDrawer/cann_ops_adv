@@ -19,12 +19,13 @@
 #include <vector>
 #include <cstdint>
 #include "tests/utils/tensor_intf.h"
+#include "tests/utils/platform.h"
 
 namespace ops::adv::tests::utils {
 
 class ContextIntf {
 public:
-    static constexpr uint64_t kMaxWorkspaceSize = 1024 * 1024 * 1024;
+    static constexpr uint64_t kWorkspaceMaxSize = 1024 * 1024 * 1024;
 
     /**
      * Kernel 运行前设置 TensorData 回调函数
@@ -41,22 +42,43 @@ public:
     [[maybe_unused]] [[nodiscard]] bool SetOutputs(const std::vector<TensorIntf *> &outputs);
     [[maybe_unused]] [[nodiscard]] bool SetKernelRunPrepareTensorDataCbf(KernelRunPrepareTensorDataCbf cbf);
 
-    /* 属性获取 */
+    /**
+     * 属性获取
+     * 获取 Tiling 结果中 BlockDim 数量(分核数)
+     */
     [[maybe_unused]] [[nodiscard]] int64_t GetTilingBlockDim() const;
+
+    /**
+     * 属性获取
+     * 获取 Tiling 结果中 TilingKey 值
+     */
     [[maybe_unused]] [[nodiscard]] uint64_t GetTilingKey() const;
+
+    /**
+     * 属性获取
+     * 获取 Workspace 指针
+     *
+     * \attention Workspace 在 RunKernelPrepare 回调函数内完成申请
+     */
     [[maybe_unused]] [[nodiscard]] uint8_t *GetWorkspacePtr() const;
+
+    /**
+     * 属性获取
+     * 获取 Tiling 结果中 Workspace 大小
+     */
     [[maybe_unused]] [[nodiscard]] uint64_t GetWorkspaceSize() const;
 
     /* Tiling */
-    virtual bool RunTiling() = 0;
+    virtual bool RunTiling(std::string &caseName) = 0;
 
     /* Kernel */
-    virtual bool RunKernel();
+    virtual bool RunKernel(std::string &caseName);
 
     /* Others */
     bool SaveOutputsToDir(const std::string &dir, const std::string &filePrefix);
 
 protected:
+    Platform *platform_ = nullptr;
     /* 属性 */
     std::string opName_;
     std::vector<TensorIntf *> inputs_;
@@ -70,8 +92,8 @@ protected:
     uint8_t *workspacePtr_ = nullptr;
 
 protected:
-    virtual bool RunKernelPrepare();
-    virtual bool RunKernelProcess() = 0;
+    virtual bool RunKernelPrepare(std::string &caseName);
+    virtual bool RunKernelProcess(std::string &caseName) = 0;
 
     virtual uint8_t *AllocWorkspaceImpl(uint64_t size) = 0;
     virtual void FreeWorkspaceImpl(uint8_t *ptr) = 0;

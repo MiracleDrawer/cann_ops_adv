@@ -8,6 +8,14 @@
 # ======================================================================================================================
 
 set(_Target ${UTest_NamePrefix}_Stubs)
+
+add_library(${_Target}_Wno INTERFACE)
+target_compile_options(${_Target}_Wno
+        INTERFACE
+            -Wno-unused-parameter
+            -Werror
+)
+
 set(_Sources
         acl/aclrt_stubs.cpp
         platform/platform_stubs.cpp
@@ -15,4 +23,9 @@ set(_Sources
 )
 add_library(${_Target} SHARED)
 target_sources(${_Target} PRIVATE ${_Sources})
-target_link_libraries(${_Target} PRIVATE $<BUILD_INTERFACE:intf_pub_utest> ${UTest_NamePrefix}_Utils)
+target_link_libraries(${_Target}
+        PRIVATE
+            $<BUILD_INTERFACE:intf_pub_utest>
+            $<BUILD_INTERFACE:${_Target}_Wno>
+            ${UTest_NamePrefix}_Utils
+)

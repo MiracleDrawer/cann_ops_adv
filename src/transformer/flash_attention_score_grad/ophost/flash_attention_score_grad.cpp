@@ -19,6 +19,8 @@
 
 using namespace op;
 
+#define CHECK_NULL(aclnTensor) do { if ((aclnTensor) == nullptr) { return {nullptr, nullptr, nullptr, nullptr};}} while (0)
+
 namespace l0op {
 
 OP_TYPE_REGISTER(FlashAttentionScoreGrad);
@@ -48,6 +50,7 @@ const std::array<const aclTensor *, MAX_FAG_OUTPUT_CNT> FlashAttentionScoreGrad(
     const aclTensor *prefix = nullptr;
     if (prefixOptional) {
         prefix = executor->ConvertToTensor(prefixOptional, op::DataType::DT_INT64);
+        CHECK_NULL(prefix);
         const_cast<aclTensor *>(prefix)->SetStorageFormat(op::Format::FORMAT_ND);
         const_cast<aclTensor *>(prefix)->SetViewFormat(op::Format::FORMAT_ND);
         const_cast<aclTensor *>(prefix)->SetOriginalFormat(op::Format::FORMAT_ND);
@@ -56,6 +59,7 @@ const std::array<const aclTensor *, MAX_FAG_OUTPUT_CNT> FlashAttentionScoreGrad(
     const aclTensor *actualSeqQLen = nullptr;
     if (actualSeqQLenOptional) {
         actualSeqQLen = executor->ConvertToTensor(actualSeqQLenOptional, op::DataType::DT_INT64);
+        CHECK_NULL(actualSeqQLen);
         const_cast<aclTensor *>(actualSeqQLen)->SetStorageFormat(op::Format::FORMAT_ND);
         const_cast<aclTensor *>(actualSeqQLen)->SetViewFormat(op::Format::FORMAT_ND);
         const_cast<aclTensor *>(actualSeqQLen)->SetOriginalFormat(op::Format::FORMAT_ND);
@@ -64,6 +68,7 @@ const std::array<const aclTensor *, MAX_FAG_OUTPUT_CNT> FlashAttentionScoreGrad(
     const aclTensor *actualSeqKvLen = nullptr;
     if (actualSeqKvLenOptional) {
         actualSeqKvLen = executor->ConvertToTensor(actualSeqKvLenOptional, op::DataType::DT_INT64);
+        CHECK_NULL(actualSeqKvLen);
         const_cast<aclTensor *>(actualSeqKvLen)->SetStorageFormat(op::Format::FORMAT_ND);
         const_cast<aclTensor *>(actualSeqKvLen)->SetViewFormat(op::Format::FORMAT_ND);
         const_cast<aclTensor *>(actualSeqKvLen)->SetOriginalFormat(op::Format::FORMAT_ND);
@@ -72,6 +77,7 @@ const std::array<const aclTensor *, MAX_FAG_OUTPUT_CNT> FlashAttentionScoreGrad(
     const aclTensor *qStartIdxOptionalTensor = nullptr;
     if (qStartIdxOptional) {
         qStartIdxOptionalTensor = executor->ConvertToTensor(qStartIdxOptional, DataType::DT_INT64);
+        CHECK_NULL(qStartIdxOptionalTensor);
         const_cast<aclTensor *>(qStartIdxOptionalTensor)->SetStorageFormat(Format::FORMAT_ND);
         const_cast<aclTensor *>(qStartIdxOptionalTensor)->SetViewFormat(Format::FORMAT_ND);
         const_cast<aclTensor *>(qStartIdxOptionalTensor)->SetOriginalFormat(Format::FORMAT_ND);
@@ -80,6 +86,7 @@ const std::array<const aclTensor *, MAX_FAG_OUTPUT_CNT> FlashAttentionScoreGrad(
     const aclTensor *kvStartIdxOptionalTensor = nullptr;
     if (kvStartIdxOptional) {
         kvStartIdxOptionalTensor = executor->ConvertToTensor(kvStartIdxOptional, DataType::DT_INT64);
+        CHECK_NULL(kvStartIdxOptionalTensor);
         const_cast<aclTensor *>(kvStartIdxOptionalTensor)->SetStorageFormat(Format::FORMAT_ND);
         const_cast<aclTensor *>(kvStartIdxOptionalTensor)->SetViewFormat(Format::FORMAT_ND);
         const_cast<aclTensor *>(kvStartIdxOptionalTensor)->SetOriginalFormat(Format::FORMAT_ND);

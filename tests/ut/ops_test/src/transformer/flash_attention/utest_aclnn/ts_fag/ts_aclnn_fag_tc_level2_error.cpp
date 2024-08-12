@@ -35,14 +35,14 @@ TEST_F(Ts_Aclnn_Fag_Ascend910B2, Tc_Fag_Level2_Err01)
                                  PrefixShapeType::NONE)                     /* PrefixShapeType */
     );
     ASSERT_TRUE(cs.Init());
-    for (auto *t : {&cs.aclnnParam.aclnnQuery}) {
+    for (auto *t : {&cs.mAclnnParam.aclnnQuery}) {
         t->FreeDevData();
     }
     std::string layout1 = "BSH";
     ops::adv::tests::utils::Tensor query1 = Tensor("query1", {2, 2048}, layout1.c_str(), ge::DataType::DT_FLOAT16,
                                                    ge::FORMAT_ND, Tensor::TensorType::REQUIRED_INPUT);
-    cs.aclnnParam.aclnnQuery = ops::adv::tests::utils::AclnnTensor(query1);
-    for (auto *t : {&cs.aclnnParam.aclnnQuery}) {
+    cs.mAclnnParam.aclnnQuery = ops::adv::tests::utils::AclnnTensor(query1);
+    for (auto *t : {&cs.mAclnnParam.aclnnQuery}) {
         t->FreeDevData();
         if (t->GetExpDataSize() <= 0) {
             continue;
@@ -81,14 +81,14 @@ TEST_F(Ts_Aclnn_Fag_Ascend910B2, Tc_Fag_Level2_Err02)
                                  {50, 25})                                  /* ActualSeqKVTensorData */
     );
     ASSERT_TRUE(cs.Init());
-    for (auto *t : {&cs.aclnnParam.aclnnQuery}) {
+    for (auto *t : {&cs.mAclnnParam.aclnnQuery}) {
         t->FreeDevData();
     }
     std::string layout1 = "TND";
     ops::adv::tests::utils::Tensor query1 = Tensor("query1", {2}, layout1.c_str(), ge::DataType::DT_FLOAT16,
                                                    ge::FORMAT_ND, Tensor::TensorType::REQUIRED_INPUT);
-    cs.aclnnParam.aclnnQuery = ops::adv::tests::utils::AclnnTensor(query1);
-    for (auto *t : {&cs.aclnnParam.aclnnQuery}) {
+    cs.mAclnnParam.aclnnQuery = ops::adv::tests::utils::AclnnTensor(query1);
+    for (auto *t : {&cs.mAclnnParam.aclnnQuery}) {
         t->FreeDevData();
         if (t->GetExpDataSize() <= 0) {
             continue;
@@ -124,14 +124,14 @@ TEST_F(Ts_Aclnn_Fag_Ascend910B2, Tc_Fag_Level2_Err03)
                                  PrefixShapeType::NONE)                     /* PrefixShapeType */
     );
     ASSERT_TRUE(cs.Init());
-    for (auto *t : {&cs.aclnnParam.aclnnQuery}) {
+    for (auto *t : {&cs.mAclnnParam.aclnnQuery}) {
         t->FreeDevData();
     }
     std::string layout1 = "BSH";
     ops::adv::tests::utils::Tensor query1 = Tensor("query1", {2, 2048}, layout1.c_str(), ge::DataType::DT_FLOAT16,
                                                    ge::FORMAT_ND, Tensor::TensorType::REQUIRED_INPUT);
-    cs.aclnnParam.aclnnQuery = ops::adv::tests::utils::AclnnTensor(query1);
-    for (auto *t : {&cs.aclnnParam.aclnnQuery}) {
+    cs.mAclnnParam.aclnnQuery = ops::adv::tests::utils::AclnnTensor(query1);
+    for (auto *t : {&cs.mAclnnParam.aclnnQuery}) {
         t->FreeDevData();
         if (t->GetExpDataSize() <= 0) {
             continue;
@@ -170,14 +170,14 @@ TEST_F(Ts_Aclnn_Fag_Ascend910B2, Tc_Fag_Level2_Err04)
                                  {50, 25})                                  /* ActualSeqKVTensorData */
     );
     ASSERT_TRUE(cs.Init());
-    for (auto *t : {&cs.aclnnParam.aclnnQuery}) {
+    for (auto *t : {&cs.mAclnnParam.aclnnQuery}) {
         t->FreeDevData();
     }
     std::string layout1 = "TND";
     ops::adv::tests::utils::Tensor query1 = Tensor("query1", {2}, layout1.c_str(), ge::DataType::DT_FLOAT16,
                                                    ge::FORMAT_ND, Tensor::TensorType::REQUIRED_INPUT);
-    cs.aclnnParam.aclnnQuery = ops::adv::tests::utils::AclnnTensor(query1);
-    for (auto *t : {&cs.aclnnParam.aclnnQuery}) {
+    cs.mAclnnParam.aclnnQuery = ops::adv::tests::utils::AclnnTensor(query1);
+    for (auto *t : {&cs.mAclnnParam.aclnnQuery}) {
         t->FreeDevData();
         if (t->GetExpDataSize() <= 0) {
             continue;
@@ -264,13 +264,13 @@ TEST_F(Ts_Aclnn_Fag_Ascend910B2, Tc_Fag_Level2_Err07)
                                  PrefixShapeType::NONE)                     /* PrefixShapeType */
     );
     ASSERT_TRUE(cs.Init());
-    for (auto *t : {&cs.aclnnParam.aclnnQuery}) {
+    for (auto *t : {&cs.mAclnnParam.aclnnQuery}) {
         t->FreeDevData();
     }
     std::string layout1 = "BSH";
     ops::adv::tests::utils::Tensor query1 = Tensor("query1", {2, 2048}, layout1.c_str(), ge::DataType::DT_FLOAT16,
                                                    ge::FORMAT_ND, Tensor::TensorType::REQUIRED_INPUT);
-    cs.aclnnParam.aclnnQuery = ops::adv::tests::utils::AclnnTensor(query1);
+    cs.mAclnnParam.aclnnQuery = ops::adv::tests::utils::AclnnTensor(query1);
 
     ASSERT_EQ(cs.Run(), false);
 }
@@ -298,13 +298,13 @@ TEST_F(Ts_Aclnn_Fag_Ascend910B2, Tc_Fag_Level2_Err08)
                                  {50, 25})                                  /* ActualSeqKVTensorData */
     );
     ASSERT_TRUE(cs.Init());
-    for (auto *t : {&cs.aclnnParam.aclnnQuery}) {
+    for (auto *t : {&cs.mAclnnParam.aclnnQuery}) {
         t->FreeDevData();
     }
     std::string layout1 = "TND";
     ops::adv::tests::utils::Tensor query1 = Tensor("query1", {2}, layout1.c_str(), ge::DataType::DT_FLOAT16,
                                                    ge::FORMAT_ND, Tensor::TensorType::REQUIRED_INPUT);
-    cs.aclnnParam.aclnnQuery = ops::adv::tests::utils::AclnnTensor(query1);
+    cs.mAclnnParam.aclnnQuery = ops::adv::tests::utils::AclnnTensor(query1);
 
     ASSERT_EQ(cs.Run(), false);
 }
@@ -329,13 +329,13 @@ TEST_F(Ts_Aclnn_Fag_Ascend910B2, Tc_Fag_Level2_Err09)
                                  PrefixShapeType::NONE)                     /* PrefixShapeType */
     );
     ASSERT_TRUE(cs.Init());
-    for (auto *t : {&cs.aclnnParam.aclnnQuery}) {
+    for (auto *t : {&cs.mAclnnParam.aclnnQuery}) {
         t->FreeDevData();
     }
     std::string layout1 = "BSH";
     ops::adv::tests::utils::Tensor query1 = Tensor("query1", {2, 2048}, layout1.c_str(), ge::DataType::DT_FLOAT16,
                                                    ge::FORMAT_ND, Tensor::TensorType::REQUIRED_INPUT);
-    cs.aclnnParam.aclnnQuery = ops::adv::tests::utils::AclnnTensor(query1);
+    cs.mAclnnParam.aclnnQuery = ops::adv::tests::utils::AclnnTensor(query1);
 
     ASSERT_EQ(cs.Run(), false);
 }
@@ -363,13 +363,13 @@ TEST_F(Ts_Aclnn_Fag_Ascend910B2, Tc_Fag_Level2_Err010)
                                  {50, 25})                                  /* ActualSeqKVTensorData */
     );
     ASSERT_TRUE(cs.Init());
-    for (auto *t : {&cs.aclnnParam.aclnnQuery}) {
+    for (auto *t : {&cs.mAclnnParam.aclnnQuery}) {
         t->FreeDevData();
     }
     std::string layout1 = "TND";
     ops::adv::tests::utils::Tensor query1 = Tensor("query1", {2}, layout1.c_str(), ge::DataType::DT_FLOAT16,
                                                    ge::FORMAT_ND, Tensor::TensorType::REQUIRED_INPUT);
-    cs.aclnnParam.aclnnQuery = ops::adv::tests::utils::AclnnTensor(query1);
+    cs.mAclnnParam.aclnnQuery = ops::adv::tests::utils::AclnnTensor(query1);
 
     ASSERT_EQ(cs.Run(), false);
 }

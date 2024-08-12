@@ -39,8 +39,8 @@ public:
     };
 
 public:
-    FunctionType functionType = FunctionType::NO_QUANT;
-    AclnnFFNVersion aclnnFFNVersion = AclnnFFNVersion::V1;
+    FunctionType mFunctionType = FunctionType::NO_QUANT;
+    AclnnFFNVersion mAclnnFFNVersion = AclnnFFNVersion::V1;
     /* 输入输出 */
     AclnnTensor aclnnX, aclnnWeight1, aclnnWeight2, aclnnExpertTokens, aclnnBias1, aclnnBias2, aclnnScale, aclnnOffset,
         aclnnDeqScale1, aclnnDeqScale2, aclnnAntiquantScale1, aclnnAntiquantScale2, aclnnAntiquantOffset1,
@@ -61,5 +61,5 @@ private:
     bool InitExpertTokens();
 };
 
-} // namespace ascendc::op::test::ffn
+} // namespace ops::adv::tests::ffn
 #endif // UTEST_ACLNN_FFN_PARAM_H

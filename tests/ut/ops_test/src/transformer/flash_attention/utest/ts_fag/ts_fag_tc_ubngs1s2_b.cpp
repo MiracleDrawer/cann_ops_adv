@@ -20,7 +20,7 @@ class Ts_Fag_Ascend910B2_Ubngs1s2Bb : public Ts_Fag_WithParam_Ascend910B2 {};
 TEST_P(Ts_Fag_Ascend910B2_Ubngs1s2Bb, Tc_BatchCase)
 {
     ASSERT_TRUE(case_->Init());
-    ASSERT_EQ(case_->Run(), case_->reverse.exp.success);
+    ASSERT_EQ(case_->Run(), case_->mReverse.mExp.mSuccess);
 }
 
 const auto Tc_Fag_Ubngs1s2Bb_BatchCase = ::testing::Values(
@@ -413,7 +413,7 @@ const auto Tc_Fag_Ubngs1s2Bb_BatchCase = ::testing::Values(
                     ge::DataType::DT_FLOAT16, LayoutType::BNSD,     /* Dtype, Layout */
                     0.08838f, 0.8f, 65536, 65536,                   /* Scale, KeepProb, PreTokens, NxtTokens */
                     0, 4,                                           /* InnerPrecise, SparseMode */
-                    PseShapeType::B_N1_ALIBI_S1_S2,                       /* PseShapeType */
+                    PseShapeType::B_N1_ALIBI_S1_S2,                 /* PseShapeType */
                     DropMaskShapeType::B_N1_S1_S2DIV8,              /* DropMaskShapeType */
                     PaddingMaskShapeType::S1_S2,                    /* PaddingMaskShapeType */
                     AttenMaskShapeType::S1_S2,                      /* AttentionMaskShapeType */

@@ -30,8 +30,8 @@ using ops::adv::tests::utils::ReadFile;
 using ops::adv::tests::utils::WriteFile;
 
 /**
- * 以下函数声明需要保持与 CMakeList.txt 中调用 OpsTest_Level2_AddOp 函数时 KERNEL_PRIVATE_COMPILE_DEFINITIONS_EXT 参数所控制的
- * Kernel 入口一致.
+ * 以下函数声明需要保持与 CMakeList.txt 中调用 OpsTest_Level2_AddOp 函数时 KERNEL_PRIVATE_COMPILE_DEFINITIONS_EXT
+ * 参数所控制的 Kernel 入口一致.
  */
 
 #define FFN_KERNEL_PARAM                                                                                               \
@@ -41,7 +41,7 @@ using ops::adv::tests::utils::WriteFile;
      __gm__ uint8_t * antiquant_scale2, __gm__ uint8_t * antiquant_offset1, __gm__ uint8_t * antiquant_offset2,        \
      __gm__ uint8_t * y, __gm__ uint8_t * workSpace, __gm__ uint8_t * tiling)
 
-typedef void (*FFNKernelFunc) FFN_KERNEL_PARAM;
+typedef void(*FFNKernelFunc) FFN_KERNEL_PARAM;
 
 extern "C" __global__ __aicore__ void ffn_quant_fp16 FFN_KERNEL_PARAM;
 extern "C" __global__ __aicore__ void ffn_quant_bf16 FFN_KERNEL_PARAM;
@@ -77,6 +77,7 @@ enum KernelParams {
 bool RunFFN(void *func, uint64_t tilingKey, int64_t blockDim, std::vector<TensorIntf *> &inputs,
             std::vector<TensorIntf *> &output, uint8_t *workspace, uint8_t *tilingData)
 {
+    (void)blockDim;
     // Kernel 运行
     auto kernelFunc = (FFNKernelFunc)func;
     ICPU_SET_TILING_KEY(tilingKey);
@@ -95,22 +96,22 @@ FFNCase::FFNCase() : FFNCase("Undefined", true, "", OpInfo(), Param(), 0)
 
 FFNCase::FFNCase(const char *name, bool enable, const char *dbgInfo, OpInfo opInfo, Param param,
                  int32_t tilingTemplatePriority)
-    : Case(name, enable, dbgInfo, tilingTemplatePriority), opInfo(std::move(opInfo)), param(std::move(param))
+    : Case(name, enable, dbgInfo, tilingTemplatePriority), mOpInfo(std::move(opInfo)), mParam(std::move(param))
 {
-    this->opInfo.name = "FFN";
+    this->mOpInfo.mName = "FFN";
 }
 
 bool FFNCase::InitParam()
 {
-    if (param.expertTokensData.size() > 0) {
-        size_t dataSize = param.expertTokensData.size() * sizeof(int64_t);
-        uint8_t *addr = param.tensors["expertTokens"].AllocDevData(0, dataSize);
+    if (mParam.mExpertTokensData.size() > 0) {
+        size_t dataSize = mParam.mExpertTokensData.size() * sizeof(int64_t);
+        uint8_t *addr = mParam.mTensors["expertTokens"].AllocDevData(0, dataSize);
         if (addr == nullptr) {
-            LOG_ERR("Tensor(%s, %ld) AllocDevData Failed.", param.tensors["expertTokens"].Name().c_str(), dataSize);
+            LOG_ERR("Tensor(%s, %zu) AllocDevData Failed.", mParam.mTensors["expertTokens"].Name().c_str(), dataSize);
             return false;
         }
-        std::string fileName = this->name + "_expertToken.bin";
-        if (!WriteFile(fileName, param.expertTokensData.data(), dataSize)) {
+        std::string fileName = this->mName + "_expertToken.bin";
+        if (!WriteFile(fileName, mParam.mExpertTokensData.data(), dataSize)) {
             LOG_ERR("Write expertToken data to file[%s] failed", fileName.c_str());
             return false;
         }
@@ -124,31 +125,32 @@ bool FFNCase::InitParam()
 
 bool FFNCase::InitOpInfo()
 {
-    auto *ffnKernelFunc = (void *)ffn_quant_fp16;;
-    if (param.tensors["x"].GetDataType() == param.tensors["weight1"].GetDataType()) {
-        if (param.tensors["weight1"].GetDataType() == ge::DataType::DT_INT8) { // 量化
-            isQuant = true;
-            if (param.tensors["y"].GetDataType() == ge::DataType::DT_FLOAT16) {
+    auto *ffnKernelFunc = (void *)ffn_quant_fp16;
+
+    if (mParam.mTensors["x"].GetDataType() == mParam.mTensors["weight1"].GetDataType()) {
+        if (mParam.mTensors["weight1"].GetDataType() == ge::DataType::DT_INT8) { // 量化
+            mIsQuant = true;
+            if (mParam.mTensors["y"].GetDataType() == ge::DataType::DT_FLOAT16) {
                 ffnKernelFunc = (void *)ffn_quant_fp16;
             } else {
                 ffnKernelFunc = (void *)ffn_quant_bf16;
             }
         } else { // 非量化
-            if (param.tensors["weight1"].GetDataType() == ge::DataType::DT_FLOAT16) {
+            if (mParam.mTensors["weight1"].GetDataType() == ge::DataType::DT_FLOAT16) {
                 ffnKernelFunc = (void *)ffn_fp16;
             } else {
                 ffnKernelFunc = (void *)ffn_bf16;
             }
         }
     } else { // 伪量化
-        if (param.tensors["weight1"].GetDataType() == ge::DataType::DT_INT8) {
-            if (param.tensors["x"].GetDataType() == ge::DataType::DT_FLOAT16) {
+        if (mParam.mTensors["weight1"].GetDataType() == ge::DataType::DT_INT8) {
+            if (mParam.mTensors["x"].GetDataType() == ge::DataType::DT_FLOAT16) {
                 ffnKernelFunc = (void *)ffn_a16w8_fp16;
             } else {
                 ffnKernelFunc = (void *)ffn_a16w8_bf16;
             }
         } else {
-            if (param.tensors["x"].GetDataType() == ge::DataType::DT_FLOAT16) {
+            if (mParam.mTensors["x"].GetDataType() == ge::DataType::DT_FLOAT16) {
                 ffnKernelFunc = (void *)ffn_a16w4_fp16;
             } else {
                 ffnKernelFunc = (void *)ffn_a16w4_bf16;
@@ -156,39 +158,39 @@ bool FFNCase::InitOpInfo()
         }
     }
 
-    bool rst = ctx.SetOpName(opInfo.name.c_str());
-    rst = rst && ctx.SetDeterministic(opInfo.ctr.deterministic);
-    rst = rst && ctx.SetInputs({&param.tensors["x"], &param.tensors["weight1"], &param.tensors["weight2"],
-                                &param.tensors["expertTokens"], &param.tensors["bias1"], &param.tensors["bias2"],
-                                &param.tensors["scale"], &param.tensors["offset"], &param.tensors["deqScale1"],
-                                &param.tensors["deqScale2"], &param.tensors["antiquant_scale1"],
-                                &param.tensors["antiquant_scale2"], &param.tensors["antiquant_offset1"],
-                                &param.tensors["antiquant_offset2"]});
-    rst = rst && ctx.SetOutputs({&param.tensors["y"]});
-    rst = rst && ctx.SetAttrs({{"activation", param.activation},
-                               {"inner_precise", param.innerPrecise},
-                               {"output_dtype", param.outputDtype},
-                               {"tokens_index_flag", param.tokensIndexFlag}});
-    rst = rst && ctx.SetKernelRunCbf(RunFFN);
-    rst = rst && ctx.SetKernelMainFunc((void *)ffnKernelFunc);
-    rst = rst && opInfo.SetContext(&ctx);
+    bool rst = mCtx.SetOpName(mOpInfo.mName.c_str());
+    rst = rst && mCtx.SetDeterministic(mOpInfo.mCtr.mDeterministic);
+    rst = rst && mCtx.SetInputs({&mParam.mTensors["x"], &mParam.mTensors["weight1"], &mParam.mTensors["weight2"],
+                                 &mParam.mTensors["expertTokens"], &mParam.mTensors["bias1"], &mParam.mTensors["bias2"],
+                                 &mParam.mTensors["scale"], &mParam.mTensors["offset"], &mParam.mTensors["deqScale1"],
+                                 &mParam.mTensors["deqScale2"], &mParam.mTensors["antiquant_scale1"],
+                                 &mParam.mTensors["antiquant_scale2"], &mParam.mTensors["antiquant_offset1"],
+                                 &mParam.mTensors["antiquant_offset2"]});
+    rst = rst && mCtx.SetOutputs({&mParam.mTensors["y"]});
+    rst = rst && mCtx.SetAttrs({{"activation", mParam.mActivation},
+                                {"inner_precise", mParam.mInnerPrecise},
+                                {"output_dtype", mParam.mOutputDtype},
+                                {"tokens_index_flag", mParam.mTokensIndexFlag}});
+    rst = rst && mCtx.SetKernelRunCbf(RunFFN);
+    rst = rst && mCtx.SetKernelMainFunc((void *)ffnKernelFunc);
+    rst = rst && mOpInfo.SetContext(&mCtx);
     return rst;
 }
 
 bool FFNCase::Run()
 {
-    if (!enable) {
+    if (!mEnable) {
         return true;
     }
-    if (!opInfo.ProcessTiling(name)) {
+    if (!mOpInfo.ProcessTiling(mName)) {
         return false;
     }
-    FFNTilingData *ffnTiling = (FFNTilingData *)ctx.GetTilingData();
+    auto *ffnTiling = const_cast<FFNTilingData *>((const FFNTilingData *)(mCtx.GetTilingData()));
     if (ffnTiling == nullptr) {
         LOG_ERR("Tiling failed!");
         return false;
     }
-    if (isQuant || ctx.GetTilingKey() == 15) { // 15: 伪量化msd模板
+    if (mIsQuant || mCtx.GetTilingKey() == 15) { // 15: 伪量化msd模板
         if (ffnTiling->mm1TilingData.baseN * ffnTiling->mm1TilingData.baseK >
             16384) {                             // 16384: int8场景右矩阵占l0b的1/4
             ffnTiling->mm1TilingData.baseN /= 2; // 2: 将l0b占用大小减半
@@ -198,7 +200,7 @@ bool FFNCase::Run()
             ffnTiling->mm2TilingData.baseN /= 2; // 2: 将l0b占用大小减半
         }
     }
-    if (!opInfo.ProcessKernel(name)) {
+    if (!mOpInfo.ProcessKernel(mName)) {
         return false;
     }
     return true;
@@ -206,7 +208,7 @@ bool FFNCase::Run()
 
 bool FFNCase::InitCurrentCasePtr()
 {
-    Case::currentCasePtr = this;
+    Case::mCurrentCasePtr = this;
     return true;
 }
 

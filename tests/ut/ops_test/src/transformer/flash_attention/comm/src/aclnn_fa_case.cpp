@@ -24,36 +24,36 @@ using namespace ops::adv::tests::fa;
 bool FasTilingRunCbf(void *curCase, uint64_t *workSpaceSize, aclOpExecutor **opExecutor)
 {
     auto *cs = static_cast<AclnnFaCase *>(curCase);
-    auto *aclnnParam = &cs->aclnnParam;
-    auto *exp = &cs->forward.exp;
+    auto *mAclnnParam = &cs->mAclnnParam;
+    auto *exp = &cs->mForward.mExp;
 
     aclnnStatus ret;
-    if (!aclnnParam->IsUnPaddingAttention()) {
+    if (!mAclnnParam->IsUnPaddingAttention()) {
         ret = aclnnFlashAttentionScoreGetWorkspaceSize(
-            aclnnParam->aclnnQuery.GetAclTensor(), aclnnParam->aclnnKey.GetAclTensor(),
-            aclnnParam->aclnnValue.GetAclTensor(), aclnnParam->aclnnPse.GetAclTensor(),
-            aclnnParam->aclnnDropMask.GetAclTensor(), aclnnParam->aclnnPaddingMask.GetAclTensor(),
-            aclnnParam->aclnnAttenMask.GetAclTensor(), aclnnParam->aclnnPrefixIntAry, aclnnParam->scale,
-            aclnnParam->keepProb, aclnnParam->preTokens, aclnnParam->nxtTokens, aclnnParam->n1,
-            (char *)aclnnParam->layout.c_str(), aclnnParam->innerPrecise, aclnnParam->sparseMode,
-            aclnnParam->aclnnSoftmaxMax.GetAclTensor(), aclnnParam->aclnnSoftmaxSum.GetAclTensor(),
-            aclnnParam->aclnnSoftmaxRes.GetAclTensor(), aclnnParam->aclnnAttenRes.GetAclTensor(), workSpaceSize,
+            mAclnnParam->aclnnQuery.GetAclTensor(), mAclnnParam->aclnnKey.GetAclTensor(),
+            mAclnnParam->aclnnValue.GetAclTensor(), mAclnnParam->aclnnPse.GetAclTensor(),
+            mAclnnParam->aclnnDropMask.GetAclTensor(), mAclnnParam->aclnnPaddingMask.GetAclTensor(),
+            mAclnnParam->aclnnAttenMask.GetAclTensor(), mAclnnParam->aclnnPrefixIntAry, mAclnnParam->scale,
+            mAclnnParam->keepProb, mAclnnParam->preTokens, mAclnnParam->nxtTokens, mAclnnParam->n1,
+            const_cast<char *>(mAclnnParam->layout.c_str()), mAclnnParam->innerPrecise, mAclnnParam->sparseMode,
+            mAclnnParam->aclnnSoftmaxMax.GetAclTensor(), mAclnnParam->aclnnSoftmaxSum.GetAclTensor(),
+            mAclnnParam->aclnnSoftmaxRes.GetAclTensor(), mAclnnParam->aclnnAttenRes.GetAclTensor(), workSpaceSize,
             opExecutor);
-        LOG_IF(ret != ACL_SUCCESS && exp->success,
+        LOG_IF(ret != ACL_SUCCESS && exp->mSuccess,
                LOG_ERR("aclnnFlashAttentionScoreGetWorkspaceSize failed, ERROR: %d", ret));
     } else {
         ret = aclnnFlashAttentionVarLenScoreGetWorkspaceSize(
-            aclnnParam->aclnnQuery.GetAclTensor(), aclnnParam->aclnnKey.GetAclTensor(),
-            aclnnParam->aclnnValue.GetAclTensor(), aclnnParam->aclnnPse.GetAclTensor(),
-            aclnnParam->aclnnDropMask.GetAclTensor(), aclnnParam->aclnnPaddingMask.GetAclTensor(),
-            aclnnParam->aclnnAttenMask.GetAclTensor(), aclnnParam->aclnnPrefixIntAry,
-            aclnnParam->aclnnActualSeqQLenIntAry, aclnnParam->aclnnActualSeqKvLenIntAry, aclnnParam->scale,
-            aclnnParam->keepProb, aclnnParam->preTokens, aclnnParam->nxtTokens, aclnnParam->n1,
-            (char *)aclnnParam->layout.c_str(), aclnnParam->innerPrecise, aclnnParam->sparseMode,
-            aclnnParam->aclnnSoftmaxMax.GetAclTensor(), aclnnParam->aclnnSoftmaxSum.GetAclTensor(),
-            aclnnParam->aclnnSoftmaxRes.GetAclTensor(), aclnnParam->aclnnAttenRes.GetAclTensor(), workSpaceSize,
+            mAclnnParam->aclnnQuery.GetAclTensor(), mAclnnParam->aclnnKey.GetAclTensor(),
+            mAclnnParam->aclnnValue.GetAclTensor(), mAclnnParam->aclnnPse.GetAclTensor(),
+            mAclnnParam->aclnnDropMask.GetAclTensor(), mAclnnParam->aclnnPaddingMask.GetAclTensor(),
+            mAclnnParam->aclnnAttenMask.GetAclTensor(), mAclnnParam->aclnnPrefixIntAry,
+            mAclnnParam->aclnnActualSeqQLenIntAry, mAclnnParam->aclnnActualSeqKvLenIntAry, mAclnnParam->scale,
+            mAclnnParam->keepProb, mAclnnParam->preTokens, mAclnnParam->nxtTokens, mAclnnParam->n1,
+            const_cast<char *>(mAclnnParam->layout.c_str()), mAclnnParam->innerPrecise, mAclnnParam->sparseMode,
+            mAclnnParam->aclnnSoftmaxMax.GetAclTensor(), mAclnnParam->aclnnSoftmaxSum.GetAclTensor(),
+            mAclnnParam->aclnnSoftmaxRes.GetAclTensor(), mAclnnParam->aclnnAttenRes.GetAclTensor(), workSpaceSize,
             opExecutor);
-        LOG_IF(ret != ACL_SUCCESS && exp->success,
+        LOG_IF(ret != ACL_SUCCESS && exp->mSuccess,
                LOG_ERR("aclnnFlashAttentionVarLenScoreGetWorkspaceSize failed, ERROR: %d", ret));
     }
     return ret == ACL_SUCCESS;
@@ -62,11 +62,11 @@ bool FasTilingRunCbf(void *curCase, uint64_t *workSpaceSize, aclOpExecutor **opE
 bool FasKernelRunCbf(void *curCase)
 {
     auto *cs = static_cast<AclnnFaCase *>(curCase);
-    auto *aclnnParam = &cs->aclnnParam;
-    auto *ctx = &cs->aclnnForwardCtx;
+    auto *mAclnnParam = &cs->mAclnnParam;
+    auto *ctx = &cs->mAclnnForwardCtx;
 
     aclnnStatus ret;
-    if (!aclnnParam->IsUnPaddingAttention()) {
+    if (!mAclnnParam->IsUnPaddingAttention()) {
         ret = aclnnFlashAttentionScore(ctx->GetWorkspacePtr(), ctx->GetWorkspaceSize(), ctx->GetAclOpExecutor(),
                                        ctx->GetAclRtStream());
         LOG_IF(ret != ACL_SUCCESS, LOG_ERR("aclnnFlashAttentionScore failed, ERROR: %d", ret));
@@ -81,74 +81,76 @@ bool FasKernelRunCbf(void *curCase)
 bool FagTilingRunCbf(void *curCase, uint64_t *workSpaceSize, aclOpExecutor **opExecutor)
 {
     auto *cs = static_cast<AclnnFaCase *>(curCase);
-    auto *aclnnParam = &cs->aclnnParam;
-    auto *exp = &cs->reverse.exp;
+    auto *mAclnnParam = &cs->mAclnnParam;
+    auto *exp = &cs->mReverse.mExp;
 
     aclnnStatus ret;
-    if (aclnnParam->pseType == 1) {
-        if (!aclnnParam->IsUnPaddingAttention()) {
+    if (mAclnnParam->pseType == 1) {
+        if (!mAclnnParam->IsUnPaddingAttention()) {
             ret = aclnnFlashAttentionScoreGradGetWorkspaceSize(
-                aclnnParam->aclnnQuery.GetAclTensor(), aclnnParam->aclnnKey.GetAclTensor(),
-                aclnnParam->aclnnValue.GetAclTensor(), aclnnParam->aclnnDy.GetAclTensor(),
-                aclnnParam->aclnnPse.GetAclTensor(), aclnnParam->aclnnDropMask.GetAclTensor(),
-                aclnnParam->aclnnPaddingMask.GetAclTensor(), aclnnParam->aclnnAttenMask.GetAclTensor(),
-                aclnnParam->aclnnSoftmaxMax.GetAclTensor(), aclnnParam->aclnnSoftmaxSum.GetAclTensor(),
-                aclnnParam->aclnnSoftmaxRes.GetAclTensor(), aclnnParam->aclnnAttenRes.GetAclTensor(),
-                aclnnParam->aclnnPrefixIntAry, aclnnParam->scale, aclnnParam->keepProb, aclnnParam->preTokens,
-                aclnnParam->nxtTokens, aclnnParam->n1, (char *)aclnnParam->layout.c_str(), aclnnParam->innerPrecise,
-                aclnnParam->sparseMode, aclnnParam->aclnnDq.GetAclTensor(), aclnnParam->aclnnDk.GetAclTensor(),
-                aclnnParam->aclnnDv.GetAclTensor(), aclnnParam->aclnnDpse.GetAclTensor(), workSpaceSize, opExecutor);
-            LOG_IF(ret != ACL_SUCCESS && exp->success,
+                mAclnnParam->aclnnQuery.GetAclTensor(), mAclnnParam->aclnnKey.GetAclTensor(),
+                mAclnnParam->aclnnValue.GetAclTensor(), mAclnnParam->aclnnDy.GetAclTensor(),
+                mAclnnParam->aclnnPse.GetAclTensor(), mAclnnParam->aclnnDropMask.GetAclTensor(),
+                mAclnnParam->aclnnPaddingMask.GetAclTensor(), mAclnnParam->aclnnAttenMask.GetAclTensor(),
+                mAclnnParam->aclnnSoftmaxMax.GetAclTensor(), mAclnnParam->aclnnSoftmaxSum.GetAclTensor(),
+                mAclnnParam->aclnnSoftmaxRes.GetAclTensor(), mAclnnParam->aclnnAttenRes.GetAclTensor(),
+                mAclnnParam->aclnnPrefixIntAry, mAclnnParam->scale, mAclnnParam->keepProb, mAclnnParam->preTokens,
+                mAclnnParam->nxtTokens, mAclnnParam->n1, const_cast<char *>(mAclnnParam->layout.c_str()),
+                mAclnnParam->innerPrecise, mAclnnParam->sparseMode, mAclnnParam->aclnnDq.GetAclTensor(),
+                mAclnnParam->aclnnDk.GetAclTensor(), mAclnnParam->aclnnDv.GetAclTensor(),
+                mAclnnParam->aclnnDpse.GetAclTensor(), workSpaceSize, opExecutor);
+            LOG_IF(ret != ACL_SUCCESS && exp->mSuccess,
                    LOG_ERR("aclnnFlashAttentionScoreGradGetWorkspaceSize failed, ERROR: %d", ret));
         } else {
             ret = aclnnFlashAttentionUnpaddingScoreGradGetWorkspaceSize(
-                aclnnParam->aclnnQuery.GetAclTensor(), aclnnParam->aclnnKey.GetAclTensor(),
-                aclnnParam->aclnnValue.GetAclTensor(), aclnnParam->aclnnDy.GetAclTensor(),
-                aclnnParam->aclnnPse.GetAclTensor(), aclnnParam->aclnnDropMask.GetAclTensor(),
-                aclnnParam->aclnnPaddingMask.GetAclTensor(), aclnnParam->aclnnAttenMask.GetAclTensor(),
-                aclnnParam->aclnnSoftmaxMax.GetAclTensor(), aclnnParam->aclnnSoftmaxSum.GetAclTensor(),
-                aclnnParam->aclnnSoftmaxRes.GetAclTensor(), aclnnParam->aclnnAttenRes.GetAclTensor(),
-                aclnnParam->aclnnPrefixIntAry, aclnnParam->aclnnActualSeqQLenIntAry,
-                aclnnParam->aclnnActualSeqKvLenIntAry, aclnnParam->scale, aclnnParam->keepProb, aclnnParam->preTokens,
-                aclnnParam->nxtTokens, aclnnParam->n1, (char *)aclnnParam->layout.c_str(), aclnnParam->innerPrecise,
-                aclnnParam->sparseMode, aclnnParam->aclnnDq.GetAclTensor(), aclnnParam->aclnnDk.GetAclTensor(),
-                aclnnParam->aclnnDv.GetAclTensor(), aclnnParam->aclnnDpse.GetAclTensor(), workSpaceSize, opExecutor);
-            LOG_IF(ret != ACL_SUCCESS && exp->success,
+                mAclnnParam->aclnnQuery.GetAclTensor(), mAclnnParam->aclnnKey.GetAclTensor(),
+                mAclnnParam->aclnnValue.GetAclTensor(), mAclnnParam->aclnnDy.GetAclTensor(),
+                mAclnnParam->aclnnPse.GetAclTensor(), mAclnnParam->aclnnDropMask.GetAclTensor(),
+                mAclnnParam->aclnnPaddingMask.GetAclTensor(), mAclnnParam->aclnnAttenMask.GetAclTensor(),
+                mAclnnParam->aclnnSoftmaxMax.GetAclTensor(), mAclnnParam->aclnnSoftmaxSum.GetAclTensor(),
+                mAclnnParam->aclnnSoftmaxRes.GetAclTensor(), mAclnnParam->aclnnAttenRes.GetAclTensor(),
+                mAclnnParam->aclnnPrefixIntAry, mAclnnParam->aclnnActualSeqQLenIntAry,
+                mAclnnParam->aclnnActualSeqKvLenIntAry, mAclnnParam->scale, mAclnnParam->keepProb,
+                mAclnnParam->preTokens, mAclnnParam->nxtTokens, mAclnnParam->n1,
+                const_cast<char *>(mAclnnParam->layout.c_str()), mAclnnParam->innerPrecise, mAclnnParam->sparseMode,
+                mAclnnParam->aclnnDq.GetAclTensor(), mAclnnParam->aclnnDk.GetAclTensor(),
+                mAclnnParam->aclnnDv.GetAclTensor(), mAclnnParam->aclnnDpse.GetAclTensor(), workSpaceSize, opExecutor);
+            LOG_IF(ret != ACL_SUCCESS && exp->mSuccess,
                    LOG_ERR("aclnnFlashAttentionUnpaddingScoreGradGetWorkspaceSize failed, ERROR: %d", ret));
         }
     } else {
-        if (!aclnnParam->IsUnPaddingAttention()) {
+        if (!mAclnnParam->IsUnPaddingAttention()) {
             ret = aclnnFlashAttentionScoreGradV2GetWorkspaceSize(
-                aclnnParam->aclnnQuery.GetAclTensor(), aclnnParam->aclnnKey.GetAclTensor(),
-                aclnnParam->aclnnValue.GetAclTensor(), aclnnParam->aclnnDy.GetAclTensor(),
-                aclnnParam->aclnnPse.GetAclTensor(), aclnnParam->aclnnDropMask.GetAclTensor(),
-                aclnnParam->aclnnPaddingMask.GetAclTensor(), aclnnParam->aclnnAttenMask.GetAclTensor(),
-                aclnnParam->aclnnSoftmaxMax.GetAclTensor(), aclnnParam->aclnnSoftmaxSum.GetAclTensor(),
-                aclnnParam->aclnnSoftmaxRes.GetAclTensor(), aclnnParam->aclnnAttenRes.GetAclTensor(),
-                aclnnParam->aclnnPrefixIntAry, aclnnParam->qStartIdxOptionalIntAry,
-                aclnnParam->kvStartIdxOptionalIntAry, aclnnParam->scale, aclnnParam->keepProb, aclnnParam->preTokens,
-                aclnnParam->nxtTokens, aclnnParam->n1, (char *)aclnnParam->layout.c_str(), aclnnParam->innerPrecise,
-                aclnnParam->sparseMode, aclnnParam->pseType, aclnnParam->aclnnDq.GetAclTensor(),
-                aclnnParam->aclnnDk.GetAclTensor(), aclnnParam->aclnnDv.GetAclTensor(),
-                aclnnParam->aclnnDpse.GetAclTensor(), workSpaceSize, opExecutor);
-            LOG_IF(ret != ACL_SUCCESS && exp->success,
+                mAclnnParam->aclnnQuery.GetAclTensor(), mAclnnParam->aclnnKey.GetAclTensor(),
+                mAclnnParam->aclnnValue.GetAclTensor(), mAclnnParam->aclnnDy.GetAclTensor(),
+                mAclnnParam->aclnnPse.GetAclTensor(), mAclnnParam->aclnnDropMask.GetAclTensor(),
+                mAclnnParam->aclnnPaddingMask.GetAclTensor(), mAclnnParam->aclnnAttenMask.GetAclTensor(),
+                mAclnnParam->aclnnSoftmaxMax.GetAclTensor(), mAclnnParam->aclnnSoftmaxSum.GetAclTensor(),
+                mAclnnParam->aclnnSoftmaxRes.GetAclTensor(), mAclnnParam->aclnnAttenRes.GetAclTensor(),
+                mAclnnParam->aclnnPrefixIntAry, mAclnnParam->qStartIdxOptionalIntAry,
+                mAclnnParam->kvStartIdxOptionalIntAry, mAclnnParam->scale, mAclnnParam->keepProb,
+                mAclnnParam->preTokens, mAclnnParam->nxtTokens, mAclnnParam->n1,
+                const_cast<char *>(mAclnnParam->layout.c_str()), mAclnnParam->innerPrecise, mAclnnParam->sparseMode,
+                mAclnnParam->pseType, mAclnnParam->aclnnDq.GetAclTensor(), mAclnnParam->aclnnDk.GetAclTensor(),
+                mAclnnParam->aclnnDv.GetAclTensor(), mAclnnParam->aclnnDpse.GetAclTensor(), workSpaceSize, opExecutor);
+            LOG_IF(ret != ACL_SUCCESS && exp->mSuccess,
                    LOG_ERR("aclnnFlashAttentionScoreGradV2GetWorkspaceSize failed, ERROR: %d", ret));
         } else {
             ret = aclnnFlashAttentionUnpaddingScoreGradV2GetWorkspaceSize(
-                aclnnParam->aclnnQuery.GetAclTensor(), aclnnParam->aclnnKey.GetAclTensor(),
-                aclnnParam->aclnnValue.GetAclTensor(), aclnnParam->aclnnDy.GetAclTensor(),
-                aclnnParam->aclnnPse.GetAclTensor(), aclnnParam->aclnnDropMask.GetAclTensor(),
-                aclnnParam->aclnnPaddingMask.GetAclTensor(), aclnnParam->aclnnAttenMask.GetAclTensor(),
-                aclnnParam->aclnnSoftmaxMax.GetAclTensor(), aclnnParam->aclnnSoftmaxSum.GetAclTensor(),
-                aclnnParam->aclnnSoftmaxRes.GetAclTensor(), aclnnParam->aclnnAttenRes.GetAclTensor(),
-                aclnnParam->aclnnPrefixIntAry, aclnnParam->aclnnActualSeqQLenIntAry,
-                aclnnParam->aclnnActualSeqKvLenIntAry, aclnnParam->qStartIdxOptionalIntAry,
-                aclnnParam->kvStartIdxOptionalIntAry, aclnnParam->scale, aclnnParam->keepProb, aclnnParam->preTokens,
-                aclnnParam->nxtTokens, aclnnParam->n1, (char *)aclnnParam->layout.c_str(), aclnnParam->innerPrecise,
-                aclnnParam->sparseMode, aclnnParam->pseType, aclnnParam->aclnnDq.GetAclTensor(),
-                aclnnParam->aclnnDk.GetAclTensor(), aclnnParam->aclnnDv.GetAclTensor(),
-                aclnnParam->aclnnDpse.GetAclTensor(), workSpaceSize, opExecutor);
-            LOG_IF(ret != ACL_SUCCESS && exp->success,
+                mAclnnParam->aclnnQuery.GetAclTensor(), mAclnnParam->aclnnKey.GetAclTensor(),
+                mAclnnParam->aclnnValue.GetAclTensor(), mAclnnParam->aclnnDy.GetAclTensor(),
+                mAclnnParam->aclnnPse.GetAclTensor(), mAclnnParam->aclnnDropMask.GetAclTensor(),
+                mAclnnParam->aclnnPaddingMask.GetAclTensor(), mAclnnParam->aclnnAttenMask.GetAclTensor(),
+                mAclnnParam->aclnnSoftmaxMax.GetAclTensor(), mAclnnParam->aclnnSoftmaxSum.GetAclTensor(),
+                mAclnnParam->aclnnSoftmaxRes.GetAclTensor(), mAclnnParam->aclnnAttenRes.GetAclTensor(),
+                mAclnnParam->aclnnPrefixIntAry, mAclnnParam->aclnnActualSeqQLenIntAry,
+                mAclnnParam->aclnnActualSeqKvLenIntAry, mAclnnParam->qStartIdxOptionalIntAry,
+                mAclnnParam->kvStartIdxOptionalIntAry, mAclnnParam->scale, mAclnnParam->keepProb,
+                mAclnnParam->preTokens, mAclnnParam->nxtTokens, mAclnnParam->n1,
+                const_cast<char *>(mAclnnParam->layout.c_str()), mAclnnParam->innerPrecise, mAclnnParam->sparseMode,
+                mAclnnParam->pseType, mAclnnParam->aclnnDq.GetAclTensor(), mAclnnParam->aclnnDk.GetAclTensor(),
+                mAclnnParam->aclnnDv.GetAclTensor(), mAclnnParam->aclnnDpse.GetAclTensor(), workSpaceSize, opExecutor);
+            LOG_IF(ret != ACL_SUCCESS && exp->mSuccess,
                    LOG_ERR("aclnnFlashAttentionUnpaddingScoreGradV2GetWorkspaceSize failed, ERROR: %d", ret));
         }
     }
@@ -158,12 +160,12 @@ bool FagTilingRunCbf(void *curCase, uint64_t *workSpaceSize, aclOpExecutor **opE
 bool FagKernelRunCbf(void *curCase)
 {
     auto *cs = static_cast<AclnnFaCase *>(curCase);
-    auto *aclnnParam = &cs->aclnnParam;
-    auto *ctx = &cs->aclnnReverseCtx;
+    auto *mAclnnParam = &cs->mAclnnParam;
+    auto *ctx = &cs->mAclnnReverseCtx;
 
     aclnnStatus ret;
-    if (aclnnParam->pseType == 1) {
-        if (!aclnnParam->IsUnPaddingAttention()) {
+    if (mAclnnParam->pseType == 1) {
+        if (!mAclnnParam->IsUnPaddingAttention()) {
             ret = aclnnFlashAttentionScoreGrad(ctx->GetWorkspacePtr(), ctx->GetWorkspaceSize(), ctx->GetAclOpExecutor(),
                                                ctx->GetAclRtStream());
             LOG_IF(ret != ACL_SUCCESS, LOG_ERR("aclnnFlashAttentionScoreGrad failed, ERROR: %d", ret));
@@ -173,7 +175,7 @@ bool FagKernelRunCbf(void *curCase)
             LOG_IF(ret != ACL_SUCCESS, LOG_ERR("aclnnFlashAttentionUnpaddingScoreGrad failed, ERROR: %d", ret));
         }
     } else {
-        if (!aclnnParam->IsUnPaddingAttention()) {
+        if (!mAclnnParam->IsUnPaddingAttention()) {
             ret = aclnnFlashAttentionScoreGradV2(ctx->GetWorkspacePtr(), ctx->GetWorkspaceSize(),
                                                  ctx->GetAclOpExecutor(), ctx->GetAclRtStream());
             LOG_IF(ret != ACL_SUCCESS, LOG_ERR("aclnnFlashAttentionScoreGradV2 failed, ERROR: %d", ret));
@@ -187,20 +189,20 @@ bool FagKernelRunCbf(void *curCase)
 }
 
 AclnnFaCase::AclnnFaCase()
-    : FaCase(), aclnnForwardCtx(AclnnContext()), aclnnReverseCtx(AclnnContext()), aclnnParam(AclnnFaParam())
+    : FaCase(), mAclnnForwardCtx(AclnnContext()), mAclnnReverseCtx(AclnnContext()), mAclnnParam(AclnnFaParam())
 {
 }
 
 AclnnFaCase::AclnnFaCase(const char *name, bool enable, const char *dbgInfo, OpInfo forward, OpInfo reverse,
-                         const AclnnFaParam &aclnnParam, int32_t tilingTemplatePriority)
+                         const AclnnFaParam &param, int32_t tilingTemplatePriority)
     : FaCase(name, enable, dbgInfo, std::move(forward), std::move(reverse), FaParam(), tilingTemplatePriority),
-      aclnnParam(aclnnParam)
+      mAclnnParam(param)
 {
 }
 
 bool AclnnFaCase::InitParam()
 {
-    return aclnnParam.Init();
+    return mAclnnParam.Init();
 }
 
 bool AclnnFaCase::InitOpInfo()
@@ -208,23 +210,23 @@ bool AclnnFaCase::InitOpInfo()
     if (!FaCase::InitOpInfo()) {
         return false;
     }
-    auto rst = aclnnForwardCtx.SetOpName(this->forward.name.c_str());
-    rst = rst && aclnnForwardCtx.SetTilingRunCbf(FasTilingRunCbf);
-    rst = rst && aclnnForwardCtx.SetKernelRunCbf(FasKernelRunCbf);
-    rst = rst && aclnnForwardCtx.SetOutputs({&aclnnParam.aclnnSoftmaxMax, &aclnnParam.aclnnSoftmaxSum,
-                                             &aclnnParam.aclnnSoftmaxRes, &aclnnParam.aclnnAttenRes});
-    rst = rst && forward.SetContext(&aclnnForwardCtx);
-    rst = rst && aclnnReverseCtx.SetOpName(this->reverse.name.c_str());
-    rst = rst && aclnnReverseCtx.SetTilingRunCbf(FagTilingRunCbf);
-    rst = rst && aclnnReverseCtx.SetKernelRunCbf(FagKernelRunCbf);
-    rst = rst && aclnnReverseCtx.SetOutputs(
-                     {&aclnnParam.aclnnDq, &aclnnParam.aclnnDk, &aclnnParam.aclnnDv, &aclnnParam.aclnnDpse});
-    rst = rst && reverse.SetContext(&aclnnReverseCtx);
+    auto rst = mAclnnForwardCtx.SetOpName(this->mForward.mName.c_str());
+    rst = rst && mAclnnForwardCtx.SetTilingRunCbf(FasTilingRunCbf);
+    rst = rst && mAclnnForwardCtx.SetKernelRunCbf(FasKernelRunCbf);
+    rst = rst && mAclnnForwardCtx.SetOutputs({&mAclnnParam.aclnnSoftmaxMax, &mAclnnParam.aclnnSoftmaxSum,
+                                              &mAclnnParam.aclnnSoftmaxRes, &mAclnnParam.aclnnAttenRes});
+    rst = rst && mForward.SetContext(&mAclnnForwardCtx);
+    rst = rst && mAclnnReverseCtx.SetOpName(this->mReverse.mName.c_str());
+    rst = rst && mAclnnReverseCtx.SetTilingRunCbf(FagTilingRunCbf);
+    rst = rst && mAclnnReverseCtx.SetKernelRunCbf(FagKernelRunCbf);
+    rst = rst && mAclnnReverseCtx.SetOutputs(
+                     {&mAclnnParam.aclnnDq, &mAclnnParam.aclnnDk, &mAclnnParam.aclnnDv, &mAclnnParam.aclnnDpse});
+    rst = rst && mReverse.SetContext(&mAclnnReverseCtx);
     return rst;
 }
 
 bool AclnnFaCase::InitCurrentCasePtr()
 {
-    Case::currentCasePtr = this;
+    Case::mCurrentCasePtr = this;
     return true;
 }

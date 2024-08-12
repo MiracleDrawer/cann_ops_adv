@@ -37,31 +37,32 @@ public:
 
 public:
     AclnnFaParam() = default;
-    AclnnFaParam(int64_t b, int64_t n2, int64_t g, int64_t s1, int64_t s2, int64_t d, ge::DataType dtype,
-                 LayoutType layoutType, float scale, float keepProb, int64_t preTokens, int64_t nxtTokens,
-                 int64_t innerPrecise, int64_t sparseMode, PseShapeType pseShapeType,
-                 DropMaskShapeType dropMaskShapeType, PaddingMaskShapeType paddingMaskShapeType,
-                 AttenMaskShapeType attenMaskShapeType, ge::DataType attenMaskDtype, PrefixShapeType prefixShapeType);
-    AclnnFaParam(int64_t b, int64_t n2, int64_t g, int64_t s1, int64_t s2, int64_t d, ge::DataType dtype,
-                 LayoutType layoutType, float scale, float keepProb, int64_t preTokens, int64_t nxtTokens,
-                 int64_t innerPrecise, int64_t sparseMode, PseShapeType pseShapeType,
-                 DropMaskShapeType dropMaskShapeType, PaddingMaskShapeType paddingMaskShapeType,
-                 AttenMaskShapeType attenMaskShapeType, ge::DataType attenMaskDtype, PrefixShapeType prefixShapeType,
-                 std::vector<int64_t> prefixTensorData, std::vector<int64_t> actualSeqQLenTensorData,
-                 std::vector<int64_t> actualSeqKvLenTensorData);
-    AclnnFaParam(int64_t b, int64_t n2, int64_t g, int64_t s1, int64_t s2, int64_t d, ge::DataType dtype,
-                 LayoutType layoutType, float scale, float keepProb, int64_t preTokens, int64_t nxtTokens,
-                 int64_t innerPrecise, int64_t sparseMode, int64_t pseType, PseShapeType pseShapeType,
-                 DropMaskShapeType dropMaskShapeType, PaddingMaskShapeType paddingMaskShapeType,
-                 AttenMaskShapeType attenMaskShapeType, ge::DataType attenMaskDtype, PrefixShapeType prefixShapeType);
-    AclnnFaParam(int64_t b, int64_t n2, int64_t g, int64_t s1, int64_t s2, int64_t d, ge::DataType dtype,
-                 LayoutType layoutType, float scale, float keepProb, int64_t preTokens, int64_t nxtTokens,
-                 int64_t innerPrecise, int64_t sparseMode, int64_t pseType, PseShapeType pseShapeType,
-                 DropMaskShapeType dropMaskShapeType, PaddingMaskShapeType paddingMaskShapeType,
-                 AttenMaskShapeType attenMaskShapeType, ge::DataType attenMaskDtype, PrefixShapeType prefixShapeType,
-                 std::vector<int64_t> prefixTensorData, std::vector<int64_t> actualSeqQLenTensorData,
-                 std::vector<int64_t> actualSeqKvLenTensorData);
-
+    AclnnFaParam(int64_t pB, int64_t pN2, int64_t pG, int64_t pS1, int64_t pS2, int64_t pD, ge::DataType pDtype,
+                 LayoutType pLayoutType, float pScale, float pKeepProb, int64_t pPreTokens, int64_t pNxtTokens,
+                 int64_t pInnerPrecise, int64_t pSparseMode, PseShapeType pPseShapeType,
+                 DropMaskShapeType pDropMaskShapeType, PaddingMaskShapeType pPaddingMaskShapeType,
+                 AttenMaskShapeType pAttenMaskShapeType, ge::DataType pAttenMaskDtype,
+                 PrefixShapeType pPrefixShapeType);
+    AclnnFaParam(int64_t pB, int64_t pN2, int64_t pG, int64_t pS1, int64_t pS2, int64_t pD, ge::DataType pDtype,
+                 LayoutType pLayoutType, float pScale, float pKeepProb, int64_t pPreTokens, int64_t pNxtTokens,
+                 int64_t pInnerPrecise, int64_t pSparseMode, PseShapeType pPseShapeType,
+                 DropMaskShapeType pDropMaskShapeType, PaddingMaskShapeType pPaddingMaskShapeType,
+                 AttenMaskShapeType pAttenMaskShapeType, ge::DataType pAttenMaskDtype, PrefixShapeType pPrefixShapeType,
+                 std::vector<int64_t> pPrefixTensorData, std::vector<int64_t> pActualSeqQLenTensorData,
+                 std::vector<int64_t> pActualSeqKvLenTensorData);
+    AclnnFaParam(int64_t pB, int64_t pN2, int64_t pG, int64_t pS1, int64_t pS2, int64_t pD, ge::DataType pDtype,
+                 LayoutType pLayoutType, float pScale, float pKeepProb, int64_t pPreTokens, int64_t pNxtTokens,
+                 int64_t pInnerPrecise, int64_t pSparseMode, int64_t pPseType, PseShapeType pPseShapeType,
+                 DropMaskShapeType pDropMaskShapeType, PaddingMaskShapeType pPaddingMaskShapeType,
+                 AttenMaskShapeType pAttenMaskShapeType, ge::DataType pAttenMaskDtype,
+                 PrefixShapeType pPrefixShapeType);
+    AclnnFaParam(int64_t pB, int64_t pN2, int64_t pG, int64_t pS1, int64_t pS2, int64_t pD, ge::DataType pDtype,
+                 LayoutType pLayoutType, float pScale, float pKeepProb, int64_t pPreTokens, int64_t pNxtTokens,
+                 int64_t pInnerPrecise, int64_t pSparseMode, int64_t pPseType, PseShapeType pPseShapeType,
+                 DropMaskShapeType pDropMaskShapeType, PaddingMaskShapeType pPaddingMaskShapeType,
+                 AttenMaskShapeType pAttenMaskShapeType, ge::DataType pAttenMaskDtype, PrefixShapeType pPrefixShapeType,
+                 std::vector<int64_t> pPrefixTensorData, std::vector<int64_t> pActualSeqQLenTensorData,
+                 std::vector<int64_t> pActualSeqKvLenTensorData);
     ~AclnnFaParam();
 
     bool Init() override;

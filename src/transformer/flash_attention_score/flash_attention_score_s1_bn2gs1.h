@@ -314,7 +314,9 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<
     this->dropMaskUnAligned = this->tilingData->inputParams.needDropMaskOp == 1;
     if (this->dropMaskUnAligned) {
         this->dropMaskGm.SetGlobalBuffer(workspace);
-        workspace += this->tilingData->dropmaskParams.shapeTotalSize;
+        if constexpr (hasDrop == true) {
+            workspace += CeilDiv(this->tilingData->dropmaskParams.shapeTotalSize, 512) * 512;
+        }
     } else {
         this->dropMaskGm.SetGlobalBuffer((__gm__ uint8_t *)dropMask);
     }

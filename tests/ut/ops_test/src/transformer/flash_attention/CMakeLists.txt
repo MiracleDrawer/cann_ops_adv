@@ -77,6 +77,7 @@ set(_FA_UTestCommonPrivateLinkLibrariesExt
 )
 
 OpsTest_Level2_AddOp(
+        SUB_SYSTEM                              transformer
         BRIEF                                   Fa
         SNAKE                                   flash_attention
         OPAPI_SOURCES_EXT                       ${_FA_OpApiSourcesExt}

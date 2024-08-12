@@ -21,9 +21,10 @@
 // INPUT_T - means data type for input
 // T       - means data type when calc
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
-          typename T = INPUT_T, bool isBasicBlock = false>
+          typename T = INPUT_T, bool isBasicBlock = false, CubeFormat bmm1Format = CubeFormat::NZ>
 class FlashAttentionVarLenScore
-    : public FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock> {
+    : public FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock,
+                                           bmm1Format> {
 public:
     __aicore__ inline FlashAttentionVarLenScore(){};
 
@@ -63,9 +64,9 @@ protected:
 };
 
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
-          typename T, bool isBasicBlock>
-__aicore__ inline void
-FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock>::UnpackInit(
+          typename T, bool isBasicBlock, CubeFormat bmm1Format>
+__aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
+                                                 isBasicBlock, bmm1Format>::UnpackInit(
     __gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *pse, __gm__ uint8_t *dropMask,
     __gm__ uint8_t *paddingMask, __gm__ uint8_t *prefix, __gm__ uint8_t *attenMask, __gm__ uint8_t *actualSeqLengths,
     __gm__ uint8_t *actualSeqLengthsKv, __gm__ uint8_t *softmaxMax, __gm__ uint8_t *softmaxSum,
@@ -92,9 +93,9 @@ FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT
 }
 
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
-          typename T, bool isBasicBlock>
-__aicore__ inline void
-FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock>::ComputeConstexpr()
+          typename T, bool isBasicBlock, CubeFormat bmm1Format>
+__aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
+                                                 isBasicBlock, bmm1Format>::ComputeConstexpr()
 {
     this->gD = this->tilingData->inputParams.gSize * this->dSize;
     this->n2D = this->tilingData->inputParams.n2Size * this->dSize;
@@ -139,11 +140,12 @@ FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT
 }
 
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
-          typename T, bool isBasicBlock>
-__aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
-                                                 isBasicBlock>::GetSeqQlenKvlenByBoidx(int64_t boIdx,
-                                                                                       int64_t &actualSeqQlen,
-                                                                                       int64_t &actualSeqKvlen)
+          typename T, bool isBasicBlock, CubeFormat bmm1Format>
+__aicore__ inline void
+FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock,
+                          bmm1Format>::GetSeqQlenKvlenByBoidx(int64_t boIdx,
+                                                              int64_t &actualSeqQlen,
+                                                              int64_t &actualSeqKvlen)
 {
     if (unlikely(boIdx == 0)) {
         actualSeqQlen = ((__gm__ int64_t *)actualSeqQlenAddr)[0];
@@ -158,10 +160,9 @@ __aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, h
 
 // 初始化s1方向上的累加值
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
-          typename T, bool isBasicBlock>
-__aicore__ inline void
-FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock>::CalS1OuterSize(
-    int64_t offset)
+          typename T, bool isBasicBlock, CubeFormat bmm1Format>
+__aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
+                                                 isBasicBlock, bmm1Format>::CalS1OuterSize(int64_t offset)
 {
     int64_t actualS1Outersize = 0;
     // 用于取actualS1Len下标
@@ -193,10 +194,9 @@ FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT
 }
 
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
-          typename T, bool isBasicBlock>
-__aicore__ inline void
-FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock>::ComputeAxisIdx(
-    int64_t multiCoreInnerIdx)
+          typename T, bool isBasicBlock, CubeFormat bmm1Format>
+__aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
+                                                 isBasicBlock, bmm1Format>::ComputeAxisIdx(int64_t multiCoreInnerIdx)
 {
     int64_t actualS1Len;
     int64_t actualS2Len;
@@ -224,9 +224,9 @@ FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT
 }
 
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
-          typename T, bool isBasicBlock>
-__aicore__ inline void
-FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock>::GetS2LoopRange()
+          typename T, bool isBasicBlock, CubeFormat bmm1Format>
+__aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
+                                                 isBasicBlock, bmm1Format>::GetS2LoopRange()
 {
     int64_t actualS1Len;
     int64_t actualS2Len;
@@ -300,9 +300,9 @@ FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT
 }
 
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
-          typename T, bool isBasicBlock>
-__aicore__ inline void
-FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock>::Process()
+          typename T, bool isBasicBlock, CubeFormat bmm1Format>
+__aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
+                                                 isBasicBlock, bmm1Format>::Process()
 {
     // 确定核内切分起点
     int64_t multiCoreInnerOffset = this->blockIdx * this->tilingData->multiCoreParams.splitFactorSize;
@@ -332,7 +332,11 @@ FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT
             }
             this->SetExtraInfo(extraInfo[taskId % 3], taskId, s2LoopCount, s2LoopLimit, multiCoreInnerIdx);
 
-            this->IterateBmm1(extraInfo[taskId % 3], this->bmm1);
+            if (extraInfo[taskId % 3].needNz2Nd == 1) {
+                this->IterateBmm1(extraInfo[taskId % 3], this->bmm1Nz);
+            } else {
+                this->IterateBmm1(extraInfo[taskId % 3], this->bmm1);
+            }
 
             if (taskId > 0) {
                 this->ProcessVec1(extraInfo[(taskId + 2) % 3]);
@@ -380,9 +384,9 @@ FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT
 };
 
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
-          typename T, bool isBasicBlock>
-__aicore__ inline void
-FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock>::SetExtraInfo(
+          typename T, bool isBasicBlock, CubeFormat bmm1Format>
+__aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
+                                                 isBasicBlock, bmm1Format>::SetExtraInfo(
     SplitExtraInfo &extraInfo, int64_t taskId, int64_t s2LoopCount, int64_t s2LoopLimit, int64_t multiCoreInnerIdx)
 {
     extraInfo.s2StartIdx = this->s2StartIdx;
@@ -418,10 +422,9 @@ FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT
 }
 
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
-          typename T, bool isBasicBlock>
-__aicore__ inline void
-FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock>::ComputeBmm1Tail(
-    SplitExtraInfo &extraInfo)
+          typename T, bool isBasicBlock, CubeFormat bmm1Format>
+__aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
+                                                 isBasicBlock, bmm1Format>::ComputeBmm1Tail(SplitExtraInfo &extraInfo)
 {
     extraInfo.s1RealSize = this->s1BaseSize;
     if (extraInfo.s1Size < (extraInfo.s1oIdx + 1) * this->s1BaseSize) {
@@ -449,7 +452,7 @@ FlashAttentionVarLenScore<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT
     } else {
         extraInfo.vec2S1BaseSize = extraInfo.s1RealSize;
     }
-    extraInfo.needNz2Nd = 0;
+    extraInfo.needNz2Nd = (extraInfo.s2RealSize % 64 == 0) ? 0 : 1;
     return;
 }
 

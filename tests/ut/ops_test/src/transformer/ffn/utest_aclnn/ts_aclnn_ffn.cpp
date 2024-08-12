@@ -18,8 +18,8 @@
 namespace {
 TEST_P(Ts_Aclnn_FFN_WithParam_Ascend910B3, Tc_Aclnn_FFN)
 {
-   ASSERT_TRUE(case_->Init());
-   ASSERT_TRUE(case_->Run());
+    ASSERT_TRUE(case_->Init());
+    ASSERT_TRUE(case_->Run());
 }
 
 const auto Tc_FFN_Aclnn_Case = ::testing::Values(
@@ -173,4 +173,4 @@ const auto Tc_FFN_Aclnn_Case = ::testing::Values(
 );
 
 INSTANTIATE_TEST_SUITE_P(FFN, Ts_Aclnn_FFN_WithParam_Ascend910B3, Tc_FFN_Aclnn_Case);
-}
+} // namespace

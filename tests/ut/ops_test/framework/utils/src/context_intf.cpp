@@ -73,10 +73,15 @@ size_t ContextIntf::GetWorkspaceSize() const
     return workspaceSize_;
 }
 
-bool ContextIntf::RunKernel()
+bool ContextIntf::RunKernel(std::string &caseName)
 {
-    auto ret = this->RunKernelPrepare();
-    ret = ret && this->RunKernelProcess();
+    platform_ = platform_ == nullptr ? Platform::GetGlobalPlatform() : platform_;
+    if (platform_ == nullptr) {
+        LOG_ERR("[%s:%s] Can't get global platform.", opName_.c_str(), caseName.c_str());
+        return false;
+    }
+    auto ret = this->RunKernelPrepare(caseName);
+    ret = ret && this->RunKernelProcess(caseName);
     return ret;
 }
 
@@ -94,10 +99,11 @@ bool ContextIntf::SaveOutputsToDir(const std::string &dir, const std::string &fi
     return true;
 }
 
-bool ContextIntf::RunKernelPrepare()
+bool ContextIntf::RunKernelPrepare(std::string &caseName)
 {
-    if (workspaceSize_ > kMaxWorkspaceSize) {
-        LOG_ERR("Op[%s] workspace(%ld) > kMaxWorkspaceSize(%ld)", opName_.c_str(), workspaceSize_, kMaxWorkspaceSize);
+    if (workspaceSize_ > kWorkspaceMaxSize) {
+        LOG_ERR("[%s:%s] workspace(%lu) > kWorkspaceMaxSize(%lu)", opName_.c_str(), caseName.c_str(), workspaceSize_,
+                kWorkspaceMaxSize);
         return false;
     }
     if (workspaceSize_ > 0) {
@@ -123,9 +129,11 @@ bool ContextIntf::RunKernelPrepare()
     }
     if (kernelRunPrepareTensorDataCbf_ != nullptr) {
         auto *cs = static_cast<ops::adv::tests::utils::Case *>(ops::adv::tests::utils::Case::GetCurrentCase());
-        LOG_IF_EXPR(cs == nullptr, LOG_ERR("Op[%s], Can't get current case", opName_.c_str()), return false);
+        LOG_IF_EXPR(cs == nullptr, LOG_ERR("[%s:%s], Can't get current case", opName_.c_str(), caseName.c_str()),
+                    return false);
         LOG_IF_EXPR(!KernelRunPrepareTensorDataCbf(cs),
-                    LOG_ERR("Op[%s] KernelRunPrepareTensorDataCbf failed", opName_.c_str()), return false);
+                    LOG_ERR("[%s:%s] KernelRunPrepareTensorDataCbf failed", opName_.c_str(), caseName.c_str()),
+                    return false);
     }
     return true;
 }

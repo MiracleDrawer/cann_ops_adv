@@ -27,16 +27,16 @@
 
 namespace ops::adv::tests::ffn {
 
+using ops::adv::tests::ffn::Param;
 using ops::adv::tests::utils::Context;
 using ops::adv::tests::utils::OpInfo;
-using ops::adv::tests::ffn::Param;
 
 class FFNCase : public ops::adv::tests::utils::Case {
 public:
-    OpInfo opInfo;
-    Context ctx;
-    Param param;
-    bool isQuant = false;
+    OpInfo mOpInfo;
+    Context mCtx;
+    Param mParam;
+    bool mIsQuant = false;
 
 public:
     FFNCase();

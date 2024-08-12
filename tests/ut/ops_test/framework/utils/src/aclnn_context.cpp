@@ -53,38 +53,38 @@ aclOpExecutor *AclnnContext::GetAclOpExecutor() const
     return aclOpExecutor_;
 }
 
-bool AclnnContext::RunTiling()
+bool AclnnContext::RunTiling(std::string &caseName)
 {
     if (tilingRunCbf_ == nullptr) {
-        LOG_ERR("Op[%s] TilingCbf nil", opName_.c_str());
+        LOG_ERR("[%s:%s] TilingCbf nil", opName_.c_str(), caseName.c_str());
         return false;
     }
     auto *curCase = ops::adv::tests::utils::Case::GetCurrentCase();
     if (curCase == nullptr) {
-        LOG_ERR("Current case nil");
+        LOG_ERR("[%s:%s] Current case nil", opName_.c_str(), caseName.c_str());
         return false;
     }
     if (!tilingRunCbf_(curCase, &workspaceSize_, &aclOpExecutor_)) {
-        LOG_DBG("Op[%s] Run Tiling failed", opName_.c_str());
+        LOG_DBG("[%s:%s] Run Tiling failed", opName_.c_str(), caseName.c_str());
         aclOpExecutor_ = nullptr;
         return false;
     }
     return true;
 }
 
-bool AclnnContext::RunKernelProcess()
+bool AclnnContext::RunKernelProcess(std::string &caseName)
 {
     auto *curCase = ops::adv::tests::utils::Case::GetCurrentCase();
     if (curCase == nullptr) {
-        LOG_ERR("Current case nil");
+        LOG_ERR("[%s:%s] Current case nil", opName_.c_str(), caseName.c_str());
         return false;
     }
     if (kernelRunCbf_ == nullptr) {
-        LOG_ERR("Op[%s] KernelCbf nil", opName_.c_str());
+        LOG_ERR("[%s:%s] KernelCbf nil", opName_.c_str(), caseName.c_str());
         return false;
     }
     if (!kernelRunCbf_(curCase)) {
-        LOG_DBG("Op[%s] Run Kernel failed", opName_.c_str());
+        LOG_DBG("[%s:%s] Run Kernel failed", opName_.c_str(), caseName.c_str());
         return false;
     }
     return true;

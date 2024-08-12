@@ -50,10 +50,7 @@ function help_info() {
     echo "--tiling_key         Sets the tiling key list for operators. If there are multiple values, separate them with semicolons and use quotation marks. The default is all."
     echo "                     For example: --tiling_key \"1\" or --tiling_key \"1;2;3;4\""
     echo
-    echo "--op_debug_config    Sets the operator debug configuration. Supported options are (oom, dump_cce, dump_bin, dump_loc, ccec_O0, ccec_g, check_flag)"
-    echo "                     For example: --op_debug_config dump_cce or --op_debug_config ccec_g"
-    echo
-    echo "--asan               Compiles with asan."
+    echo "--asan               Compiles with AddressSanitizer, only supported in UTest."
     echo
     echo "--cov                Compiles with cov."
     echo

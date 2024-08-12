@@ -430,7 +430,8 @@ void FFNTiling::UpdateMaxTokens()
 
 void FFNTiling::CheckMSD()
 {
-    uint64_t bestMaxTokenMsd = static_cast<float>(n1) / static_cast<float>(TYPICAL1_N1) * TINY_TOKEN_BOUND;
+    uint64_t bestMaxTokenMsd =
+        static_cast<uint64_t>(static_cast<float>(n1) / static_cast<float>(TYPICAL1_N1) * TINY_TOKEN_BOUND);
     bool isMsdN1K1 =
         (n1 % BEST_BASEN_MSD == 0) && n1 > MSD_N_THRESHOLD && (k1 % BEST_BASEN_MSD == 0) && k1 > MSD_K_THRESHOLD;
     isMsdCase = isMsdN1K1 && (xDataType == ge::DT_BF16 || xDataType == ge::DT_FLOAT16) && weight1Dtype == ge::DT_INT8 &&

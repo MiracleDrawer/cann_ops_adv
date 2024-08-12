@@ -135,12 +135,12 @@ protected:
     ge::graphStatus PostTiling() override;
 
     ge::graphStatus DoSplit();
-    void DoSparse();
+    ge::graphStatus DoSparse();
     bool CheckFuzzyArgsLegal(uint32_t s1Inner, uint32_t s2Inner);
     std::tuple<uint32_t, uint32_t, uint32_t> FuzzyForBestSplit();
     void SetMatmulTilingBufferInfo(TCubeTiling &mmTiling);
     ge::graphStatus GetSparseBlockInfo();
-    void DoPreTiling();
+    ge::graphStatus DoPreTiling();
     ge::graphStatus DoPostTiling();
     void DetermineMode();
     virtual void SetQKVStartIdx();

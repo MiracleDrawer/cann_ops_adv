@@ -51,7 +51,8 @@ using namespace AscendC;
     do {                                                                                                               \
         templateClass<__VA_ARGS__> op;                                                                                 \
         COPY_TILING_DATA(tiling);                                                                                      \
-        REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.bmm1, bmm1tiling, op.bmm2, bmm2tiling);                     \
+        REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.bmm1, bmm1tiling, op.bmm1Nz, bmm1tiling, op.bmm2,           \
+                          bmm2tiling);                                                                                 \
     } while (0)
 
 #else // VECTOR 实现
@@ -122,7 +123,8 @@ using namespace AscendC;
         }                                                                                                              \
         tPipe.Reset();                                                                                                 \
         templateClass<__VA_ARGS__> op;                                                                                 \
-        REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.bmm1, bmm1tiling, op.bmm2, bmm2tiling);                     \
+        REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.bmm1, bmm1tiling, op.bmm1Nz, bmm1tiling, op.bmm2,           \
+                          bmm2tiling);                                                                                 \
         op.UnpackInit(query, key, value, pse, dropMask, paddingMask, prefix, attenMask, actualSeqLengths,              \
                       actualSeqLengthsKv, softmaxMax, softmaxSum, softmaxOut, attentionOut, user, tilingData, &tPipe); \
         op.Process();                                                                                                  \

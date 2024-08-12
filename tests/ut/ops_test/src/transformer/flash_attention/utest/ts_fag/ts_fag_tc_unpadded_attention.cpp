@@ -20,7 +20,7 @@ class Ts_Fag_Ascend910B2_UnpaddedAttention : public Ts_WithParam_Ascend910B2<Fag
 TEST_P(Ts_Fag_Ascend910B2_UnpaddedAttention, Tc_BatchCase)
 {
     ASSERT_TRUE(case_->Init());
-    ASSERT_EQ(case_->Run(), case_->reverse.exp.success);
+    ASSERT_EQ(case_->Run(), case_->mReverse.mExp.mSuccess);
 }
 
 const auto Tc_Fag_UnpaddedAttention_BatchCase = ::testing::Values(
@@ -215,135 +215,7 @@ const auto Tc_Fag_UnpaddedAttention_BatchCase = ::testing::Values(
                     {50, 60, 65, 115, 117}),                        /* ActualSeqKVTensorData */
             FaCase::kTilingTemplatePriority_Invalid                 /* TilingTemplatePriority */
             ),
-    FagCase(
-        "Fag_UnpaddedAttention_Case_009", true,                 /* CaseName, Enable */
-        "",                                                     /* DebugInfo */
-        OpInfo(ControlInfo(true, false, true),                  /* RunTiling, RunKernel, Deterministic */
-               ExpectInfo(true,                                 /* ExpectSuccess */
-                          10000000011000030134UL,               /* ExpectTilingKey */
-                          ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
-        FaParam(13, 22, 1, 1509, 1509, 128,                     /* B, N2, G, S1, S2, D */
-                ge::DataType::DT_FLOAT16, LayoutType::TND,      /* Dtype, Layout */
-                0.08838f, 0.8f, 65535, 0,                       /* Scale, KeepProb, PreTokens, NxtTokens */
-                1, 1,                                           /* InnerPrecise, SparseMode */
-                PseShapeType::NONE,                             /* PseShapeType */
-                DropMaskShapeType::B_N1_S1_S2DIV8,              /* DropMaskShapeType */
-                PaddingMaskShapeType::S1_S2,                    /* PaddingMaskShapeType */
-                AttenMaskShapeType::S1_S2,                      /* AttentionMaskShapeType */
-                ge::DataType::DT_BOOL,                          /* AttentionMaskDtype */
-                PrefixShapeType::NONE,                          /* PrefixShapeType */
-                {},                                             /* PrefixTensorData */
-                {59, 1568, 1713, 1771, 1818, 1861, 2424, 3026, 3165, 3216, 3241, 4573, 4645}, /* ActualSeqQTensorData */
-                {59, 1568, 1713, 1771, 1818, 1861, 2424, 3026, 3165, 3216, 3241, 4573,
-                 4645}),                        /* ActualSeqKVTensorData */
-        FaCase::kTilingTemplatePriority_Invalid /* TilingTemplatePriority */
-        ),
-    FagCase("Fag_UnpaddedAttention_Case_010", true,                 /* CaseName, Enable */
-            "",                                                     /* DebugInfo */
-            OpInfo(ControlInfo(true, false, true),                  /* RunTiling, RunKernel, Deterministic */
-                   ExpectInfo(true,                                 /* ExpectSuccess */
-                              10000000011000030134UL,               /* ExpectTilingKey */
-                              ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
-            FaParam(4, 20, 1, 2048, 2048, 128,                      /* B, N2, G, S1, S2, D */
-                    ge::DataType::DT_FLOAT16, LayoutType::TND,      /* Dtype, Layout */
-                    0.08838f, 0.8f, 65535, 0,                       /* Scale, KeepProb, PreTokens, NxtTokens */
-                    1, 1,                                           /* InnerPrecise, SparseMode */
-                    PseShapeType::NONE,                             /* PseShapeType */
-                    DropMaskShapeType::B_N1_S1_S2DIV8,              /* DropMaskShapeType */
-                    PaddingMaskShapeType::S1_S2,                    /* PaddingMaskShapeType */
-                    AttenMaskShapeType::S1_S2,                      /* AttentionMaskShapeType */
-                    ge::DataType::DT_BOOL,                          /* AttentionMaskDtype */
-                    PrefixShapeType::NONE,                          /* PrefixShapeType */
-                    {},                                             /* PrefixTensorData */
-                    {2048, 4096, 6144, 8192},                       /* ActualSeqQTensorData */
-                    {2048, 4096, 6144, 8192}),                      /* ActualSeqKVTensorData */
-            FaCase::kTilingTemplatePriority_Invalid                 /* TilingTemplatePriority */
-            ),
-    FagCase("Fag_UnpaddedAttention_Case_011", true,                 /* CaseName, Enable */
-            "",                                                     /* DebugInfo */
-            OpInfo(ControlInfo(true, false, true),                  /* RunTiling, RunKernel, Deterministic */
-                   ExpectInfo(true,                                 /* ExpectSuccess */
-                              10000000011000032134UL,               /* ExpectTilingKey */
-                              ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
-            FaParam(10, 5, 1, 1024, 1024, 128,                      /* B, N2, G, S1, S2, D */
-                    ge::DataType::DT_BF16, LayoutType::TND,         /* Dtype, Layout */
-                    0.08838f, 0.8f, 65535, 0,                       /* Scale, KeepProb, PreTokens, NxtTokens */
-                    1, 1,                                           /* InnerPrecise, SparseMode */
-                    PseShapeType::NONE,                             /* PseShapeType */
-                    DropMaskShapeType::B_N1_S1_S2DIV8,              /* DropMaskShapeType */
-                    PaddingMaskShapeType::S1_S2,                    /* PaddingMaskShapeType */
-                    AttenMaskShapeType::S1_S2,                      /* AttentionMaskShapeType */
-                    ge::DataType::DT_BOOL,                          /* AttentionMaskDtype */
-                    PrefixShapeType::NONE,                          /* PrefixShapeType */
-                    {},                                             /* PrefixTensorData */
-                    {1024, 1025, 1026, 1027, 1028, 1029, 1030, 1031, 1032, 1033},  /* ActualSeqQTensorData */
-                    {1024, 1025, 1026, 1027, 1028, 1029, 1030, 1031, 1032, 1033}), /* ActualSeqKVTensorData */
-            FaCase::kTilingTemplatePriority_Invalid                                /* TilingTemplatePriority */
-            ),
-    FagCase("Fag_UnpaddedAttention_Case_012", true,                 /* CaseName, Enable */
-            "",                                                     /* DebugInfo */
-            OpInfo(ControlInfo(true, false, true),                  /* RunTiling, RunKernel, Deterministic */
-                   ExpectInfo(true,                                 /* ExpectSuccess */
-                              10000000011000032134UL,               /* ExpectTilingKey */
-                              ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
-            FaParam(10, 5, 1, 1024, 1024, 128,                      /* B, N2, G, S1, S2, D */
-                    ge::DataType::DT_BF16, LayoutType::TND,         /* Dtype, Layout */
-                    0.08838f, 0.8f, 65535, 0,                       /* Scale, KeepProb, PreTokens, NxtTokens */
-                    1, 1,                                           /* InnerPrecise, SparseMode */
-                    PseShapeType::NONE,                             /* PseShapeType */
-                    DropMaskShapeType::B_N1_S1_S2DIV8,              /* DropMaskShapeType */
-                    PaddingMaskShapeType::S1_S2,                    /* PaddingMaskShapeType */
-                    AttenMaskShapeType::S1_S2,                      /* AttentionMaskShapeType */
-                    ge::DataType::DT_BOOL,                          /* AttentionMaskDtype */
-                    PrefixShapeType::NONE,                          /* PrefixShapeType */
-                    {},                                             /* PrefixTensorData */
-                    {1024, 1025, 1026, 1027, 1028, 1029, 1030, 1031, 1032, 1033},  /* ActualSeqQTensorData */
-                    {1024, 1025, 1026, 1027, 1028, 1029, 1030, 1031, 1032, 1033}), /* ActualSeqKVTensorData */
-            FaCase::kTilingTemplatePriority_Invalid                                /* TilingTemplatePriority */
-            ),
-    FagCase("Fag_UnpaddedAttention_Case_013", true,                 /* CaseName, Enable */
-            "",                                                     /* DebugInfo */
-            OpInfo(ControlInfo(true, false, true),                  /* RunTiling, RunKernel, Deterministic */
-                   ExpectInfo(true,                                 /* ExpectSuccess */
-                              10000000011100032134UL,               /* ExpectTilingKey */
-                              ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
-            FaParam(1, 5, 1, 2048, 2048, 128,                       /* B, N2, G, S1, S2, D */
-                    ge::DataType::DT_BF16, LayoutType::TND,         /* Dtype, Layout */
-                    0.08838f, 0.8f, 65535, 0,                       /* Scale, KeepProb, PreTokens, NxtTokens */
-                    1, 1,                                           /* InnerPrecise, SparseMode */
-                    PseShapeType::B_N1_ALIBI_S1_S2,                 /* PseShapeType */
-                    DropMaskShapeType::B_N1_S1_S2DIV8,              /* DropMaskShapeType */
-                    PaddingMaskShapeType::S1_S2,                    /* PaddingMaskShapeType */
-                    AttenMaskShapeType::S1_S2,                      /* AttentionMaskShapeType */
-                    ge::DataType::DT_BOOL,                          /* AttentionMaskDtype */
-                    PrefixShapeType::NONE,                          /* PrefixShapeType */
-                    {},                                             /* PrefixTensorData */
-                    {2048},                                         /* ActualSeqQTensorData */
-                    {2048}),                                        /* ActualSeqKVTensorData */
-            FaCase::kTilingTemplatePriority_Invalid                 /* TilingTemplatePriority */
-            ),
-    FagCase("Fag_UnpaddedAttention_Case_014", true,                 /* CaseName, Enable */
-            "",                                                     /* DebugInfo */
-            OpInfo(ControlInfo(true, false, true),                  /* RunTiling, RunKernel, Deterministic */
-                   ExpectInfo(true,                                 /* ExpectSuccess */
-                              10000000011100032134UL,               /* ExpectTilingKey */
-                              ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
-            FaParam(1, 5, 1, 2048, 2048, 128,                       /* B, N2, G, S1, S2, D */
-                    ge::DataType::DT_BF16, LayoutType::TND,         /* Dtype, Layout */
-                    0.08838f, 0.8f, 65535, 0,                       /* Scale, KeepProb, PreTokens, NxtTokens */
-                    1, 1,                                           /* InnerPrecise, SparseMode */
-                    PseShapeType::_1_N1_ALIBI_S1_S2,                /* PseShapeType */
-                    DropMaskShapeType::B_N1_S1_S2DIV8,              /* DropMaskShapeType */
-                    PaddingMaskShapeType::S1_S2,                    /* PaddingMaskShapeType */
-                    AttenMaskShapeType::S1_S2,                      /* AttentionMaskShapeType */
-                    ge::DataType::DT_BOOL,                          /* AttentionMaskDtype */
-                    PrefixShapeType::NONE,                          /* PrefixShapeType */
-                    {},                                             /* PrefixTensorData */
-                    {2048},                                         /* ActualSeqQTensorData */
-                    {2048}),                                        /* ActualSeqKVTensorData */
-            FaCase::kTilingTemplatePriority_Invalid                 /* TilingTemplatePriority */
-            ),
-    FagCase("Fag_UnpaddedAttention_Case_015", true,                 /* CaseName, Enable */
+    FagCase("Fag_UnpaddedAttention_Case_009", true,                 /* CaseName, Enable */
             "",                                                     /* DebugInfo */
             OpInfo(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                    ExpectInfo(true,                                 /* ExpectSuccess */
@@ -364,7 +236,7 @@ const auto Tc_Fag_UnpaddedAttention_BatchCase = ::testing::Values(
                     {2048, 2321, 2515}),                            /* ActualSeqKVTensorData */
             FaCase::kTilingTemplatePriority_Invalid                 /* TilingTemplatePriority */
             ),
-    FagCase("Fag_UnpaddedAttention_Case_016", true,                 /* CaseName, Enable */
+    FagCase("Fag_UnpaddedAttention_Case_010", true,                 /* CaseName, Enable */
             "",                                                     /* DebugInfo */
             OpInfo(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                    ExpectInfo(true,                                 /* ExpectSuccess */
@@ -385,7 +257,7 @@ const auto Tc_Fag_UnpaddedAttention_BatchCase = ::testing::Values(
                     {2048, 2321, 2515}),                            /* ActualSeqKVTensorData */
             FaCase::kTilingTemplatePriority_Invalid                 /* TilingTemplatePriority */
             ),
-    FagCase("Fag_UnpaddedAttention_Case_017", true,                 /* CaseName, Enable */
+    FagCase("Fag_UnpaddedAttention_Case_011", true,                 /* CaseName, Enable */
             "",                                                     /* DebugInfo */
             OpInfo(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                    ExpectInfo(true,                                 /* ExpectSuccess */
@@ -406,91 +278,7 @@ const auto Tc_Fag_UnpaddedAttention_BatchCase = ::testing::Values(
                     {64, 192, 256, 384}),                           /* ActualSeqKVTensorData */
             FaCase::kTilingTemplatePriority_Invalid                 /* TilingTemplatePriority */
             ),
-    FagCase("Fag_UnpaddedAttention_Case_018", true,                 /* CaseName, Enable */
-            "",                                                     /* DebugInfo */
-            OpInfo(ControlInfo(true, false, true),                  /* RunTiling, RunKernel, Deterministic */
-                   ExpectInfo(true,                                 /* ExpectSuccess */
-                              10000000011100032134UL,               /* ExpectTilingKey */
-                              ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
-            FaParam(1, 5, 1, 2048, 2048, 128,                       /* B, N2, G, S1, S2, D */
-                    ge::DataType::DT_BF16, LayoutType::TND,         /* Dtype, Layout */
-                    0.08838f, 0.8f, 65535, 0,                       /* Scale, KeepProb, PreTokens, NxtTokens */
-                    1, 7,                                           /* InnerPrecise, SparseMode */
-                    PseShapeType::_1_N1_ALIBI_S1_S2,                /* PseShapeType */
-                    DropMaskShapeType::B_N1_S1_S2DIV8,              /* DropMaskShapeType */
-                    PaddingMaskShapeType::S1_S2,                    /* PaddingMaskShapeType */
-                    AttenMaskShapeType::S1_S2,                      /* AttentionMaskShapeType */
-                    ge::DataType::DT_BOOL,                          /* AttentionMaskDtype */
-                    PrefixShapeType::NONE,                          /* PrefixShapeType */
-                    {},                                             /* PrefixTensorData */
-                    {2048},                                         /* ActualSeqQTensorData */
-                    {2048}),                                        /* ActualSeqKVTensorData */
-            FaCase::kTilingTemplatePriority_Invalid                 /* TilingTemplatePriority */
-            ),
-    FagCase("Fag_UnpaddedAttention_Case_019", true,                 /* CaseName, Enable */
-            "",                                                     /* DebugInfo */
-            OpInfo(ControlInfo(true, false, true),                  /* RunTiling, RunKernel, Deterministic */
-                   ExpectInfo(true,                                 /* ExpectSuccess */
-                              10000000011100032134UL,               /* ExpectTilingKey */
-                              ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
-            FaParam(1, 5, 1, 2048, 2048, 128,                       /* B, N2, G, S1, S2, D */
-                    ge::DataType::DT_BF16, LayoutType::TND,         /* Dtype, Layout */
-                    0.08838f, 0.8f, 65535, 0,                       /* Scale, KeepProb, PreTokens, NxtTokens */
-                    1, 8,                                           /* InnerPrecise, SparseMode */
-                    PseShapeType::_1_N1_ALIBI_S1_S2,                /* PseShapeType */
-                    DropMaskShapeType::B_N1_S1_S2DIV8,              /* DropMaskShapeType */
-                    PaddingMaskShapeType::S1_S2,                    /* PaddingMaskShapeType */
-                    AttenMaskShapeType::S1_S2,                      /* AttentionMaskShapeType */
-                    ge::DataType::DT_BOOL,                          /* AttentionMaskDtype */
-                    PrefixShapeType::NONE,                          /* PrefixShapeType */
-                    {},                                             /* PrefixTensorData */
-                    {2048},                                         /* ActualSeqQTensorData */
-                    {2048}),                                        /* ActualSeqKVTensorData */
-            FaCase::kTilingTemplatePriority_Invalid                 /* TilingTemplatePriority */
-            ),
-    FagCase("Fag_UnpaddedAttention_Case_020", true,                 /* CaseName, Enable */
-            "",                                                     /* DebugInfo */
-            OpInfo(ControlInfo(true, false, true),                  /* RunTiling, RunKernel, Deterministic */
-                   ExpectInfo(true,                                 /* ExpectSuccess */
-                              10000000011100032134UL,               /* ExpectTilingKey */
-                              ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
-            FaParam(1, 5, 1, 2048, 2048, 128,                       /* B, N2, G, S1, S2, D */
-                    ge::DataType::DT_BF16, LayoutType::TND,         /* Dtype, Layout */
-                    0.08838f, 0.8f, 65535, 0,                       /* Scale, KeepProb, PreTokens, NxtTokens */
-                    1, 8,                                           /* InnerPrecise, SparseMode */
-                    PseShapeType::TND_1S,                           /* PseShapeType */
-                    DropMaskShapeType::B_N1_S1_S2DIV8,              /* DropMaskShapeType */
-                    PaddingMaskShapeType::S1_S2,                    /* PaddingMaskShapeType */
-                    AttenMaskShapeType::S1_S2,                      /* AttentionMaskShapeType */
-                    ge::DataType::DT_BOOL,                          /* AttentionMaskDtype */
-                    PrefixShapeType::NONE,                          /* PrefixShapeType */
-                    {},                                             /* PrefixTensorData */
-                    {2048},                                         /* ActualSeqQTensorData */
-                    {2048}),                                        /* ActualSeqKVTensorData */
-            FaCase::kTilingTemplatePriority_Invalid                 /* TilingTemplatePriority */
-            ),
-    FagCase("Fag_UnpaddedAttention_Case_021", true,                 /* CaseName, Enable */
-            "",                                                     /* DebugInfo */
-            OpInfo(ControlInfo(true, false, true),                  /* RunTiling, RunKernel, Deterministic */
-                   ExpectInfo(true,                                 /* ExpectSuccess */
-                              10000000011100032134UL,               /* ExpectTilingKey */
-                              ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
-            FaParam(1, 5, 1, 2048, 2048, 128,                       /* B, N2, G, S1, S2, D */
-                    ge::DataType::DT_BF16, LayoutType::TND,         /* Dtype, Layout */
-                    0.08838f, 0.8f, 65535, 0,                       /* Scale, KeepProb, PreTokens, NxtTokens */
-                    1, 8,                                           /* InnerPrecise, SparseMode */
-                    PseShapeType::TND_SS,                           /* PseShapeType */
-                    DropMaskShapeType::B_N1_S1_S2DIV8,              /* DropMaskShapeType */
-                    PaddingMaskShapeType::S1_S2,                    /* PaddingMaskShapeType */
-                    AttenMaskShapeType::S1_S2,                      /* AttentionMaskShapeType */
-                    ge::DataType::DT_BOOL,                          /* AttentionMaskDtype */
-                    PrefixShapeType::NONE,                          /* PrefixShapeType */
-                    {},                                             /* PrefixTensorData */
-                    {2048},                                         /* ActualSeqQTensorData */
-                    {2048}),                                        /* ActualSeqKVTensorData */
-            FaCase::kTilingTemplatePriority_Invalid                 /* TilingTemplatePriority */
-            ),
-    FagCase("Fag_UnpaddedAttention_Case_022", true,                 /* CaseName, Enable */
+    FagCase("Fag_UnpaddedAttention_Case_012", true,                 /* CaseName, Enable */
             "",                                                     /* DebugInfo */
             OpInfo(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                    ExpectInfo(true,                                 /* ExpectSuccess */
@@ -511,7 +299,7 @@ const auto Tc_Fag_UnpaddedAttention_BatchCase = ::testing::Values(
                     {2048, 2321, 2515}),                            /* ActualSeqKVTensorData */
             FaCase::kTilingTemplatePriority_Invalid                 /* TilingTemplatePriority */
             ),
-    FagCase("Fag_UnpaddedAttention_Case_023", true,                 /* CaseName, Enable */
+    FagCase("Fag_UnpaddedAttention_Case_013", true,                 /* CaseName, Enable */
             "",                                                     /* DebugInfo */
             OpInfo(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                    ExpectInfo(true,                                 /* ExpectSuccess */
@@ -532,7 +320,7 @@ const auto Tc_Fag_UnpaddedAttention_BatchCase = ::testing::Values(
                     {2048, 2321, 2515}),                            /* ActualSeqKVTensorData */
             FaCase::kTilingTemplatePriority_Invalid                 /* TilingTemplatePriority */
             ),
-    FagCase("Fag_UnpaddedAttention_Case_024", true,                 /* CaseName, Enable */
+    FagCase("Fag_UnpaddedAttention_Case_014", true,                 /* CaseName, Enable */
             "",                                                     /* DebugInfo */
             OpInfo(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                    ExpectInfo(false,                                /* ExpectSuccess */
@@ -553,7 +341,7 @@ const auto Tc_Fag_UnpaddedAttention_BatchCase = ::testing::Values(
                     {2048, 2321, 2515}),                            /* ActualSeqKVTensorData */
             FaCase::kTilingTemplatePriority_Invalid                 /* TilingTemplatePriority */
             ),
-    FagCase("Fag_UnpaddedAttention_Case_025", true,                 /* CaseName, Enable */
+    FagCase("Fag_UnpaddedAttention_Case_015", true,                 /* CaseName, Enable */
             "",                                                     /* DebugInfo */
             OpInfo(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                    ExpectInfo(false,                                /* ExpectSuccess */
@@ -583,16 +371,16 @@ class Ts_Fag_Ascend910B2_UnpaddedAttention_InvalidParam : public Ts_Fag_Ascend91
 TEST_P(Ts_Fag_Ascend910B2_UnpaddedAttention_InvalidParam, Tc_seqlen_nullptr)
 {
     ASSERT_TRUE(case_->Init());
-    case_->param.actualSeqQLen = Tensor("actualSeqQLen", {}, "None", ge::DataType::DT_INT64, ge::FORMAT_ND);
-    ASSERT_EQ(case_->Run(), case_->reverse.exp.success);
+    case_->mParam.actualSeqQLen = Tensor("actualSeqQLen", {}, "None", ge::DataType::DT_INT64, ge::FORMAT_ND);
+    ASSERT_EQ(case_->Run(), case_->mReverse.mExp.mSuccess);
 }
 
 TEST_P(Ts_Fag_Ascend910B2_UnpaddedAttention_InvalidParam, Tc_seqlen_dimerr)
 {
     ASSERT_TRUE(case_->Init());
-    case_->param.actualSeqQLen =
-        Tensor("actualSeqQLen", {case_->param.b + 1}, "B", ge::DataType::DT_INT64, ge::FORMAT_ND);
-    ASSERT_EQ(case_->Run(), case_->reverse.exp.success);
+    case_->mParam.actualSeqQLen =
+        Tensor("actualSeqQLen", {case_->mParam.b + 1}, "B", ge::DataType::DT_INT64, ge::FORMAT_ND);
+    ASSERT_EQ(case_->Run(), case_->mReverse.mExp.mSuccess);
 }
 
 const auto Tc_Fag_UnpaddedAttention_InvalidParam_BatchCase = ::testing::Values(
@@ -627,7 +415,7 @@ TEST_F(Ts_Fag_Ascend910B2, Tc_seqlen_dim_long)
 {
     auto cur = FagCase("Fag_UnpaddedAttention_Case_000", true,                 /* CaseName, Enable */
                        "",                                                     /* DebugInfo */
-                       OpInfo(ControlInfo(true, false),                        /* RunTiling, RunKernel */
+                       OpInfo(ControlInfo(true, true),                         /* RunTiling, RunKernel */
                               ExpectInfo(true,                                 /* ExpectSuccess */
                                          10000000000101033434UL,               /* ExpectTilingKey */
                                          ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
@@ -648,9 +436,9 @@ TEST_F(Ts_Fag_Ascend910B2, Tc_seqlen_dim_long)
     );
     int64_t tmpData = 32;
     for (int64_t i = 0; i < 2049; i++) {
-        cur.param.actualSeqQLenTensorData.push_back(tmpData);
-        cur.param.actualSeqKVLenTensorData.push_back(tmpData);
+        cur.mParam.actualSeqQLenTensorData.push_back(tmpData);
+        cur.mParam.actualSeqKVLenTensorData.push_back(tmpData);
     }
     ASSERT_TRUE(cur.Init());
-    ASSERT_EQ(cur.Run(), (cur.reverse.exp.success));
+    ASSERT_EQ(cur.Run(), (cur.mReverse.mExp.mSuccess));
 }

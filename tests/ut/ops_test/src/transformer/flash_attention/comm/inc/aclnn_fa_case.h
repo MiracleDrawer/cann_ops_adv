@@ -29,11 +29,11 @@ public:
 
 public:
     /* 算子控制信息 */
-    AclnnContext aclnnForwardCtx;
-    AclnnContext aclnnReverseCtx;
+    AclnnContext mAclnnForwardCtx;
+    AclnnContext mAclnnReverseCtx;
 
     /* 输入/输出 参数 */
-    AclnnFaParam aclnnParam;
+    AclnnFaParam mAclnnParam;
 
 public:
     AclnnFaCase();

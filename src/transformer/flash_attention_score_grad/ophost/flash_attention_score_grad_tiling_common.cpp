@@ -19,7 +19,7 @@
 
 namespace optiling {
 
-ge::graphStatus CheckSoftmaxMaxShape(gert::TilingContext *context, uint32_t b, uint32_t n1, uint32_t s1)
+ge::graphStatus CheckSoftmaxMaxShape(gert::TilingContext *context, int64_t b, int64_t n1, int64_t s1)
 {
     auto softmaxMaxShape = context->GetOptionalInputShape(SOFTMAX_MAX);
     if (softmaxMaxShape == nullptr) {
@@ -34,15 +34,16 @@ ge::graphStatus CheckSoftmaxMaxShape(gert::TilingContext *context, uint32_t b, u
     auto dim1 = softmaxMaxShape->GetStorageShape().GetDim(1); // 1:n1
     auto dim2 = softmaxMaxShape->GetStorageShape().GetDim(2); // 2:s1
     auto dim3 = softmaxMaxShape->GetStorageShape().GetDim(3); // 3:8
-    if (dim0 != b || dim1 != n1 || dim2 != s1 || dim3 != 8) { // softmaxMax pad to 8
-        OPS_LOG_E(context, "The shape of softmaxMax is invalid, got (%ld,%ld,%ld,%ld), should be (%u,%u,%u,8)",
-                  dim0, dim1, dim2, dim3, b, n1, s1);
-        return ge::GRAPH_FAILED;
-    }
+
+    // softmaxMax pad to 8
+    OPS_ERR_IF((dim0 != b || dim1 != n1 || dim2 != s1 || dim3 != 8),
+              OPS_LOG_E(context, "The shape of softmaxMax is invalid, got (%ld,%ld,%ld,%ld), should be (%ld,%ld,%ld,8)",
+                        dim0, dim1, dim2, dim3, b, n1, s1),
+              return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckTndSoftmaxMaxShape(gert::TilingContext *context, uint32_t t1, uint32_t n1)
+ge::graphStatus CheckTndSoftmaxMaxShape(gert::TilingContext *context, int64_t t1, int64_t n1)
 {
     auto softmaxMaxShape = context->GetOptionalInputShape(SOFTMAX_MAX);
     if (softmaxMaxShape == nullptr) {
@@ -56,15 +57,16 @@ ge::graphStatus CheckTndSoftmaxMaxShape(gert::TilingContext *context, uint32_t t
     auto dim0 = softmaxMaxShape->GetStorageShape().GetDim(0); // 0:t1
     auto dim1 = softmaxMaxShape->GetStorageShape().GetDim(1); // 1:n1
     auto dim2 = softmaxMaxShape->GetStorageShape().GetDim(2); // 2:8
-    if (dim0 != t1 || dim1 != n1 || dim2 != 8) {              // softmaxMax pad to 8
-        OPS_LOG_E(context, "The shape of softmaxMax is invalid, got (%ld,%ld,%ld), should be (%u,%u,8)", dim0, dim1,
-                  dim2, t1, n1);
-        return ge::GRAPH_FAILED;
-    }
+
+    // softmaxMax pad to 8
+    OPS_ERR_IF((dim0 != t1 || dim1 != n1 || dim2 != 8),
+              OPS_LOG_E(context, "The shape of softmaxMax is invalid, got (%ld,%ld,%ld), should be (%ld,%ld,8)",
+              dim0, dim1, dim2, t1, n1),
+              return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckSoftmaxSumShape(gert::TilingContext *context, uint32_t b, uint32_t n1, uint32_t s1)
+ge::graphStatus CheckSoftmaxSumShape(gert::TilingContext *context, int64_t b, int64_t n1, int64_t s1)
 {
     auto softmaxSumShape = context->GetOptionalInputShape(SOFTMAX_SUM);
     if (softmaxSumShape == nullptr) {
@@ -79,15 +81,16 @@ ge::graphStatus CheckSoftmaxSumShape(gert::TilingContext *context, uint32_t b, u
     auto dim1 = softmaxSumShape->GetStorageShape().GetDim(1); // 1:n1
     auto dim2 = softmaxSumShape->GetStorageShape().GetDim(2); // 2:s1
     auto dim3 = softmaxSumShape->GetStorageShape().GetDim(3); // 3:8
-    if (dim0 != b || dim1 != n1 || dim2 != s1 || dim3 != 8) { // softmaxSum pad to 8
-        OPS_LOG_E(context, "The shape of softmaxSum is invalid, got (%ld,%ld,%ld,%ld), should be (%u,%u,%u,8)", dim0,
-                  dim1, dim2, dim3, b, n1, s1);
-        return ge::GRAPH_FAILED;
-    }
+
+    // softmaxSum pad to 8
+    OPS_ERR_IF((dim0 != b || dim1 != n1 || dim2 != s1 || dim3 != 8),
+              OPS_LOG_E(context, "The shape of softmaxSum is invalid, got (%ld,%ld,%ld,%ld), should be (%ld,%ld,%ld,8)",
+              dim0, dim1, dim2, dim3, b, n1, s1),
+              return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckTndSoftmaxSumShape(gert::TilingContext *context, uint32_t t1, uint32_t n1)
+ge::graphStatus CheckTndSoftmaxSumShape(gert::TilingContext *context, int64_t t1, int64_t n1)
 {
     auto softmaxSumShape = context->GetOptionalInputShape(SOFTMAX_SUM);
     if (softmaxSumShape == nullptr) {
@@ -101,11 +104,12 @@ ge::graphStatus CheckTndSoftmaxSumShape(gert::TilingContext *context, uint32_t t
     auto dim0 = softmaxSumShape->GetStorageShape().GetDim(0); // 0:t1
     auto dim1 = softmaxSumShape->GetStorageShape().GetDim(1); // 1:n1
     auto dim2 = softmaxSumShape->GetStorageShape().GetDim(2); // 2:8
-    if (dim0 != t1 || dim1 != n1 || dim2 != 8) {              // softmaxSum pad to 8
-        OPS_LOG_E(context, "The shape of softmaxSum is invalid, got (%ld,%ld,%ld), should be (%u,%u,8)", dim0, dim1,
-                  dim2, t1, n1);
-        return ge::GRAPH_FAILED;
-    }
+
+    // softmaxSum pad to 8
+    OPS_ERR_IF((dim0 != t1 || dim1 != n1 || dim2 != 8),
+              OPS_LOG_E(context, "The shape of softmaxSum is invalid, got (%ld,%ld,%ld), should be (%ld,%ld,8)",
+              dim0, dim1, dim2, t1, n1),
+              return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -142,7 +146,7 @@ ge::graphStatus CheckSoftmaxDtype(gert::TilingContext *context) {
 
     auto softmaxMaxType = static_cast<uint32_t>(softmaxMax->GetDataType());
     auto softmaxSumType = static_cast<uint32_t>(softmaxSum->GetDataType());
-    
+
     bool softmaxTypeCheck = (softmaxMaxType == softmaxSumType) &&
                             (softmaxMaxType == ge::DT_FLOAT);
     OPS_ERR_IF(softmaxTypeCheck != true,
@@ -169,13 +173,12 @@ ge::graphStatus CheckAttentionInDtype(gert::TilingContext *context) {
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckShapeValid(gert::TilingContext *context, uint32_t b, uint32_t n1, uint32_t s1, uint32_t d)
+ge::graphStatus CheckShapeValid(gert::TilingContext *context, int64_t b, int64_t n1, int64_t s1, int64_t d)
 {
     auto isShapeInValid = (b == 0 || n1 == 0 || s1 == 0 || d == 0);
-    if (isShapeInValid) {
-        OPS_LOG_E(context, "input shape error, got 0 in bnsd(%u,%u,%u,%u)", b, n1, s1, d);
-        return ge::GRAPH_FAILED;
-    }
+    OPS_ERR_IF(isShapeInValid,
+              OPS_LOG_E(context, "input shape error, got 0 in bnsd(%ld,%ld,%ld,%ld)", b, n1, s1, d),
+              return ge::GRAPH_FAILED);
 
     auto ret = CheckSoftmaxMaxShape(context, b, n1, s1);
     if (ret != ge::GRAPH_SUCCESS) {
@@ -193,7 +196,7 @@ ge::graphStatus CheckShapeValid(gert::TilingContext *context, uint32_t b, uint32
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus CheckTndShapeValid(gert::TilingContext *context, uint32_t t1, uint32_t n1, uint32_t d)
+ge::graphStatus CheckTndShapeValid(gert::TilingContext *context, int64_t t1, int64_t n1, int64_t d)
 {
     if (context == nullptr) {
         OPS_LOG_E(context, "context is nullptr");
@@ -201,10 +204,9 @@ ge::graphStatus CheckTndShapeValid(gert::TilingContext *context, uint32_t t1, ui
     }
 
     auto isShapeInValid = (t1 == 0 || n1 == 0 || d == 0);
-    if (isShapeInValid) {
-        OPS_LOG_E(context, "input shape error, got 0 in tnd(%u,%u,%u)", t1, n1, d);
-        return ge::GRAPH_FAILED;
-    }
+    OPS_ERR_IF(isShapeInValid,
+              OPS_LOG_E(context, "input shape error, got 0 in tnd(%ld,%ld,%ld)", t1, n1, d),
+              return ge::GRAPH_FAILED);
 
     auto ret = CheckTndSoftmaxMaxShape(context, t1, n1);
     if (ret != ge::GRAPH_SUCCESS) {
@@ -242,6 +244,9 @@ ge::graphStatus CheckDtypeValid(gert::TilingContext *context)
 }
 
 bool IsSameShape(const gert::StorageShape *aShape, const gert::StorageShape *bShape) {
+    OPS_ERR_IF((aShape == nullptr) || (bShape == nullptr),
+               OPS_LOG_W("flash_attention_score_grad_tiling_common", "aShape or bShape is nullptr."),
+               return false);
     uint32_t dimSizeA = aShape->GetStorageShape().GetDimNum();
     uint32_t dimSizeB = bShape->GetStorageShape().GetDimNum();
     if (dimSizeA != dimSizeB) {

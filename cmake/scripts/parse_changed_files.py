@@ -152,8 +152,11 @@ class Parser:
             logging.info("Don't trigger any target.")
             return ""
         ops_test_ut_str: str = ""
-        for opt in ops_test_option_lst:
-            ops_test_ut_str += f"{opt};"
+        if "all" in ops_test_option_lst:
+            ops_test_ut_str = "all"
+        else:
+            for opt in ops_test_option_lst:
+                ops_test_ut_str += f"{opt};"
         ops_test_ut_str = f"{ops_test_ut_str}"
         return ops_test_ut_str
 

@@ -20,49 +20,50 @@ using Tensor = ops::adv::tests::utils::Tensor;
 
 using namespace ops::adv::tests::fa;
 
-FaParam::FaParam(int64_t b, int64_t n2, int64_t g, int64_t s1, int64_t s2, int64_t d, ge::DataType dtype,
-                 LayoutType layoutType, float scale, float keepProb, int64_t preTokens, int64_t nxtTokens,
-                 int64_t innerPrecise, int64_t sparseMode, PseShapeType pseShapeType,
-                 DropMaskShapeType dropMaskShapeType, PaddingMaskShapeType paddingMaskShapeType,
-                 AttenMaskShapeType attenMaskShapeType, ge::DataType attenMaskDtype, PrefixShapeType prefixShapeType)
-    : FaParam(b, n2, g, s1, s2, d, dtype, layoutType, scale, keepProb, preTokens, nxtTokens, innerPrecise, sparseMode,
-              1, pseShapeType, dropMaskShapeType, paddingMaskShapeType, attenMaskShapeType, attenMaskDtype,
-              prefixShapeType, {}, {}, {}, {}, {})
+FaParam::FaParam(int64_t pB, int64_t pN2, int64_t pG, int64_t pS1, int64_t pS2, int64_t pD, ge::DataType pDtype,
+                 LayoutType pLayoutType, float pScale, float pKeepProb, int64_t pPreTokens, int64_t pNxtTokens,
+                 int64_t pInnerPrecise, int64_t pSparseMode, PseShapeType pPseShapeType,
+                 DropMaskShapeType pDropMaskShapeType, PaddingMaskShapeType pPaddingMaskShapeType,
+                 AttenMaskShapeType pAttenMaskShapeType, ge::DataType pAttenMaskDtype, PrefixShapeType pPrefixShapeType)
+    : FaParam(pB, pN2, pG, pS1, pS2, pD, pDtype, pLayoutType, pScale, pKeepProb, pPreTokens, pNxtTokens, pInnerPrecise,
+              pSparseMode, 1, pPseShapeType, pDropMaskShapeType, pPaddingMaskShapeType, pAttenMaskShapeType,
+              pAttenMaskDtype, pPrefixShapeType, {}, {}, {}, {}, {})
 {
 }
 
-FaParam::FaParam(int64_t b, int64_t n2, int64_t g, int64_t s1, int64_t s2, int64_t d, ge::DataType dtype,
-                 LayoutType layoutType, float scale, float keepProb, int64_t preTokens, int64_t nxtTokens,
-                 int64_t innerPrecise, int64_t sparseMode, PseShapeType pseShapeType,
-                 DropMaskShapeType dropMaskShapeType, PaddingMaskShapeType paddingMaskShapeType,
-                 AttenMaskShapeType attenMaskShapeType, ge::DataType attenMaskDtype, PrefixShapeType prefixShapeType,
-                 std::vector<int64_t> prefixTensorData, std::vector<int64_t> actualSeqQLenTensorData,
-                 std::vector<int64_t> actualSeqKvLenTensorData)
-    : b(b), n2(n2), g(g), s1(s1), s2(s2), d(d), dtype(dtype), layoutType(layoutType), scale(scale), keepProb(keepProb),
-      preTokens(preTokens), nxtTokens(nxtTokens), innerPrecise(innerPrecise), sparseMode(sparseMode),
-      pseShapeType(pseShapeType), dropMaskShapeType(dropMaskShapeType), paddingMaskShapeType(paddingMaskShapeType),
-      attenMaskShapeType(attenMaskShapeType), attenMaskDtype(attenMaskDtype), prefixShapeType(prefixShapeType),
-      prefixTensorData(std::move(prefixTensorData)), actualSeqQLenTensorData(std::move(actualSeqQLenTensorData)),
-      actualSeqKVLenTensorData(std::move(actualSeqKvLenTensorData))
+FaParam::FaParam(int64_t pB, int64_t pN2, int64_t pG, int64_t pS1, int64_t pS2, int64_t pD, ge::DataType pDtype,
+                 LayoutType pLayoutType, float pScale, float pKeepProb, int64_t pPreTokens, int64_t pNxtTokens,
+                 int64_t pInnerPrecise, int64_t pSparseMode, PseShapeType pPseShapeType,
+                 DropMaskShapeType pDropMaskShapeType, PaddingMaskShapeType pPaddingMaskShapeType,
+                 AttenMaskShapeType pAttenMaskShapeType, ge::DataType pAttenMaskDtype, PrefixShapeType pPrefixShapeType,
+                 std::vector<int64_t> pPrefixTensorData, std::vector<int64_t> pActualSeqQLenTensorData,
+                 std::vector<int64_t> pActualSeqKvLenTensorData)
+    : b(pB), n2(pN2), g(pG), s1(pS1), s2(pS2), d(pD), dtype(pDtype), layoutType(pLayoutType), scale(pScale),
+      keepProb(pKeepProb), preTokens(pPreTokens), nxtTokens(pNxtTokens), innerPrecise(pInnerPrecise),
+      sparseMode(pSparseMode), pseShapeType(pPseShapeType), dropMaskShapeType(pDropMaskShapeType),
+      paddingMaskShapeType(pPaddingMaskShapeType), attenMaskShapeType(pAttenMaskShapeType),
+      attenMaskDtype(pAttenMaskDtype), prefixShapeType(pPrefixShapeType),
+      prefixTensorData(std::move(pPrefixTensorData)), actualSeqQLenTensorData(std::move(pActualSeqQLenTensorData)),
+      actualSeqKVLenTensorData(std::move(pActualSeqKvLenTensorData))
 {
 }
 
-FaParam::FaParam(int64_t b, int64_t n2, int64_t g, int64_t s1, int64_t s2, int64_t d, ge::DataType dtype,
-                 LayoutType layoutType, float scale, float keepProb, int64_t preTokens, int64_t nxtTokens,
-                 int64_t innerPrecise, int64_t sparseMode, int64_t pseType, PseShapeType pseShapeType,
-                 DropMaskShapeType dropMaskShapeType, PaddingMaskShapeType paddingMaskShapeType,
-                 AttenMaskShapeType attenMaskShapeType, ge::DataType attenMaskDtype, PrefixShapeType prefixShapeType,
-                 std::vector<int64_t> prefixTensorData, std::vector<int64_t> actualSeqQLenTensorData,
-                 std::vector<int64_t> actualSeqKvLenTensorData,
-                 std::vector<int64_t> qStartIdxTensorData, std::vector<int64_t> kvStartIdxTensorData)
-    : b(b), n2(n2), g(g), s1(s1), s2(s2), d(d), dtype(dtype), layoutType(layoutType), scale(scale), keepProb(keepProb),
-      preTokens(preTokens), nxtTokens(nxtTokens), innerPrecise(innerPrecise), sparseMode(sparseMode), pseType(pseType),
-      pseShapeType(pseShapeType), dropMaskShapeType(dropMaskShapeType), paddingMaskShapeType(paddingMaskShapeType),
-      attenMaskShapeType(attenMaskShapeType), attenMaskDtype(attenMaskDtype), prefixShapeType(prefixShapeType),
-      prefixTensorData(std::move(prefixTensorData)), actualSeqQLenTensorData(std::move(actualSeqQLenTensorData)),
-      actualSeqKVLenTensorData(std::move(actualSeqKvLenTensorData)),
-      qStartIdxTensorData(std::move(qStartIdxTensorData)),
-      kvStartIdxTensorData(std::move(kvStartIdxTensorData))
+FaParam::FaParam(int64_t pB, int64_t pN2, int64_t pG, int64_t pS1, int64_t pS2, int64_t pD, ge::DataType pDtype,
+                 LayoutType pLayoutType, float pScale, float pKeepProb, int64_t pPreTokens, int64_t pNxtTokens,
+                 int64_t pInnerPrecise, int64_t pSparseMode, int64_t pPseType, PseShapeType pPseShapeType,
+                 DropMaskShapeType pDropMaskShapeType, PaddingMaskShapeType pPaddingMaskShapeType,
+                 AttenMaskShapeType pAttenMaskShapeType, ge::DataType pAttenMaskDtype, PrefixShapeType pPrefixShapeType,
+                 std::vector<int64_t> pPrefixTensorData, std::vector<int64_t> pActualSeqQLenTensorData,
+                 std::vector<int64_t> pActualSeqKvLenTensorData, std::vector<int64_t> pQStartIdxTensorData,
+                 std::vector<int64_t> pKVStartIdxTensorData)
+    : b(pB), n2(pN2), g(pG), s1(pS1), s2(pS2), d(pD), dtype(pDtype), layoutType(pLayoutType), scale(pScale),
+      keepProb(pKeepProb), preTokens(pPreTokens), nxtTokens(pNxtTokens), innerPrecise(pInnerPrecise),
+      sparseMode(pSparseMode), pseType(pPseType), pseShapeType(pPseShapeType), dropMaskShapeType(pDropMaskShapeType),
+      paddingMaskShapeType(pPaddingMaskShapeType), attenMaskShapeType(pAttenMaskShapeType),
+      attenMaskDtype(pAttenMaskDtype), prefixShapeType(pPrefixShapeType),
+      prefixTensorData(std::move(pPrefixTensorData)), actualSeqQLenTensorData(std::move(pActualSeqQLenTensorData)),
+      actualSeqKVLenTensorData(std::move(pActualSeqKvLenTensorData)),
+      qStartIdxTensorData(std::move(pQStartIdxTensorData)), kvStartIdxTensorData(std::move(pKVStartIdxTensorData))
 {
 }
 
@@ -104,10 +105,8 @@ bool FaParam::Init()
             if (actualSeqQLenTensorData.size() > 1) {
                 auto &arr1 = actualSeqQLenTensorData;
                 auto &arr2 = actualSeqKVLenTensorData;
-                for (auto it1 = arr1.begin(), it2 = arr2.begin();
-                    it1 != arr1.end() && it2 != arr2.end();
-                    ++it1, ++it2)
-                {
+                for (auto it1 = arr1.begin(), it2 = arr2.begin(); it1 != arr1.end() && it2 != arr2.end();
+                     ++it1, ++it2) {
                     if (it1 == arr1.begin()) {
                         productS1S2 += *it1 * *it2;
                     } else {
@@ -292,32 +291,32 @@ bool FaParam::Init()
                         Tensor::TensorType::REQUIRED_OUTPUT);
 
     if (!actualSeqQLenTensorData.empty()) {
-        actualSeqQLen = Tensor("actualSeqQLen", {b}, "B", ge::DataType::DT_INT64, ge::FORMAT_ND,
-                               Tensor::TensorType::OPTIONAL_INPUT);
+        actualSeqQLen = Tensor("actualSeqQLen", {static_cast<int64_t>(actualSeqQLenTensorData.size())}, "B",
+                               ge::DataType::DT_INT64, ge::FORMAT_ND, Tensor::TensorType::OPTIONAL_INPUT);
     } else {
         actualSeqQLen = Tensor("actualSeqQLen", {}, "None", ge::DataType::DT_INT64, ge::FORMAT_ND,
                                Tensor::TensorType::OPTIONAL_INPUT);
     }
     if (!actualSeqKVLenTensorData.empty()) {
-        actualSeqKvLen = Tensor("actualSeqKvLen", {b}, "B", ge::DataType::DT_INT64, ge::FORMAT_ND,
-                                Tensor::TensorType::OPTIONAL_INPUT);
+        actualSeqKvLen = Tensor("actualSeqKvLen", {static_cast<int64_t>(actualSeqKVLenTensorData.size())}, "B",
+                                ge::DataType::DT_INT64, ge::FORMAT_ND, Tensor::TensorType::OPTIONAL_INPUT);
     } else {
         actualSeqKvLen = Tensor("actualSeqKvLen", {}, "None", ge::DataType::DT_INT64, ge::FORMAT_ND,
                                 Tensor::TensorType::OPTIONAL_INPUT);
     }
     if (!qStartIdxTensorData.empty()) {
-        qStartIdx = Tensor("qStartIdx", {b}, "B", ge::DataType::DT_INT64, ge::FORMAT_ND,
-                           Tensor::TensorType::OPTIONAL_INPUT);
+        qStartIdx =
+            Tensor("qStartIdx", {b}, "B", ge::DataType::DT_INT64, ge::FORMAT_ND, Tensor::TensorType::OPTIONAL_INPUT);
     } else {
-        qStartIdx = Tensor("qStartIdx", {}, "None", ge::DataType::DT_INT64, ge::FORMAT_ND,
-                           Tensor::TensorType::OPTIONAL_INPUT);
+        qStartIdx =
+            Tensor("qStartIdx", {}, "None", ge::DataType::DT_INT64, ge::FORMAT_ND, Tensor::TensorType::OPTIONAL_INPUT);
     }
     if (!kvStartIdxTensorData.empty()) {
-        kvStartIdx = Tensor("kvStartIdx", {b}, "B", ge::DataType::DT_INT64, ge::FORMAT_ND,
-                            Tensor::TensorType::OPTIONAL_INPUT);
+        kvStartIdx =
+            Tensor("kvStartIdx", {b}, "B", ge::DataType::DT_INT64, ge::FORMAT_ND, Tensor::TensorType::OPTIONAL_INPUT);
     } else {
-        kvStartIdx = Tensor("kvStartIdx", {}, "None", ge::DataType::DT_INT64, ge::FORMAT_ND,
-                            Tensor::TensorType::OPTIONAL_INPUT);
+        kvStartIdx =
+            Tensor("kvStartIdx", {}, "None", ge::DataType::DT_INT64, ge::FORMAT_ND, Tensor::TensorType::OPTIONAL_INPUT);
     }
 
     /**

@@ -29,35 +29,6 @@ public:
     static constexpr int32_t kTilingTemplatePriority_Invalid = 0;
 
 public:
-    /**
-     * 用例名
-     */
-    std::string name;
-
-    /**
-     * 用例根目录
-     */
-    std::string rootPath;
-
-    /**
-     * 用例是否使能
-     *
-     * \attention
-     * 非使能用例会执行 Init 但 Run 流程会返回执行成功.
-     */
-    bool enable = true;
-
-    /**
-     * 诊断信息
-     */
-    std::string dbgInfo;
-
-    /**
-     * Tiling Template Priority
-     */
-    int32_t tilingTemplatePriority = kTilingTemplatePriority_Invalid;
-
-public:
     Case();
     Case(const char *name, bool enable, const char *dbgInfo,
          int32_t tilingTemplatePriority = kTilingTemplatePriority_Invalid);
@@ -80,6 +51,45 @@ public:
      */
     virtual bool Run() = 0;
 
+    /**
+     * 获取用例根目录
+     */
+    const char *GetRootPath();
+
+protected:
+    /**
+     * 用例名
+     */
+    std::string mName;
+
+    /**
+     * 用例根目录
+     */
+    std::string mRootPath;
+
+    /**
+     * 用例是否使能
+     *
+     * \attention
+     * 非使能用例会执行 Init 但 Run 流程会返回执行成功.
+     */
+    bool mEnable = true;
+
+    /**
+     * 诊断信息
+     */
+    std::string mDbgInfo;
+
+    /**
+     * Tiling Template Priority
+     */
+    int32_t mTilingTemplatePriority = kTilingTemplatePriority_Invalid;
+
+    /**
+     * 当前用例
+     */
+    static void *mCurrentCasePtr;
+
 protected:
     /**
      * 初始化参数
@@ -97,12 +107,6 @@ protected:
      * \attention 若子类需要调用 GetCurrentCase 接口, 需确保已重写本接口实现, 以确保所获取指针的正确性.
      */
     virtual bool InitCurrentCasePtr();
-
-protected:
-    /**
-     * 当前用例
-     */
-    static void *currentCasePtr;
 };
 
 } // namespace ops::adv::tests::utils

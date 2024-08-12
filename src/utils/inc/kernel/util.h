@@ -113,7 +113,7 @@ __aicore__ inline void Bit2Int8CopyIn(LocalTensor<uint8_t> &dstTensor, GlobalTen
     dataCopyParams.blockCount = batchSize * s1BaseSize;
     dataCopyParams.blockLen = CeilDiv(s2BaseSize / byteBitRatio, blockBytes);
     dataCopyParams.dstStride = 0;
-    if (s2TotalSize / byteBitRatio % blockBytes == 0) {
+    if (s2TotalSize / byteBitRatio % blockBytes == 0 && s2BaseSize / byteBitRatio % blockBytes == 0) {
         dataCopyParams.srcStride =
             (s2TotalSize / byteBitRatio - dataCopyParams.blockLen * blockBytes) / blockBytes;
         DataCopy(dstTensor, srcTensor[srcOffset / byteBitRatio], dataCopyParams);

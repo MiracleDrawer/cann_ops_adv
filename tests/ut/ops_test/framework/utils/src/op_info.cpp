@@ -32,19 +32,19 @@ OpInfo::OpInfo(const ControlInfo &ctr, const ExpectInfo &exp) : OpInfo("Undefine
 }
 
 OpInfo::OpInfo(const char *name, const ControlInfo &ctr, const ExpectInfo &exp)
-    : name(name), ctr(ctr), exp(exp), ctx(nullptr)
+    : mName(name), mCtr(ctr), mExp(exp), mCtx(nullptr)
 {
 }
 
 bool OpInfo::SetContext(ContextIntf *ctxParam)
 {
-    this->ctx = static_cast<ContextIntf *>(ctxParam);
+    this->mCtx = static_cast<ContextIntf *>(ctxParam);
     return true;
 }
 
 bool OpInfo::ProcessTiling(std::string &caseName)
 {
-    if (ctr.runTiling) {
+    if (mCtr.mRunTiling) {
         if (!this->RunTiling(caseName)) {
             return false;
         }
@@ -57,7 +57,7 @@ bool OpInfo::ProcessTiling(std::string &caseName)
 
 bool OpInfo::ProcessKernel(std::string &caseName)
 {
-    if (ctr.runKernel) {
+    if (mCtr.mRunKernel) {
         if (!this->RunKernel(caseName)) {
             return false;
         }
@@ -70,8 +70,8 @@ bool OpInfo::ProcessKernel(std::string &caseName)
 
 bool OpInfo::RunTiling(std::string &caseName)
 {
-    if (!ctx->RunTiling()) {
-        LOG_IF(exp.success, LOG_ERR("Case[%s:%s] Run Tiling Failed.", caseName.c_str(), name.c_str()));
+    if (!mCtx->RunTiling(caseName)) {
+        LOG_IF(mExp.mSuccess, LOG_ERR("Case[%s:%s] Run Tiling Failed.", caseName.c_str(), mName.c_str()));
         return false;
     }
     return true;
@@ -79,24 +79,24 @@ bool OpInfo::RunTiling(std::string &caseName)
 
 bool OpInfo::ChkTiling(std::string &caseName)
 {
-    if (exp.tilingKey != ExpectInfo::kInvalidTilingKey) {
-        auto actTilingKey = ctx->GetTilingKey();
-        if (exp.tilingKey != actTilingKey) {
-            LOG_IF(exp.success, LOG_ERR("Case[%s:%s] Check Tiling result failed(TilingKey), Exp=%lu, Act=%lu",
-                                        caseName.c_str(), name.c_str(), exp.tilingKey, actTilingKey));
+    if (mExp.mTilingKey != ExpectInfo::kInvalidTilingKey) {
+        auto actTilingKey = mCtx->GetTilingKey();
+        if (mExp.mTilingKey != actTilingKey) {
+            LOG_IF(mExp.mSuccess, LOG_ERR("Case[%s:%s] Check Tiling result failed(TilingKey), Exp=%lu, Act=%lu",
+                                          caseName.c_str(), mName.c_str(), mExp.mTilingKey, actTilingKey));
             return false;
         }
     }
-    if (exp.tilingBlockDim != ExpectInfo::kInvalidTilingBlockDim) {
-        int64_t expTilingBlockDim = exp.tilingBlockDim;
+    if (mExp.mTilingBlockDim != ExpectInfo::kInvalidTilingBlockDim) {
+        int64_t expTilingBlockDim = mExp.mTilingBlockDim;
         if (expTilingBlockDim == ExpectInfo::kFullTilingBlockDim) {
             auto *platform = Platform::GetGlobalPlatform();
             expTilingBlockDim = platform != nullptr ? platform->GetBlockDim() : expTilingBlockDim;
         }
-        auto actTilingBlockDim = ctx->GetTilingBlockDim();
+        auto actTilingBlockDim = mCtx->GetTilingBlockDim();
         if (expTilingBlockDim != actTilingBlockDim) {
-            LOG_IF(exp.success, LOG_ERR("Case[%s:%s] Check Tiling result failed(TilingBlockDim), Exp=%ld, Act=%ld",
-                                        caseName.c_str(), name.c_str(), expTilingBlockDim, actTilingBlockDim));
+            LOG_IF(mExp.mSuccess, LOG_ERR("Case[%s:%s] Check Tiling result failed(TilingBlockDim), Exp=%ld, Act=%ld",
+                                          caseName.c_str(), mName.c_str(), expTilingBlockDim, actTilingBlockDim));
             return false;
         }
     }
@@ -105,8 +105,8 @@ bool OpInfo::ChkTiling(std::string &caseName)
 
 bool OpInfo::RunKernel(std::string &caseName)
 {
-    if (!ctx->RunKernel()) {
-        LOG_IF(exp.success, LOG_ERR("Case[%s:%s] Run Kernel Failed.", caseName.c_str(), name.c_str()));
+    if (!mCtx->RunKernel(caseName)) {
+        LOG_IF(mExp.mSuccess, LOG_ERR("Case[%s:%s] Run Kernel Failed.", caseName.c_str(), mName.c_str()));
         return false;
     }
     return true;
@@ -114,5 +114,6 @@ bool OpInfo::RunKernel(std::string &caseName)
 
 bool OpInfo::ChkKernel(std::string &caseName)
 {
+    LOG_DBG("Case[%s:%s] Run Kernel Finish.", caseName.c_str(), mName.c_str());
     return true;
 }

@@ -21,37 +21,37 @@ TEST_F(Ts_Fag_Ascend910B3, Tc_EmptyTensor_001)
      * 用例信息
      */
     // 用例 Shape 和 Attrs 信息
-    case_->param.b = 2;
-    case_->param.n2 = 16;
-    case_->param.g = 1;
-    case_->param.s1 = 2048;
-    case_->param.s2 = 2048;
-    case_->param.d = 32;
-    case_->param.dtype = ge::DataType::DT_FLOAT16;
-    case_->param.layoutType = LayoutType::BSH;
-    case_->param.scale = 1.0f;
-    case_->param.keepProb = 0.9f;
-    case_->param.preTokens = 65536;
-    case_->param.nxtTokens = 65536;
-    case_->param.innerPrecise = 0;
-    case_->param.sparseMode = 0;
-    case_->param.pseShapeType = PseShapeType::NONE;
-    case_->param.dropMaskShapeType = DropMaskShapeType::NONE;
-    case_->param.paddingMaskShapeType = PaddingMaskShapeType::NONE;
-    case_->param.attenMaskShapeType = AttenMaskShapeType::NONE;
-    case_->param.attenMaskDtype = ge::DataType::DT_BOOL;
-    case_->param.prefixShapeType = PrefixShapeType::NONE;
+    case_->mParam.b = 2;
+    case_->mParam.n2 = 16;
+    case_->mParam.g = 1;
+    case_->mParam.s1 = 2048;
+    case_->mParam.s2 = 2048;
+    case_->mParam.d = 32;
+    case_->mParam.dtype = ge::DataType::DT_FLOAT16;
+    case_->mParam.layoutType = LayoutType::BSH;
+    case_->mParam.scale = 1.0f;
+    case_->mParam.keepProb = 0.9f;
+    case_->mParam.preTokens = 65536;
+    case_->mParam.nxtTokens = 65536;
+    case_->mParam.innerPrecise = 0;
+    case_->mParam.sparseMode = 0;
+    case_->mParam.pseShapeType = PseShapeType::NONE;
+    case_->mParam.dropMaskShapeType = DropMaskShapeType::NONE;
+    case_->mParam.paddingMaskShapeType = PaddingMaskShapeType::NONE;
+    case_->mParam.attenMaskShapeType = AttenMaskShapeType::NONE;
+    case_->mParam.attenMaskDtype = ge::DataType::DT_BOOL;
+    case_->mParam.prefixShapeType = PrefixShapeType::NONE;
 
     // 用例 期望信息
-    case_->reverse.exp.tilingKey = 90UL;
+    case_->mReverse.mExp.mTilingKey = 90UL;
 
     // 用例 信息初始化及修正
     ASSERT_TRUE(case_->Init());
-    case_->param.query = Tensor("query", {case_->param.b, 0, case_->param.h1}, "BSH EmptyTensor",
-                                ge::DataType::DT_FLOAT16, ge::FORMAT_ND);
-    case_->param.dq =
-        Tensor("dq", {case_->param.b, 0, case_->param.h1}, "BSH EmptyTensor", ge::DataType::DT_FLOAT16, ge::FORMAT_ND);
-    ASSERT_TRUE(case_->reverseCtx.SetTilingMaxDataSize(ops::adv::tests::utils::Context::kMaxTilingDataSize * 2));
+    case_->mParam.query = Tensor("query", {case_->mParam.b, 0, case_->mParam.h1}, "BSH EmptyTensor",
+                                 ge::DataType::DT_FLOAT16, ge::FORMAT_ND);
+    case_->mParam.dq = Tensor("dq", {case_->mParam.b, 0, case_->mParam.h1}, "BSH EmptyTensor", ge::DataType::DT_FLOAT16,
+                              ge::FORMAT_ND);
+    ASSERT_TRUE(case_->mReverseCtx.SetTilingDataMaxSize(ops::adv::tests::utils::Context::kDefaultTilingDataMaxSize * 2));
 
     // 用例 执行
     ASSERT_TRUE(case_->Run());

@@ -20,7 +20,7 @@ class Ts_Fag_Ascend910B2_Redline : public Ts_Fag_WithParam_Ascend910B2 {};
 TEST_P(Ts_Fag_Ascend910B2_Redline, Tc_Redline)
 {
     ASSERT_TRUE(case_->Init());
-    ASSERT_EQ(case_->Run(), case_->reverse.exp.success);
+    ASSERT_EQ(case_->Run(), case_->mReverse.mExp.mSuccess);
 }
 
 const auto Tc_Fag_Redline_Case = ::testing::Values(
@@ -221,11 +221,10 @@ const auto Tc_Fag_Redline_Case = ::testing::Values(
                     AttenMaskShapeType::B_1_S1_S2,                  /* AttentionMaskShapeType */
                     ge::DataType::DT_BOOL,                          /* AttentionMaskDtype */
                     PrefixShapeType::B,                             /* PrefixShapeType */
-                    {128, 128, 128, 128, 128, 128,
-                     128, 128, 128, 128, 128, 128},                 /* PrefixTensorData */
-                    {},                                             /* ActualSeqQTensorData */
-                    {}),                                            /* ActualSeqKVTensorData */
-            FagCase::kTemplatePriority_Us1s2_Bbn2                   /* TilingTemplatePriority */
+                    {128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128}, /* PrefixTensorData */
+                    {},                                                           /* ActualSeqQTensorData */
+                    {}),                                                          /* ActualSeqKVTensorData */
+            FagCase::kTemplatePriority_Us1s2_Bbn2                                 /* TilingTemplatePriority */
             )
 
 );

@@ -19,13 +19,13 @@ namespace {
 TEST_P(Ts_FFN_WithParam_Ascend310P3, Tc_Tiling310P_FFN)
 {
     ASSERT_TRUE(case_->Init());
-    ASSERT_EQ(case_->Run(), case_->opInfo.exp.success);
+    ASSERT_EQ(case_->Run(), case_->mOpInfo.mExp.mSuccess);
 }
 
 TEST_P(Ts_FFN_WithParam_Ascend910B3, Tc_Tiling_FFN)
 {
     ASSERT_TRUE(case_->Init());
-    ASSERT_EQ(case_->Run(), case_->opInfo.exp.success);
+    ASSERT_EQ(case_->Run(), case_->mOpInfo.mExp.mSuccess);
 }
 
 const auto Tc_FFN_Tiling310P_Case = ::testing::Values(FFNCase(
@@ -309,4 +309,4 @@ const auto Tc_FFN_Tiling_Case = ::testing::Values(
 
 INSTANTIATE_TEST_SUITE_P(FFN, Ts_FFN_WithParam_Ascend310P3, Tc_FFN_Tiling310P_Case);
 INSTANTIATE_TEST_SUITE_P(FFN, Ts_FFN_WithParam_Ascend910B3, Tc_FFN_Tiling_Case);
-}
+} // namespace

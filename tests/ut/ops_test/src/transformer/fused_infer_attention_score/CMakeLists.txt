@@ -39,13 +39,14 @@ set(_FIA_CompileDefintions
         KernelCtrlParam incre_flash_attention,incre_flash_attention_FIAS,prompt_flash_attention,prompt_flash_attention_FIAS fia PFA_UT
 )
 OpsTest_Level2_AddOp(
-         BRIEF                                         Fia
-         SNAKE                                         fused_infer_attention_score
-         KERNEL_TILING_DATA_DEF_H                      ${_FIA_KernelTilingDataDefH}
-         KERNEL_SOURCES_EXT                            ${_FIA_KernelSourcesExt}
-         TILING_SOURCES_EXT                             ${_FIA_TilingSourcesExt}
-         TILING_PRIVATE_INCLUDES_EXT                    ${_FIA_KernelTilingExtInclude}
-         KERNEL_PRIVATE_COMPILE_DEFINITIONS_EXT        ${_FIA_CompileDefintions}
-         UTEST_COMMON_PRIVATE_LINK_LIBRARIES_EXT        ${_FIA_TargetPrivateLinkLibrariesExt}
+        SUB_SYSTEM                              transformer
+        BRIEF                                   Fia
+        SNAKE                                   fused_infer_attention_score
+        KERNEL_TILING_DATA_DEF_H                ${_FIA_KernelTilingDataDefH}
+        KERNEL_SOURCES_EXT                      ${_FIA_KernelSourcesExt}
+        TILING_SOURCES_EXT                      ${_FIA_TilingSourcesExt}
+        TILING_PRIVATE_INCLUDES_EXT             ${_FIA_KernelTilingExtInclude}
+        KERNEL_PRIVATE_COMPILE_DEFINITIONS_EXT  ${_FIA_CompileDefintions}
+        UTEST_COMMON_PRIVATE_LINK_LIBRARIES_EXT ${_FIA_TargetPrivateLinkLibrariesExt}
 )
 

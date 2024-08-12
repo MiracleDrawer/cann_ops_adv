@@ -19,35 +19,35 @@
 
 class FagCaseUs1s2Bbn2gs1s2 : public FagCase {
 public:
-    bool chkTilingData = true;
-    uint32_t isSparseValue = 1;
+    bool mChkTilingData = true;
+    uint32_t mIsSparseValue = 1;
 
     FagCaseUs1s2Bbn2gs1s2() = default;
     FagCaseUs1s2Bbn2gs1s2(const char *name, bool enable, const char *dbgInfo, const OpInfo &reverse,
                           const FaParam &param, bool chkTilingData = true, uint32_t isSparseValue = 1)
         : FagCase(name, enable, dbgInfo, reverse, param, FagCase::kTemplatePriority_Us1s2_Bbn2gs1s2),
-          chkTilingData(chkTilingData), isSparseValue(isSparseValue)
+          mChkTilingData(chkTilingData), mIsSparseValue(isSparseValue)
     {
     }
 
     bool Run() override
     {
-        if (!enable) {
+        if (!mEnable) {
             return true;
         }
-        if (!reverse.ProcessTiling(name)) {
+        if (!mReverse.ProcessTiling(mName)) {
             return false;
         }
-        if (chkTilingData) {
-            auto *td = static_cast<FlashAttentionScoreGradTilingDataS1s2Bn2gs1s2 *>(reverseCtx.GetTilingData());
-            if (td->s1s2BNGS1S2BaseParams.isSparse != isSparseValue) {
-                LOG_IF(reverse.exp.success,
-                       LOG_ERR("Case[%s:%s] TilingData check failed(isSparse), Exp=%u, Act=%u", name.c_str(),
-                               reverse.name.c_str(), isSparseValue, td->s1s2BNGS1S2BaseParams.isSparse));
+        if (mChkTilingData) {
+            auto *td = (const FlashAttentionScoreGradTilingDataS1s2Bn2gs1s2 *)(mReverseCtx.GetTilingData());
+            if (td->s1s2BNGS1S2BaseParams.isSparse != mIsSparseValue) {
+                LOG_IF(mReverse.mExp.mSuccess,
+                       LOG_ERR("Case[%s:%s] TilingData check failed(isSparse), Exp=%u, Act=%u", mName.c_str(),
+                               mReverse.mName.c_str(), mIsSparseValue, td->s1s2BNGS1S2BaseParams.isSparse));
                 return false;
             }
         }
-        if (!reverse.ProcessKernel(name)) {
+        if (!mReverse.ProcessKernel(mName)) {
             return false;
         }
         return true;
@@ -76,8 +76,8 @@ TEST_F(Ts_Fag_Ascend910B2_Us1s2Bbn2gs1s2_TilingFailed, Tc_Us1s2Bbn2gs1s2_Illegal
                                      PrefixShapeType::NONE)             /* PrefixShapeType */
     );
     ASSERT_TRUE(cs.Init());
-    cs.param.pse = Tensor("pse", {1, 2, 3, 4, 5}, "1_2_3_4_5", cs.param.dtype, ge::FORMAT_ND);
-    ASSERT_EQ(cs.Run(), cs.reverse.exp.success);
+    cs.mParam.pse = Tensor("pse", {1, 2, 3, 4, 5}, "1_2_3_4_5", cs.mParam.dtype, ge::FORMAT_ND);
+    ASSERT_EQ(cs.Run(), cs.mReverse.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fag_Ascend910B2_Us1s2Bbn2gs1s2_TilingFailed, Tc_Us1s2Bbn2gs1s2_IllegalPseShape_002)
@@ -100,8 +100,8 @@ TEST_F(Ts_Fag_Ascend910B2_Us1s2Bbn2gs1s2_TilingFailed, Tc_Us1s2Bbn2gs1s2_Illegal
                                      PrefixShapeType::NONE)             /* PrefixShapeType */
     );
     ASSERT_TRUE(cs.Init());
-    cs.param.pse = Tensor("pse", {16, 16, 16, 16}, "16_16_16_16", cs.param.dtype, ge::FORMAT_ND);
-    ASSERT_EQ(cs.Run(), cs.reverse.exp.success);
+    cs.mParam.pse = Tensor("pse", {16, 16, 16, 16}, "16_16_16_16", cs.mParam.dtype, ge::FORMAT_ND);
+    ASSERT_EQ(cs.Run(), cs.mReverse.mExp.mSuccess);
 }
 
 class Ts_Fag_Ascend910B2_Us1s2Bbn2gs1s2 : public Ts_WithParam_Ascend910B2<FagCaseUs1s2Bbn2gs1s2> {};
@@ -109,7 +109,7 @@ class Ts_Fag_Ascend910B2_Us1s2Bbn2gs1s2 : public Ts_WithParam_Ascend910B2<FagCas
 TEST_P(Ts_Fag_Ascend910B2_Us1s2Bbn2gs1s2, Tc_BatchCase)
 {
     ASSERT_TRUE(case_->Init());
-    ASSERT_EQ(case_->Run(), case_->reverse.exp.success);
+    ASSERT_EQ(case_->Run(), case_->mReverse.mExp.mSuccess);
 }
 
 const auto Tc_Fag_Us1s2Bbn2gs1s2_BatchCase = ::testing::Values(
@@ -460,11 +460,11 @@ const auto Tc_Fag_Us1s2Bbn2gs1s2_BatchCase = ::testing::Values(
                           ),
     FagCaseUs1s2Bbn2gs1s2("Fag_Us1s2Bbn2gs1s2_Case_020", true,                    /* CaseName, Enable */
                           "",                                                     /* DebugInfo */
-                          OpInfo(ControlInfo(true, true),                        /* RunTiling, RunKernel */
+                          OpInfo(ControlInfo(true, true),                         /* RunTiling, RunKernel */
                                  ExpectInfo(true,                                 /* ExpectSuccess */
                                             10000000000111021434UL,               /* ExpectTilingKey */
                                             ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
-                          FaParam(2, 2, 1, 128, 128, 128,                       /* B, N2, G, S1, S2, D */
+                          FaParam(2, 2, 1, 128, 128, 128,                         /* B, N2, G, S1, S2, D */
                                   ge::DataType::DT_FLOAT, LayoutType::BNSD,       /* Dtype, Layout */
                                   0.08838f, 0.8f, 2050, 2050,        /* Scale, KeepProb, PreTokens, NxtTokens */
                                   1, 4,                              /* InnerPrecise, SparseMode */
@@ -537,7 +537,7 @@ const auto Tc_Fag_Us1s2Bbn2gs1s2_BatchCase = ::testing::Values(
                                             10000000000101001434UL,               /* ExpectTilingKey */
                                             ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
                           FaParam(2, 40, 1, 2048, 2048, 128,                      /* B, N2, G, S1, S2, D */
-                                  ge::DataType::DT_FLOAT, LayoutType::BSH,      /* Dtype, Layout */
+                                  ge::DataType::DT_FLOAT, LayoutType::BSH,        /* Dtype, Layout */
                                   0.08838f, 0.8f, 100, 100,          /* Scale, KeepProb, PreTokens, NxtTokens */
                                   1, 4,                              /* InnerPrecise, SparseMode */
                                   PseShapeType::NONE,                /* PseShapeType */
@@ -550,17 +550,17 @@ const auto Tc_Fag_Us1s2Bbn2gs1s2_BatchCase = ::testing::Values(
     FagCaseUs1s2Bbn2gs1s2("Fag_Us1s2Bbn2gs1s2_Case_025", true,                    /* CaseName, Enable */
                           "",                                                     /* DebugInfo */
                           OpInfo(ControlInfo(true, false),                        /* RunTiling, RunKernel */
-                                 ExpectInfo(false,                                 /* ExpectSuccess */
+                                 ExpectInfo(false,                                /* ExpectSuccess */
                                             ExpectInfo::kInvalidTilingKey,        /* ExpectTilingKey */
                                             ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
-                          FaParam(1, 1, 1, 256, 128, 128,                      /* B, N2, G, S1, S2, D */
+                          FaParam(1, 1, 1, 256, 128, 128,                         /* B, N2, G, S1, S2, D */
                                   ge::DataType::DT_FLOAT16, LayoutType::BSH,      /* Dtype, Layout */
                                   0.08838f, 0.8f, 65504, 0,          /* Scale, KeepProb, PreTokens, NxtTokens */
                                   1, 8,                              /* InnerPrecise, SparseMode */
                                   PseShapeType::NONE,                /* PseShapeType */
                                   DropMaskShapeType::B_N1_S1_S2DIV8, /* DropMaskShapeType */
                                   PaddingMaskShapeType::S1_S2,       /* PaddingMaskShapeType */
-                                  AttenMaskShapeType::S1_S2,     /* AttentionMaskShapeType */
+                                  AttenMaskShapeType::S1_S2,         /* AttentionMaskShapeType */
                                   ge::DataType::DT_BOOL,             /* AttentionMaskDtype */
                                   PrefixShapeType::NONE)             /* PrefixShapeType */
                           )
@@ -573,57 +573,57 @@ class Ts_Fag_Ascend910B2_Us1s2Bbn2gs1s2_InvalidShape : public Ts_Fag_Ascend910B2
 TEST_P(Ts_Fag_Ascend910B2_Us1s2Bbn2gs1s2_InvalidShape, Tc_SoftmaxMax_Invalid)
 {
     ASSERT_TRUE(case_->Init());
-    case_->param.softmaxMax = Tensor("softmaxMax", {case_->param.b, case_->param.n1, case_->param.s1, 1},
-                                     "B_N1_S1_1(Invalid)", case_->param.dtype, ge::FORMAT_ND);
-    ASSERT_EQ(case_->Run(), case_->reverse.exp.success);
+    case_->mParam.softmaxMax = Tensor("softmaxMax", {case_->mParam.b, case_->mParam.n1, case_->mParam.s1, 1},
+                                      "B_N1_S1_1(Invalid)", case_->mParam.dtype, ge::FORMAT_ND);
+    ASSERT_EQ(case_->Run(), case_->mReverse.mExp.mSuccess);
 }
 
 TEST_P(Ts_Fag_Ascend910B2_Us1s2Bbn2gs1s2_InvalidShape, Tc_SoftmaxSum_Invalid)
 {
     ASSERT_TRUE(case_->Init());
-    case_->param.softmaxSum = Tensor("softmaxSum", {case_->param.b, case_->param.n1, case_->param.s1, 1},
-                                     "B_N1_S1_1(Invalid)", case_->param.dtype, ge::FORMAT_ND);
-    ASSERT_EQ(case_->Run(), case_->reverse.exp.success);
+    case_->mParam.softmaxSum = Tensor("softmaxSum", {case_->mParam.b, case_->mParam.n1, case_->mParam.s1, 1},
+                                      "B_N1_S1_1(Invalid)", case_->mParam.dtype, ge::FORMAT_ND);
+    ASSERT_EQ(case_->Run(), case_->mReverse.mExp.mSuccess);
 }
 
 TEST_P(Ts_Fag_Ascend910B2_Us1s2Bbn2gs1s2_InvalidShape, Tc_SoftmaxMax_DimErr)
 {
     ASSERT_TRUE(case_->Init());
-    case_->param.softmaxMax = Tensor("softmaxMax", {case_->param.b, case_->param.n1, case_->param.s1},
-                                     "B_N1_S1(Invalid)", case_->param.dtype, ge::FORMAT_ND);
-    ASSERT_EQ(case_->Run(), case_->reverse.exp.success);
+    case_->mParam.softmaxMax = Tensor("softmaxMax", {case_->mParam.b, case_->mParam.n1, case_->mParam.s1},
+                                      "B_N1_S1(Invalid)", case_->mParam.dtype, ge::FORMAT_ND);
+    ASSERT_EQ(case_->Run(), case_->mReverse.mExp.mSuccess);
 }
 
 TEST_P(Ts_Fag_Ascend910B2_Us1s2Bbn2gs1s2_InvalidShape, Tc_SoftmaxSum_DimErr)
 {
     ASSERT_TRUE(case_->Init());
-    case_->param.softmaxSum = Tensor("softmaxSum", {case_->param.b, case_->param.n1, case_->param.s1},
-                                     "B_N1_S1(Invalid)", case_->param.dtype, ge::FORMAT_ND);
-    ASSERT_EQ(case_->Run(), case_->reverse.exp.success);
+    case_->mParam.softmaxSum = Tensor("softmaxSum", {case_->mParam.b, case_->mParam.n1, case_->mParam.s1},
+                                      "B_N1_S1(Invalid)", case_->mParam.dtype, ge::FORMAT_ND);
+    ASSERT_EQ(case_->Run(), case_->mReverse.mExp.mSuccess);
 }
 
 TEST_P(Ts_Fag_Ascend910B2_Us1s2Bbn2gs1s2_InvalidShape, Tc_AttenmaskErr)
 {
     ASSERT_TRUE(case_->Init());
-    case_->param.attenMask =
-        Tensor("attenMask", {case_->param.s1, 1}, "S1_1(Invalid)", case_->param.dtype, ge::FORMAT_ND);
-    ASSERT_EQ(case_->Run(), case_->reverse.exp.success);
+    case_->mParam.attenMask =
+        Tensor("attenMask", {case_->mParam.s1, 1}, "S1_1(Invalid)", case_->mParam.dtype, ge::FORMAT_ND);
+    ASSERT_EQ(case_->Run(), case_->mReverse.mExp.mSuccess);
 }
 
 TEST_P(Ts_Fag_Ascend910B2_Us1s2Bbn2gs1s2_InvalidShape, Tc_AttenmaskErrDim)
 {
     ASSERT_TRUE(case_->Init());
-    case_->param.attenMask = Tensor("attenMask", {1, case_->param.s1, 1, case_->param.s2}, "1_S1_1_S2(Invalid)",
-                                    case_->param.dtype, ge::FORMAT_ND);
-    ASSERT_EQ(case_->Run(), case_->reverse.exp.success);
+    case_->mParam.attenMask = Tensor("attenMask", {1, case_->mParam.s1, 1, case_->mParam.s2}, "1_S1_1_S2(Invalid)",
+                                     case_->mParam.dtype, ge::FORMAT_ND);
+    ASSERT_EQ(case_->Run(), case_->mReverse.mExp.mSuccess);
 }
 
 TEST_P(Ts_Fag_Ascend910B2_Us1s2Bbn2gs1s2_InvalidShape, Tc_AttenmaskErrDimNum)
 {
     ASSERT_TRUE(case_->Init());
-    case_->param.attenMask =
-        Tensor("attenMask", {1, case_->param.s1, 1}, "1_S1_1(Invalid)", case_->param.dtype, ge::FORMAT_ND);
-    ASSERT_EQ(case_->Run(), case_->reverse.exp.success);
+    case_->mParam.attenMask =
+        Tensor("attenMask", {1, case_->mParam.s1, 1}, "1_S1_1(Invalid)", case_->mParam.dtype, ge::FORMAT_ND);
+    ASSERT_EQ(case_->Run(), case_->mReverse.mExp.mSuccess);
 }
 
 const auto Tc_Fag_Us1s2Bbn2gs1s2_InvalidShape_BatchCase = ::testing::Values(
@@ -655,17 +655,17 @@ class Ts_Fag_Ascend910B2_Us1s2Bbn2gs1s2_InvalidPrefixCompressShape : public Ts_F
 TEST_P(Ts_Fag_Ascend910B2_Us1s2Bbn2gs1s2_InvalidPrefixCompressShape, Tc_AttenmaskErrShapeForPrefixCompress)
 {
     ASSERT_TRUE(case_->Init());
-    case_->param.attenMask =
-        Tensor("attenMask", {2048, 2048}, "not_3072_2048(Invalid)", case_->param.dtype, ge::FORMAT_ND);
-    ASSERT_EQ(case_->Run(), case_->reverse.exp.success);
+    case_->mParam.attenMask =
+        Tensor("attenMask", {2048, 2048}, "not_3072_2048(Invalid)", case_->mParam.dtype, ge::FORMAT_ND);
+    ASSERT_EQ(case_->Run(), case_->mReverse.mExp.mSuccess);
 }
 
 TEST_P(Ts_Fag_Ascend910B2_Us1s2Bbn2gs1s2_InvalidPrefixCompressShape, Tc_PrefixErrShapeForPrefixCompress)
 {
     ASSERT_TRUE(case_->Init());
-    case_->param.prefix =
-        Tensor("prefix", {110, 110, 110, 110, 110}, "prefixN_gt_B(Invalid)", case_->param.dtype, ge::FORMAT_ND);
-    ASSERT_EQ(case_->Run(), case_->reverse.exp.success);
+    case_->mParam.prefix =
+        Tensor("prefix", {110, 110, 110, 110, 110}, "prefixN_gt_B(Invalid)", case_->mParam.dtype, ge::FORMAT_ND);
+    ASSERT_EQ(case_->Run(), case_->mReverse.mExp.mSuccess);
 }
 
 const auto Tc_Fag_Us1s2Bbn2gs1s2_InvalidPrefixCompressShape_BatchCase = ::testing::Values(

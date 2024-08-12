@@ -34,7 +34,6 @@ target_link_libraries(${_Target}
             dl
             tikicpulib::${OPS_ADV_UTEST_OPS_TEST_ASCEND_PRODUCT_TYPE}
         PRIVATE
-            $<BUILD_INTERFACE:intf_utest_strict_compile_options>
             $<BUILD_INTERFACE:intf_pub_utest>
 )
 target_compile_options(${_Target}

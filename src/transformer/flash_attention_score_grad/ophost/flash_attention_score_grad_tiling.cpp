@@ -35,6 +35,7 @@ constexpr uint32_t SOFTMAX_MAX = 8;
 constexpr uint32_t SOFTMAX_SUM = 9;
 constexpr uint32_t ATTENTION_IN = 11;
 
+constexpr uint32_t HEAD_NUM_IDX =4;
 constexpr uint32_t LAYOUT_ATTR_IDX = 5;
 
 constexpr uint32_t FAG_EMPTY_TILING_KEY = 90;
@@ -154,6 +155,63 @@ static ge::graphStatus CheckAttrs(gert::TilingContext *context)
     return ge::GRAPH_SUCCESS;
 }
 
+static ge::graphStatus CheckBaseInput(gert::TilingContext *context){
+    auto &queryShape = context->GetInputShape(QUERY_INPUT_INDEX)->GetStorageShape();
+    auto &keyShape = context->GetInputShape(KEY_INPUT_INDEX)->GetStorageShape();
+    auto &valueShape = context->GetInputShape(VALUE_INPUT_INDEX)->GetStorageShape();
+    int64_t headNum = *context->GetAttrs()->GetAttrPointer<int>(HEAD_NUM_IDX);
+    OPS_ERR_IF(headNum == 0,
+               OPS_REPORT_VECTOR_INNER_ERR(context, "headNum is 0."),
+               return ge::GRAPH_FAILED);
+    const char *inputLayout = context->GetAttrs()->GetAttrPointer<char>(LAYOUT_ATTR_IDX);
+    if (strlen(inputLayout) == 3) { // 3: BSH or SBH or TND
+        OPS_LOG_E_IF(keyShape != valueShape, context, return ge::GRAPH_FAILED, "key or value shape is invalid");
+        if (inputLayout[0] == 'B') {
+            // layout is BSH
+            OPS_LOG_E_IF((queryShape.GetDim(0) != keyShape.GetDim(0)), context, return ge::GRAPH_FAILED,
+                         "query or key shape is invalid");
+            OPS_ERR_IF(queryShape.GetDim(2) % headNum != 0,
+               OPS_REPORT_VECTOR_INNER_ERR(context, "h1 [%ld] should be a multiple of headNum [%ld].",
+               queryShape.GetDim(2), headNum),
+               return ge::GRAPH_FAILED);
+        } else if (inputLayout[0] == 'T') { // TND  N1 != N2
+            OPS_ERR_IF(headNum != queryShape.GetDim(1),
+               OPS_REPORT_VECTOR_INNER_ERR(context, "headNum is [%ld], but got n1 [%ld].",
+               headNum, queryShape.GetDim(1)),
+               return ge::GRAPH_FAILED);
+            return ge::SUCCESS;
+        } else {
+            // layout is SBH
+            OPS_LOG_E_IF((queryShape.GetDim(1) != keyShape.GetDim(1)), context, return ge::GRAPH_FAILED,
+                         "query or key shape is invalid");
+            OPS_ERR_IF(queryShape.GetDim(2) % headNum != 0,
+               OPS_REPORT_VECTOR_INNER_ERR(context, "h1 [%ld] should be a multiple of headNum [%ld].",
+               queryShape.GetDim(2), headNum),
+               return ge::GRAPH_FAILED);
+        }
+    } else if (strlen(inputLayout) == 4) { // 4: layout is BNSD or BSND
+        OPS_LOG_E_IF((queryShape.GetDim(0) != keyShape.GetDim(0)), context, return ge::GRAPH_FAILED,
+                     "query or key shape is invalid");
+        OPS_LOG_E_IF((queryShape.GetDim(3) != keyShape.GetDim(3)), context, return ge::GRAPH_FAILED,
+                     "query or key shape is invalid");
+        if (inputLayout[1] == 'N') {
+            OPS_ERR_IF(headNum != queryShape.GetDim(1),
+                   OPS_REPORT_VECTOR_INNER_ERR(context, "headNum is [%ld], but got n1 [%ld].",
+                   headNum, queryShape.GetDim(1)),
+                   return ge::GRAPH_FAILED);
+        } else {
+            OPS_ERR_IF(headNum != queryShape.GetDim(2),
+                   OPS_REPORT_VECTOR_INNER_ERR(context, "headNum is [%ld], but got n1 [%ld].",
+                   headNum, queryShape.GetDim(2)),
+                   return ge::GRAPH_FAILED);  
+        }
+    } else {
+        OPS_LOG_E(context, "invalid input_layout[%s].", inputLayout);
+        return ge::GRAPH_FAILED;
+    }
+    return ge::SUCCESS;
+}
+
 static ge::graphStatus CheckParams(gert::TilingContext *context)
 {
     OPS_LOG_E_IF(context == nullptr, context, return ge::GRAPH_FAILED, "context is null");
@@ -164,33 +222,9 @@ static ge::graphStatus CheckParams(gert::TilingContext *context)
         context->GetOptionalInputShape(SOFTMAX_MAX) != nullptr &&
         context->GetOptionalInputShape(SOFTMAX_SUM) != nullptr &&
         context->GetOptionalInputShape(ATTENTION_IN) != nullptr) {
-        auto &queryShape = context->GetInputShape(QUERY_INPUT_INDEX)->GetStorageShape();
-        auto &keyShape = context->GetInputShape(KEY_INPUT_INDEX)->GetStorageShape();
-        auto &valueShape = context->GetInputShape(VALUE_INPUT_INDEX)->GetStorageShape();
-        const char *inputLayout = context->GetAttrs()->GetAttrPointer<char>(LAYOUT_ATTR_IDX);
-        if (strlen(inputLayout) == 3) { // 3: BSH or SBH or TND
-            OPS_LOG_E_IF(keyShape != valueShape, context, return ge::GRAPH_FAILED, "key or value shape is invalid");
-            if (inputLayout[0] == 'B') {
-                // layout is BSH
-                OPS_LOG_E_IF((queryShape.GetDim(0) != keyShape.GetDim(0)), context, return ge::GRAPH_FAILED,
-                             "query or key shape is invalid");
-            } else if (inputLayout[0] == 'T') { // TND  N1 != N2
-                return ge::SUCCESS;
-            } else {
-                // layout is SBH
-                OPS_LOG_E_IF((queryShape.GetDim(1) != keyShape.GetDim(1)), context, return ge::GRAPH_FAILED,
-                             "query or key shape is invalid");
-            }
-        } else if (strlen(inputLayout) == 4) { // 4: layout is BNSD or BSND
-            OPS_LOG_E_IF((queryShape.GetDim(0) != keyShape.GetDim(0)), context, return ge::GRAPH_FAILED,
-                         "query or key shape is invalid");
-            OPS_LOG_E_IF((queryShape.GetDim(3) != keyShape.GetDim(3)), context, return ge::GRAPH_FAILED,
-                         "query or key shape is invalid");
-        } else {
-            OPS_LOG_E(context, "invalid input_layout[%s].", inputLayout);
-            return ge::GRAPH_FAILED;
+        if (CheckBaseInput(context) == ge::GRAPH_SUCCESS) {
+            return ge::SUCCESS;
         }
-        return ge::SUCCESS;
     }
     OPS_LOG_E(context, "fail to get shape or attr from context");
     return ge::GRAPH_FAILED;

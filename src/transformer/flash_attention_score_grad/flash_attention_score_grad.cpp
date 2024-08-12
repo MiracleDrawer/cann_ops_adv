@@ -75,7 +75,7 @@ constexpr static const uint32_t TND = 3;
     } while (0)
 
 #define INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(INPUT_TYPE, MM_CONFIG, CUBE_FORMAT, PSE_CFG, ATTEN_MASK_CFG, DROPOUT_CFG,     \
-                                         INPUT_LAYOUT)                                                                 \
+                                         INPUT_LAYOUT, MM2_OUT_FORMAT)                                                 \
     do {                                                                                                               \
         GET_TILING_DATA_WITH_STRUCT(FlashAttentionScoreGradTilingDataS1s2Bn2, tiling_data_in, tiling_data);            \
         const FlashAttentionScoreGradTilingDataS1s2Bn2 *__restrict tilingData = &tiling_data_in;                       \
@@ -89,7 +89,7 @@ constexpr static const uint32_t TND = 3;
         pipeIn.Destroy();                                                                                              \
         TPipe pipeOp;                                                                                                  \
         FlashAttentionScoreGradS1s2Bn2<INPUT_TYPE, float, MM_CONFIG, CUBE_FORMAT, PSE_CFG, ATTEN_MASK_CFG,             \
-                                       DROPOUT_CFG, INPUT_LAYOUT>                                                      \
+                                       DROPOUT_CFG, INPUT_LAYOUT, MM2_OUT_FORMAT>                                      \
             op;                                                                                                        \
         REGIST_MATMUL_OBJ(&pipeOp, GetSysWorkSpacePtr(), op.mm1, bmm1tiling, op.mm4, bmm4tiling, op.mm3_1,             \
                           bmm31tiling);                                                                                \
@@ -99,14 +99,15 @@ constexpr static const uint32_t TND = 3;
         op.Process();                                                                                                  \
         pipeOp.Destroy();                                                                                              \
         TPipe pipeCast;                                                                                                \
-        FlashAttentionScoreGradPost<INPUT_TYPE, FlashAttentionScoreGradTilingDataS1s2Bn2, true, INPUT_LAYOUT, ND>      \
-            opCast;                                                                                                    \
+        constexpr static uint32_t input_format = (MM2_OUT_FORMAT == MM_NZ_OUT_FORMAT) ? NZ : ND;                       \
+        FlashAttentionScoreGradPost<INPUT_TYPE, FlashAttentionScoreGradTilingDataS1s2Bn2, true, INPUT_LAYOUT,          \
+        input_format> opCast;                                                                                          \
         opCast.Init(dq, dk, dv, actual_seq_qlen, actual_seq_kvlen, user, tilingData, &pipeCast);                       \
         opCast.Process();                                                                                              \
     } while (0)
 
 #define INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(INPUT_TYPE, MM_CONFIG, CUBE_FORMAT, PSE_CFG, ATTEN_MASK_CFG,       \
-                                                    DROPOUT_CFG, INPUT_LAYOUT)                                         \
+                                                    DROPOUT_CFG, INPUT_LAYOUT, MM2_OUT_FORMAT)                         \
     do {                                                                                                               \
         GET_TILING_DATA_WITH_STRUCT(FlashAttentionScoreGradTilingDataS1s2Bn2, tiling_data_in, tiling_data);            \
         const FlashAttentionScoreGradTilingDataS1s2Bn2 *__restrict tilingData = &tiling_data_in;                       \
@@ -114,7 +115,7 @@ constexpr static const uint32_t TND = 3;
         const TCubeTiling *__restrict bmm31tiling = &(tilingData->mm31TilingData);                                     \
         const TCubeTiling *__restrict bmm4tiling = &(tilingData->mm4TilingData);                                       \
         FlashAttentionScoreGradS1s2Bn2<INPUT_TYPE, float, MM_CONFIG, CUBE_FORMAT, PSE_CFG, ATTEN_MASK_CFG,             \
-                                       DROPOUT_CFG, INPUT_LAYOUT>                                                      \
+                                       DROPOUT_CFG, INPUT_LAYOUT, MM2_OUT_FORMAT>                                      \
             op;                                                                                                        \
         REGIST_MATMUL_OBJ(&pipeIn, GetSysWorkSpacePtr(), op.mm1, bmm1tiling, op.mm4, bmm4tiling, op.mm3_1,             \
                           bmm31tiling);                                                                                \
@@ -124,8 +125,9 @@ constexpr static const uint32_t TND = 3;
         op.Process();                                                                                                  \
         pipeIn.Destroy();                                                                                              \
         TPipe pipeCast;                                                                                                \
-        FlashAttentionScoreGradPost<INPUT_TYPE, FlashAttentionScoreGradTilingDataS1s2Bn2, true, INPUT_LAYOUT, ND>      \
-            opCast;                                                                                                    \
+        constexpr static uint32_t input_format = (MM2_OUT_FORMAT == MM_NZ_OUT_FORMAT) ? NZ : ND;                       \
+        FlashAttentionScoreGradPost<INPUT_TYPE, FlashAttentionScoreGradTilingDataS1s2Bn2, true, INPUT_LAYOUT,          \
+        input_format> opCast;                                                                                          \
         opCast.Init(dq, dk, dv, actual_seq_qlen, actual_seq_kvlen, user, tilingData, &pipeCast);                       \
         opCast.Process();                                                                                              \
     } while (0)
@@ -279,7 +281,90 @@ extern "C" __global__ __aicore__ void flash_attention_score_grad(
         INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_DISABLE, INPUT_DISABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
                                               BSNGD, MM_ND_OUT_NOALIGN);
         return;
-        // 1
+
+        // --- mm2 out Nz
+    } else if (TILING_KEY_IS(10000000010111003434UL)) {
+        // attention_mask:1, pse:1, drop:1, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_ENABLE, INPUT_ENABLE, INPUT_ENABLE, MM_ND_OUT_NOALIGN, BSNGD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010011003434UL)) {
+        // attention_mask:0, pse:1, drop:1, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_DISABLE, INPUT_ENABLE, INPUT_ENABLE, MM_ND_OUT_NOALIGN, BSNGD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010101003434UL)) {
+        // attention_mask:1, pse:0, drop:1, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_ENABLE, INPUT_DISABLE, INPUT_ENABLE, MM_ND_OUT_NOALIGN, BSNGD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010001003434UL)) {
+        // attention_mask:0, pse:0, drop:1, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_DISABLE, INPUT_DISABLE, INPUT_ENABLE, MM_ND_OUT_NOALIGN, BSNGD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010110003434UL)) {
+        // attention_mask:1, pse:1, drop:0, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_ENABLE, INPUT_ENABLE, INPUT_DISABLE, MM_ND_OUT_NOALIGN, BSNGD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010010003434UL)) {
+        // attention_mask:0, pse:1, drop:0, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_DISABLE, INPUT_ENABLE, INPUT_DISABLE, MM_ND_OUT_NOALIGN, BSNGD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010100003434UL)) {
+        // attention_mask:1, pse:0, drop:0, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_ENABLE, INPUT_DISABLE, INPUT_DISABLE, MM_ND_OUT_NOALIGN, BSNGD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010000003434UL)) {
+        // attention_mask:0, pse:0, drop:0, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_DISABLE, INPUT_DISABLE, INPUT_DISABLE, MM_ND_OUT_NOALIGN, BSNGD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011111003434UL)) {
+        // attention_mask:1, pse:1, drop:1, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_ENABLE, INPUT_ENABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT, BSNGD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011011003434UL)) {
+        // attention_mask:0, pse:1, drop:1, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_DISABLE, INPUT_ENABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT, BSNGD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011101003434UL)) {
+        // attention_mask:1, pse:0, drop:1, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_ENABLE, INPUT_DISABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT, BSNGD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011001003434UL)) {
+        // attention_mask:0, pse:0, drop:1, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_DISABLE, INPUT_DISABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT, BSNGD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011110003434UL)) {
+        // attention_mask:1, pse:1, drop:0, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_ENABLE, INPUT_ENABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT, BSNGD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011010003434UL)) {
+        // attention_mask:0, pse:1, drop:0, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_DISABLE, INPUT_ENABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT, BSNGD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011100003434UL)) {
+        // attention_mask:1, pse:0, drop:0, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_ENABLE, INPUT_DISABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT, BSNGD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011000003434UL)) {
+        // attention_mask:0, pse:0, drop:0, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_DISABLE, INPUT_DISABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT, BSNGD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+
+        // 1 格式为SBNGD
     } else if (TILING_KEY_IS(10000000000111013434UL)) {
         // attention_mask:1, pse:1, drop:1, mm_out:nd
         INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_ENABLE, INPUT_ENABLE, INPUT_ENABLE, MM_ND_OUT_NOALIGN, SBNGD,
@@ -360,7 +445,90 @@ extern "C" __global__ __aicore__ void flash_attention_score_grad(
         INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_DISABLE, INPUT_DISABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
                                               SBNGD, MM_ND_OUT_NOALIGN);
         return;
-        // 2
+
+        // --- mm2 out Nz
+    } else if (TILING_KEY_IS(10000000010111013434UL)) {
+        // attention_mask:1, pse:1, drop:1, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_ENABLE, INPUT_ENABLE, INPUT_ENABLE, MM_ND_OUT_NOALIGN, SBNGD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010011013434UL)) {
+        // attention_mask:0, pse:1, drop:1, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_DISABLE, INPUT_ENABLE, INPUT_ENABLE, MM_ND_OUT_NOALIGN, SBNGD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010101013434UL)) {
+        // attention_mask:1, pse:0, drop:1, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_ENABLE, INPUT_DISABLE, INPUT_ENABLE, MM_ND_OUT_NOALIGN, SBNGD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010001013434UL)) {
+        // attention_mask:0, pse:0, drop:1, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_DISABLE, INPUT_DISABLE, INPUT_ENABLE, MM_ND_OUT_NOALIGN, SBNGD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010110013434UL)) {
+        // attention_mask:1, pse:1, drop:0, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_ENABLE, INPUT_ENABLE, INPUT_DISABLE, MM_ND_OUT_NOALIGN, SBNGD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010010013434UL)) {
+        // attention_mask:0, pse:1, drop:0, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_DISABLE, INPUT_ENABLE, INPUT_DISABLE, MM_ND_OUT_NOALIGN, SBNGD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010100013434UL)) {
+        // attention_mask:1, pse:0, drop:0, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_ENABLE, INPUT_DISABLE, INPUT_DISABLE, MM_ND_OUT_NOALIGN, SBNGD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010000013434UL)) {
+        // attention_mask:0, pse:0, drop:0, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_DISABLE, INPUT_DISABLE, INPUT_DISABLE, MM_ND_OUT_NOALIGN, SBNGD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011111013434UL)) {
+        // attention_mask:1, pse:1, drop:1, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_ENABLE, INPUT_ENABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT, SBNGD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011011013434UL)) {
+        // attention_mask:0, pse:1, drop:1, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_DISABLE, INPUT_ENABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT, SBNGD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011101013434UL)) {
+        // attention_mask:1, pse:0, drop:1, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_ENABLE, INPUT_DISABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT, SBNGD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011001013434UL)) {
+        // attention_mask:0, pse:0, drop:1, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_DISABLE, INPUT_DISABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT, SBNGD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011110013434UL)) {
+        // attention_mask:1, pse:1, drop:0, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_ENABLE, INPUT_ENABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT, SBNGD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011010013434UL)) {
+        // attention_mask:0, pse:1, drop:0, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_DISABLE, INPUT_ENABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT, SBNGD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011100013434UL)) {
+        // attention_mask:1, pse:0, drop:0, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_ENABLE, INPUT_DISABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT, SBNGD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011000013434UL)) {
+        // attention_mask:0, pse:0, drop:0, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_DISABLE, INPUT_DISABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT, SBNGD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+
+        // 2 格式为BNGSD
     } else if (TILING_KEY_IS(10000000000111023434UL)) {
         // attention_mask:1, pse:1, drop:1, mm_out:nd
         INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_ENABLE, INPUT_ENABLE, INPUT_ENABLE, MM_ND_OUT_NOALIGN, BNGSD,
@@ -441,7 +609,89 @@ extern "C" __global__ __aicore__ void flash_attention_score_grad(
         INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_DISABLE, INPUT_DISABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
                                               BNGSD, MM_ND_OUT_NOALIGN);
         return;
-        // 3
+        // --- mm2 out Nz
+    } else if (TILING_KEY_IS(10000000010111023434UL)) {
+        // attention_mask:1, pse:1, drop:1, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_ENABLE, INPUT_ENABLE, INPUT_ENABLE, MM_ND_OUT_NOALIGN, BNGSD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010011023434UL)) {
+        // attention_mask:0, pse:1, drop:1, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_DISABLE, INPUT_ENABLE, INPUT_ENABLE, MM_ND_OUT_NOALIGN, BNGSD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010101023434UL)) {
+        // attention_mask:1, pse:0, drop:1, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_ENABLE, INPUT_DISABLE, INPUT_ENABLE, MM_ND_OUT_NOALIGN, BNGSD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010001023434UL)) {
+        // attention_mask:0, pse:0, drop:1, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_DISABLE, INPUT_DISABLE, INPUT_ENABLE, MM_ND_OUT_NOALIGN, BNGSD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010110023434UL)) {
+        // attention_mask:1, pse:1, drop:0, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_ENABLE, INPUT_ENABLE, INPUT_DISABLE, MM_ND_OUT_NOALIGN, BNGSD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010010023434UL)) {
+        // attention_mask:0, pse:1, drop:0, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_DISABLE, INPUT_ENABLE, INPUT_DISABLE, MM_ND_OUT_NOALIGN, BNGSD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010100023434UL)) {
+        // attention_mask:1, pse:0, drop:0, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_ENABLE, INPUT_DISABLE, INPUT_DISABLE, MM_ND_OUT_NOALIGN, BNGSD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010000023434UL)) {
+        // attention_mask:0, pse:0, drop:0, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_DISABLE, INPUT_DISABLE, INPUT_DISABLE, MM_ND_OUT_NOALIGN, BNGSD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011111023434UL)) {
+        // attention_mask:1, pse:1, drop:1, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_ENABLE, INPUT_ENABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT, BNGSD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011011023434UL)) {
+        // attention_mask:0, pse:1, drop:1, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_DISABLE, INPUT_ENABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT, BNGSD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011101023434UL)) {
+        // attention_mask:1, pse:0, drop:1, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_ENABLE, INPUT_DISABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT, BNGSD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011001023434UL)) {
+        // attention_mask:0, pse:0, drop:1, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_DISABLE, INPUT_DISABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT, BNGSD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011110023434UL)) {
+        // attention_mask:1, pse:1, drop:0, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_ENABLE, INPUT_ENABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT, BNGSD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011010023434UL)) {
+        // attention_mask:0, pse:1, drop:0, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_DISABLE, INPUT_ENABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT, BNGSD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011100023434UL)) {
+        // attention_mask:1, pse:0, drop:0, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_ENABLE, INPUT_DISABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT, BNGSD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011000023434UL)) {
+        // attention_mask:0, pse:0, drop:0, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_DISABLE, INPUT_DISABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT, BNGSD,
+                                              MM_NZ_OUT_FORMAT);
+        return;
+
+        // 3 格式为TND
     } else if (TILING_KEY_IS(10000000000111033434UL)) {
         // attention_mask:1, pse:1, drop:1, mm_out:nd
         INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_ENABLE, INPUT_ENABLE, INPUT_ENABLE, MM_ND_OUT_NOALIGN, TND,
@@ -480,46 +730,6 @@ extern "C" __global__ __aicore__ void flash_attention_score_grad(
     } else if (TILING_KEY_IS(10000000000000033434UL)) {
         // attention_mask:0, pse:0, drop:0, mm_out:nd
         INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_DISABLE, INPUT_DISABLE, INPUT_DISABLE, MM_ND_OUT_NOALIGN, TND,
-                                              MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001111033434UL)) {
-        // attention_mask:1, pse:1, drop:1, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_ENABLE, INPUT_ENABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT, TND,
-                                              MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001011033434UL)) {
-        // attention_mask:0, pse:1, drop:1, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_DISABLE, INPUT_ENABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT, TND,
-                                              MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001101033434UL)) {
-        // attention_mask:1, pse:0, drop:1, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_ENABLE, INPUT_DISABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT, TND,
-                                              MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001001033434UL)) {
-        // attention_mask:0, pse:0, drop:1, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_DISABLE, INPUT_DISABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT, TND,
-                                              MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001110033434UL)) {
-        // attention_mask:1, pse:1, drop:0, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_ENABLE, INPUT_ENABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT, TND,
-                                              MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001010033434UL)) {
-        // attention_mask:0, pse:1, drop:0, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_DISABLE, INPUT_ENABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT, TND,
-                                              MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001100033434UL)) {
-        // attention_mask:1, pse:0, drop:0, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_ENABLE, INPUT_DISABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT, TND,
-                                              MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001000033434UL)) {
-        // attention_mask:0, pse:0, drop:0, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_DISABLE, INPUT_DISABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT, TND,
                                               MM_ND_OUT_NOALIGN);
         return;
         // --- mm2 out Nz
@@ -563,595 +773,655 @@ extern "C" __global__ __aicore__ void flash_attention_score_grad(
         INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_DISABLE, INPUT_DISABLE, INPUT_DISABLE, MM_ND_OUT_NOALIGN, TND,
                                               MM_NZ_OUT_FORMAT);
         return;
-    } else if (TILING_KEY_IS(10000000011111033434UL)) {
-        // attention_mask:1, pse:1, drop:1, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_ENABLE, INPUT_ENABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT, TND,
-                                              MM_NZ_OUT_FORMAT);
-        return;
-    } else if (TILING_KEY_IS(10000000011011033434UL)) {
-        // attention_mask:0, pse:1, drop:1, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_DISABLE, INPUT_ENABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT, TND,
-                                              MM_NZ_OUT_FORMAT);
-        return;
-    } else if (TILING_KEY_IS(10000000011101033434UL)) {
-        // attention_mask:1, pse:0, drop:1, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_ENABLE, INPUT_DISABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT, TND,
-                                              MM_NZ_OUT_FORMAT);
-        return;
-    } else if (TILING_KEY_IS(10000000011001033434UL)) {
-        // attention_mask:0, pse:0, drop:1, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_DISABLE, INPUT_DISABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT, TND,
-                                              MM_NZ_OUT_FORMAT);
-        return;
-    } else if (TILING_KEY_IS(10000000011110033434UL)) {
-        // attention_mask:1, pse:1, drop:0, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_ENABLE, INPUT_ENABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT, TND,
-                                              MM_NZ_OUT_FORMAT);
-        return;
-    } else if (TILING_KEY_IS(10000000011010033434UL)) {
-        // attention_mask:0, pse:1, drop:0, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_DISABLE, INPUT_ENABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT, TND,
-                                              MM_NZ_OUT_FORMAT);
-        return;
-    } else if (TILING_KEY_IS(10000000011100033434UL)) {
-        // attention_mask:1, pse:0, drop:0, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_ENABLE, INPUT_DISABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT, TND,
-                                              MM_NZ_OUT_FORMAT);
-        return;
-    } else if (TILING_KEY_IS(10000000011000033434UL)) {
-        // attention_mask:0, pse:0, drop:0, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(half, INPUT_DISABLE, INPUT_DISABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT, TND,
-                                              MM_NZ_OUT_FORMAT);
-        return;
         // -----------------------1.1 end---------------------------------
 
-        // -----------------------1.2 start---------------------------------
+         // -----------------------1.2 start---------------------------------
         // For BSNGD
         // pse atten_mask dropout 均不存在
     } else if (TILING_KEY_IS(10000000000000000134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, BSNGD);
+                                                    INPUT_NONE, BSNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000000010000134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000000001000134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000000011000134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, BSNGD);
+                                                    INPUT_NONE, BSNGD, MM_ND_OUT_NOALIGN);
         return;
         // pse单独存在
     } else if (TILING_KEY_IS(10000000000100000134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                                    INPUT_NONE, BSNGD);
+                                                    INPUT_NONE, BSNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000000110000134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                                    INPUT_NONE, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000000101000134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                                    INPUT_NONE, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000000111000134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                                    INPUT_NONE, BSNGD);
+                                                    INPUT_NONE, BSNGD, MM_ND_OUT_NOALIGN);
         return;
         // atten_mask单独存在
     } else if (TILING_KEY_IS(10000000001000000134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                                    INPUT_NONE, BSNGD);
+                                                    INPUT_NONE, BSNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000001010000134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                                    INPUT_NONE, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000001001000134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                                    INPUT_NONE, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000001011000134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                                    INPUT_NONE, BSNGD);
+                                                    INPUT_NONE, BSNGD, MM_ND_OUT_NOALIGN);
         return;
         // dropout单独存在
     } else if (TILING_KEY_IS(10000000010000000134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE, INPUT_EXIST,
-                                         BSNGD);
+                                         BSNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000010010000134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE, INPUT_EXIST,
-                                         BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000010001000134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE, INPUT_EXIST,
-                                         BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000010011000134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE, INPUT_EXIST,
-                                         BSNGD);
+                                         BSNGD, MM_ND_OUT_NOALIGN);
         return;
         // pse atten_mask存在
     } else if (TILING_KEY_IS(10000000001100000134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                                    INPUT_NONE, BSNGD);
+                                                    INPUT_NONE, BSNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000001110000134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                                    INPUT_NONE, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000001101000134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                                    INPUT_NONE, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000001111000134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                                    INPUT_NONE, BSNGD);
+                                                    INPUT_NONE, BSNGD, MM_ND_OUT_NOALIGN);
         return;
         // pse dropout存在
     } else if (TILING_KEY_IS(10000000010100000134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE, INPUT_EXIST,
-                                         BSNGD);
+                                         BSNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000010110000134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE, INPUT_EXIST,
-                                         BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000010101000134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE, INPUT_EXIST,
-                                         BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000010111000134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE, INPUT_EXIST,
-                                         BSNGD);
+                                         BSNGD, MM_ND_OUT_NOALIGN);
         return;
         // atten_mask dropout存在
     } else if (TILING_KEY_IS(10000000011000000134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST, INPUT_EXIST,
-                                         BSNGD);
+                                         BSNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000011010000134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST, INPUT_EXIST,
-                                         BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000011001000134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST, INPUT_EXIST,
-                                         BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000011011000134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST, INPUT_EXIST,
-                                         BSNGD);
+                                         BSNGD, MM_ND_OUT_NOALIGN);
         return;
         // 均存在
     } else if (TILING_KEY_IS(10000000011100000134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST, INPUT_EXIST,
-                                         BSNGD);
+                                         BSNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000011110000134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST, INPUT_EXIST,
-                                         BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000011101000134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST, INPUT_EXIST,
-                                         BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000011111000134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST, INPUT_EXIST,
-                                         BSNGD);
+                                         BSNGD, MM_ND_OUT_NOALIGN);
         return;
         // For SBNGD
         // pse atten_mask dropout 均不存在
     } else if (TILING_KEY_IS(10000000000000010134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, SBNGD);
+                                                    INPUT_NONE, SBNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000000010010134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, SBNGD);
+                                                    INPUT_NONE, SBNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000000001010134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, SBNGD);
+                                                    INPUT_NONE, SBNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000000011010134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, SBNGD);
+                                                    INPUT_NONE, SBNGD, MM_ND_OUT_NOALIGN);
         return;
         // pse单独存在
     } else if (TILING_KEY_IS(10000000000100010134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                                    INPUT_NONE, SBNGD);
+                                                    INPUT_NONE, SBNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000000110010134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                                    INPUT_NONE, SBNGD);
+                                                    INPUT_NONE, SBNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000000101010134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                                    INPUT_NONE, SBNGD);
+                                                    INPUT_NONE, SBNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000000111010134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                                    INPUT_NONE, SBNGD);
+                                                    INPUT_NONE, SBNGD, MM_ND_OUT_NOALIGN);
         return;
         // atten_mask单独存在
     } else if (TILING_KEY_IS(10000000001000010134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                                    INPUT_NONE, SBNGD);
+                                                    INPUT_NONE, SBNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000001010010134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                                    INPUT_NONE, SBNGD);
+                                                    INPUT_NONE, SBNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000001001010134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                                    INPUT_NONE, SBNGD);
+                                                    INPUT_NONE, SBNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000001011010134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                                    INPUT_NONE, SBNGD);
+                                                    INPUT_NONE, SBNGD, MM_ND_OUT_NOALIGN);
         return;
         // dropout单独存在
     } else if (TILING_KEY_IS(10000000010000010134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE, INPUT_EXIST,
-                                         SBNGD);
+                                         SBNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000010010010134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE, INPUT_EXIST,
-                                         SBNGD);
+                                         SBNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000010001010134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE, INPUT_EXIST,
-                                         SBNGD);
+                                         SBNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000010011010134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE, INPUT_EXIST,
-                                         SBNGD);
+                                         SBNGD, MM_ND_OUT_NOALIGN);
         return;
         // pse atten_mask存在
     } else if (TILING_KEY_IS(10000000001100010134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                                    INPUT_NONE, SBNGD);
+                                                    INPUT_NONE, SBNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000001110010134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                                    INPUT_NONE, SBNGD);
+                                                    INPUT_NONE, SBNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000001101010134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                                    INPUT_NONE, SBNGD);
+                                                    INPUT_NONE, SBNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000001111010134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                                    INPUT_NONE, SBNGD);
+                                                    INPUT_NONE, SBNGD, MM_ND_OUT_NOALIGN);
         return;
         // pse dropout存在
     } else if (TILING_KEY_IS(10000000010100010134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE, INPUT_EXIST,
-                                         SBNGD);
+                                         SBNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000010110010134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE, INPUT_EXIST,
-                                         SBNGD);
+                                         SBNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000010101010134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE, INPUT_EXIST,
-                                         SBNGD);
+                                         SBNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000010111010134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE, INPUT_EXIST,
-                                         SBNGD);
+                                         SBNGD, MM_ND_OUT_NOALIGN);
         return;
         // atten_mask dropout存在
     } else if (TILING_KEY_IS(10000000011000010134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST, INPUT_EXIST,
-                                         SBNGD);
+                                         SBNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000011010010134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST, INPUT_EXIST,
-                                         SBNGD);
+                                         SBNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000011001010134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST, INPUT_EXIST,
-                                         SBNGD);
+                                         SBNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000011011010134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST, INPUT_EXIST,
-                                         SBNGD);
+                                         SBNGD, MM_ND_OUT_NOALIGN);
         return;
         // 均存在
     } else if (TILING_KEY_IS(10000000011100010134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST, INPUT_EXIST,
-                                         SBNGD);
+                                         SBNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000011110010134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST, INPUT_EXIST,
-                                         SBNGD);
+                                         SBNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000011101010134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST, INPUT_EXIST,
-                                         SBNGD);
+                                         SBNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000011111010134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST, INPUT_EXIST,
-                                         SBNGD);
+                                         SBNGD, MM_ND_OUT_NOALIGN);
         return;
         // For BNGSD
         // pse atten_mask dropout 均不存在
     } else if (TILING_KEY_IS(10000000000000020134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, BNGSD);
+                                                    INPUT_NONE, BNGSD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000000010020134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000000001020134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000000011020134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, BNGSD);
+                                                    INPUT_NONE, BNGSD, MM_ND_OUT_NOALIGN);
         return;
         // pse单独存在
     } else if (TILING_KEY_IS(10000000000100020134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                                    INPUT_NONE, BNGSD);
+                                                    INPUT_NONE, BNGSD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000000110020134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                                    INPUT_NONE, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000000101020134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                                    INPUT_NONE, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000000111020134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                                    INPUT_NONE, BNGSD);
+                                                    INPUT_NONE, BNGSD, MM_ND_OUT_NOALIGN);
         return;
         // atten_mask单独存在
     } else if (TILING_KEY_IS(10000000001000020134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                                    INPUT_NONE, BNGSD);
+                                                    INPUT_NONE, BNGSD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000001010020134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                                    INPUT_NONE, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000001001020134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                                    INPUT_NONE, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000001011020134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                                    INPUT_NONE, BNGSD);
+                                                    INPUT_NONE, BNGSD, MM_ND_OUT_NOALIGN);
         return;
         // dropout单独存在
     } else if (TILING_KEY_IS(10000000010000020134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE, INPUT_EXIST,
-                                         BNGSD);
+                                         BNGSD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000010010020134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE, INPUT_EXIST,
-                                         BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000010001020134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE, INPUT_EXIST,
-                                         BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000010011020134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE, INPUT_EXIST,
-                                         BNGSD);
+                                         BNGSD, MM_ND_OUT_NOALIGN);
         return;
         // pse atten_mask存在
     } else if (TILING_KEY_IS(10000000001100020134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                                    INPUT_NONE, BNGSD);
+                                                    INPUT_NONE, BNGSD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000001110020134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                                    INPUT_NONE, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000001101020134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                                    INPUT_NONE, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000001111020134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                                    INPUT_NONE, BNGSD);
+                                                    INPUT_NONE, BNGSD, MM_ND_OUT_NOALIGN);
         return;
         // pse dropout存在
     } else if (TILING_KEY_IS(10000000010100020134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE, INPUT_EXIST,
-                                         BNGSD);
+                                         BNGSD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000010110020134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE, INPUT_EXIST,
-                                         BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000010101020134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE, INPUT_EXIST,
-                                         BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000010111020134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE, INPUT_EXIST,
-                                         BNGSD);
+                                         BNGSD, MM_ND_OUT_NOALIGN);
         return;
         // atten_mask dropout存在
     } else if (TILING_KEY_IS(10000000011000020134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST, INPUT_EXIST,
-                                         BNGSD);
+                                         BNGSD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000011010020134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST, INPUT_EXIST,
-                                         BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000011001020134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST, INPUT_EXIST,
-                                         BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000011011020134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST, INPUT_EXIST,
-                                         BNGSD);
+                                         BNGSD, MM_ND_OUT_NOALIGN);
         return;
         // 均存在
     } else if (TILING_KEY_IS(10000000011100020134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST, INPUT_EXIST,
-                                         BNGSD);
+                                         BNGSD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000011110020134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST, INPUT_EXIST,
-                                         BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000011101020134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST, INPUT_EXIST,
-                                         BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000011111020134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST, INPUT_EXIST,
-                                         BNGSD);
+                                         BNGSD, MM_ND_OUT_NOALIGN);
         return;
         // for TND
     } else if (TILING_KEY_IS(10000000000000030134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000000010030134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000000001030134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000000011030134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, TND);
+                                                    INPUT_NONE, TND, MM_ND_OUT_NOALIGN);
         return;
         // pse单独存在
     } else if (TILING_KEY_IS(10000000000100030134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                                    INPUT_NONE, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000000110030134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                                    INPUT_NONE, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000000101030134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                                    INPUT_NONE, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000000111030134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                                    INPUT_NONE, TND);
+                                                    INPUT_NONE, TND, MM_ND_OUT_NOALIGN);
         return;
         // atten_mask单独存在
     } else if (TILING_KEY_IS(10000000001000030134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                                    INPUT_NONE, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000001010030134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                                    INPUT_NONE, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000001001030134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                                    INPUT_NONE, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000001011030134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                                    INPUT_NONE, TND);
+                                                    INPUT_NONE, TND, MM_ND_OUT_NOALIGN);
         return;
         // dropout单独存在
     } else if (TILING_KEY_IS(10000000010000030134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE, INPUT_EXIST,
-                                         TND);
-        return;
-    } else if (TILING_KEY_IS(10000000010010030134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE, INPUT_EXIST,
-                                         TND);
-        return;
-    } else if (TILING_KEY_IS(10000000010001030134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE, INPUT_EXIST,
-                                         TND);
-        return;
-    } else if (TILING_KEY_IS(10000000010011030134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE, INPUT_EXIST,
-                                         TND);
+                                         TND, MM_ND_OUT_NOALIGN);
         return;
         // pse atten_mask存在
     } else if (TILING_KEY_IS(10000000001100030134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                                    INPUT_NONE, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000001110030134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                                    INPUT_NONE, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000001101030134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                                    INPUT_NONE, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000001111030134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                                    INPUT_NONE, TND);
+                                                    INPUT_NONE, TND, MM_ND_OUT_NOALIGN);
         return;
         // pse dropout存在
     } else if (TILING_KEY_IS(10000000010100030134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE, INPUT_EXIST,
-                                         TND);
-        return;
-    } else if (TILING_KEY_IS(10000000010110030134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE, INPUT_EXIST,
-                                         TND);
-        return;
-    } else if (TILING_KEY_IS(10000000010101030134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE, INPUT_EXIST,
-                                         TND);
-        return;
-    } else if (TILING_KEY_IS(10000000010111030134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE, INPUT_EXIST,
-                                         TND);
+                                         TND, MM_ND_OUT_NOALIGN);
         return;
         // atten_mask dropout存在
     } else if (TILING_KEY_IS(10000000011000030134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST, INPUT_EXIST,
-                                         TND);
-        return;
-    } else if (TILING_KEY_IS(10000000011010030134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST, INPUT_EXIST,
-                                         TND);
-        return;
-    } else if (TILING_KEY_IS(10000000011001030134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST, INPUT_EXIST,
-                                         TND);
-        return;
-    } else if (TILING_KEY_IS(10000000011011030134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST, INPUT_EXIST,
-                                         TND);
+                                         TND, MM_ND_OUT_NOALIGN);
         return;
         // 均存在
     } else if (TILING_KEY_IS(10000000011100030134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST, INPUT_EXIST,
-                                         TND);
+                                         TND, MM_ND_OUT_NOALIGN);
         return;
-    } else if (TILING_KEY_IS(10000000011110030134UL)) {
+        // For mm345 out
+        // For BSNGD
+        // pse atten_mask dropout 均不存在
+    } else if (TILING_KEY_IS(10000000100000000134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
+                                                    INPUT_NONE, BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000100010000134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
+                                                    INPUT_NONE, BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+        // pse单独存在
+    } else if (TILING_KEY_IS(10000000100100000134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
+                                                    INPUT_NONE, BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000100110000134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
+                                                    INPUT_NONE, BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+        // atten_mask单独存在
+    } else if (TILING_KEY_IS(10000000101000000134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
+                                                    INPUT_NONE, BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000101010000134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
+                                                    INPUT_NONE, BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+        // dropout单独存在
+    } else if (TILING_KEY_IS(10000000110000000134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE, INPUT_EXIST,
+                                         BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000110010000134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE, INPUT_EXIST,
+                                         BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+        // pse atten_mask存在
+    } else if (TILING_KEY_IS(10000000101100000134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
+                                                    INPUT_NONE, BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000101110000134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
+                                                    INPUT_NONE, BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+        // pse dropout存在
+    } else if (TILING_KEY_IS(10000000110100000134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE, INPUT_EXIST,
+                                         BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000110110000134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE, INPUT_EXIST,
+                                         BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+        // atten_mask dropout存在
+    } else if (TILING_KEY_IS(10000000111000000134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST, INPUT_EXIST,
+                                         BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000111010000134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST, INPUT_EXIST,
+                                         BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+        // 均存在
+    } else if (TILING_KEY_IS(10000000111100000134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST, INPUT_EXIST,
+                                         BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000111110000134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST, INPUT_EXIST,
-                                         TND);
+                                         BSNGD, MM_NZ_OUT_FORMAT);
         return;
-    } else if (TILING_KEY_IS(10000000011101030134UL)) {
+        // For SBNGD
+        // pse atten_mask dropout 均不存在
+    } else if (TILING_KEY_IS(10000000100000010134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
+                                                    INPUT_NONE, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000100010010134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
+                                                    INPUT_NONE, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000100001010134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
+                                                    INPUT_NONE, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000100011010134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
+                                                    INPUT_NONE, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+        // pse单独存在
+    } else if (TILING_KEY_IS(10000000100100010134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
+                                                    INPUT_NONE, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000100110010134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
+                                                    INPUT_NONE, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000100101010134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
+                                                    INPUT_NONE, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000100111010134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
+                                                    INPUT_NONE, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+        // atten_mask单独存在
+    } else if (TILING_KEY_IS(10000000101000010134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
+                                                    INPUT_NONE, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000101010010134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
+                                                    INPUT_NONE, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000101001010134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
+                                                    INPUT_NONE, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000101011010134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
+                                                    INPUT_NONE, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+        // dropout单独存在
+    } else if (TILING_KEY_IS(10000000110000010134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE, INPUT_EXIST,
+                                         SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000110010010134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE, INPUT_EXIST,
+                                         SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000110001010134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE, INPUT_EXIST,
+                                         SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000110011010134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE, INPUT_EXIST,
+                                         SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+        // pse atten_mask存在
+    } else if (TILING_KEY_IS(10000000101100010134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
+                                                    INPUT_NONE, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000101110010134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
+                                                    INPUT_NONE, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000101101010134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
+                                                    INPUT_NONE, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000101111010134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
+                                                    INPUT_NONE, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+        // pse dropout存在
+    } else if (TILING_KEY_IS(10000000110100010134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE, INPUT_EXIST,
+                                         SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000110110010134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE, INPUT_EXIST,
+                                         SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000110101010134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE, INPUT_EXIST,
+                                         SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000110111010134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE, INPUT_EXIST,
+                                         SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+        // atten_mask dropout存在
+    } else if (TILING_KEY_IS(10000000111000010134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST, INPUT_EXIST,
+                                         SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000111010010134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST, INPUT_EXIST,
+                                         SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000111001010134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST, INPUT_EXIST,
+                                         SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000111011010134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST, INPUT_EXIST,
+                                         SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+        // 均存在
+    } else if (TILING_KEY_IS(10000000111100010134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST, INPUT_EXIST,
+                                         SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000111110010134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST, INPUT_EXIST,
+                                         SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000111101010134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST, INPUT_EXIST,
-                                         TND);
+                                         SBNGD, MM_NZ_OUT_FORMAT);
         return;
-    } else if (TILING_KEY_IS(10000000011111030134UL)) {
+    } else if (TILING_KEY_IS(10000000111111010134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST, INPUT_EXIST,
-                                         TND);
+                                         SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+        // For BNGSD
+        // pse atten_mask dropout 均不存在
+    } else if (TILING_KEY_IS(10000000100000020134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
+                                                    INPUT_NONE, BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000100010020134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
+                                                    INPUT_NONE, BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+        // pse单独存在
+    } else if (TILING_KEY_IS(10000000100100020134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
+                                                    INPUT_NONE, BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000100110020134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
+                                                    INPUT_NONE, BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+        // atten_mask单独存在
+    } else if (TILING_KEY_IS(10000000101000020134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
+                                                    INPUT_NONE, BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000101010020134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
+                                                    INPUT_NONE, BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+        // dropout单独存在
+    } else if (TILING_KEY_IS(10000000110000020134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE, INPUT_EXIST,
+                                         BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000110010020134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE, INPUT_EXIST,
+                                         BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+        // pse atten_mask存在
+    } else if (TILING_KEY_IS(10000000101100020134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
+                                                    INPUT_NONE, BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000101110020134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
+                                                    INPUT_NONE, BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+        // pse dropout存在
+    } else if (TILING_KEY_IS(10000000110100020134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE, INPUT_EXIST,
+                                         BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000110110020134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE, INPUT_EXIST,
+                                         BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+        // atten_mask dropout存在
+    } else if (TILING_KEY_IS(10000000111000020134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST, INPUT_EXIST,
+                                         BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000111010020134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST, INPUT_EXIST,
+                                         BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+        // 均存在
+    } else if (TILING_KEY_IS(10000000111100020134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST, INPUT_EXIST,
+                                         BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000111110020134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST, INPUT_EXIST,
+                                         BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+        // for TND
+    } else if (TILING_KEY_IS(10000000100000030134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
+                                                    INPUT_NONE, TND, MM_NZ_OUT_FORMAT);
+        return;
+        // pse单独存在
+    } else if (TILING_KEY_IS(10000000100100030134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
+                                                    INPUT_NONE, TND, MM_NZ_OUT_FORMAT);
+        return;
+        // atten_mask单独存在
+    } else if (TILING_KEY_IS(10000000101000030134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
+                                                    INPUT_NONE, TND, MM_NZ_OUT_FORMAT);
+        return;
+        // dropout单独存在
+    } else if (TILING_KEY_IS(10000000110000030134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE, INPUT_EXIST,
+                                         TND, MM_NZ_OUT_FORMAT);
+        return;
+        // pse atten_mask存在
+    } else if (TILING_KEY_IS(10000000101100030134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
+                                                    INPUT_NONE, TND, MM_NZ_OUT_FORMAT);
+        return;
+        // pse dropout存在
+    } else if (TILING_KEY_IS(10000000110100030134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE, INPUT_EXIST,
+                                         TND, MM_NZ_OUT_FORMAT);
+        return;
+        // atten_mask dropout存在
+    } else if (TILING_KEY_IS(10000000111000030134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST, INPUT_EXIST,
+                                         TND, MM_NZ_OUT_FORMAT);
+        return;
+        // 均存在
+    } else if (TILING_KEY_IS(10000000111100030134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(half, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST, INPUT_EXIST,
+                                         TND, MM_NZ_OUT_FORMAT);
         return;
         // -----------------------1.2 end---------------------------------
 
@@ -1269,7 +1539,89 @@ extern "C" __global__ __aicore__ void flash_attention_score_grad(
         INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_DISABLE, INPUT_DISABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
                                               BSNGD, MM_ND_OUT_NOALIGN);
         return;
-        // 1
+
+        // mm2 out nz
+    } else if (TILING_KEY_IS(10000000010111002434UL)) {
+        // attention_mask:1, pse:1, drop:1, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_ENABLE, INPUT_ENABLE, INPUT_ENABLE, MM_ND_OUT_NOALIGN,
+                                              BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010011002434UL)) {
+        // attention_mask:0, pse:1, drop:1, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_DISABLE, INPUT_ENABLE, INPUT_ENABLE, MM_ND_OUT_NOALIGN,
+                                              BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010101002434UL)) {
+        // attention_mask:1, pse:0, drop:1, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_ENABLE, INPUT_DISABLE, INPUT_ENABLE, MM_ND_OUT_NOALIGN,
+                                              BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010001002434UL)) {
+        // // attention_mask:0, pse:0, drop:1, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_DISABLE, INPUT_DISABLE, INPUT_ENABLE, MM_ND_OUT_NOALIGN,
+                                              BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010110002434UL)) {
+        // attention_mask:1, pse:1, drop:0, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_ENABLE, INPUT_ENABLE, INPUT_DISABLE, MM_ND_OUT_NOALIGN,
+                                              BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010010002434UL)) {
+        //  attention_mask:0, pse:1, drop:0, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_DISABLE, INPUT_ENABLE, INPUT_DISABLE, MM_ND_OUT_NOALIGN,
+                                              BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010100002434UL)) {
+        // attention_mask:1, pse:0, drop:0, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_ENABLE, INPUT_DISABLE, INPUT_DISABLE, MM_ND_OUT_NOALIGN,
+                                              BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010000002434UL)) {
+        //  attention_mask:0, pse:0, drop:0, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_DISABLE, INPUT_DISABLE, INPUT_DISABLE,
+                                              MM_ND_OUT_NOALIGN, BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011111002434UL)) {
+        // attention_mask:1, pse:1, drop:1, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_ENABLE, INPUT_ENABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
+                                              BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011011002434UL)) {
+        // attention_mask:0, pse:1, drop:1, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_DISABLE, INPUT_ENABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
+                                              BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011101002434UL)) {
+        // attention_mask:1, pse:0, drop:1, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_ENABLE, INPUT_DISABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
+                                              BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011001002434UL)) {
+        // // attention_mask:0, pse:0, drop:1, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_DISABLE, INPUT_DISABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
+                                              BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011110002434UL)) {
+        // attention_mask:1, pse:1, drop:0, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_ENABLE, INPUT_ENABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
+                                              BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011010002434UL)) {
+        //  attention_mask:0, pse:1, drop:0, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_DISABLE, INPUT_ENABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
+                                              BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011100002434UL)) {
+        // attention_mask:1, pse:0, drop:0, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_ENABLE, INPUT_DISABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
+                                              BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011000002434UL)) {
+        //  attention_mask:0, pse:0, drop:0, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_DISABLE, INPUT_DISABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
+                                              BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+        // 1 for layout SBNGD
     } else if (TILING_KEY_IS(10000000000111012434UL)) {
         // attention_mask:1, pse:1, drop:1, mm_out:nd
         INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_ENABLE, INPUT_ENABLE, INPUT_ENABLE, MM_ND_OUT_NOALIGN,
@@ -1350,7 +1702,89 @@ extern "C" __global__ __aicore__ void flash_attention_score_grad(
         INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_DISABLE, INPUT_DISABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
                                               SBNGD, MM_ND_OUT_NOALIGN);
         return;
-        // 2
+
+        // mm2 out nz
+    } else if (TILING_KEY_IS(10000000010111012434UL)) {
+        // attention_mask:1, pse:1, drop:1, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_ENABLE, INPUT_ENABLE, INPUT_ENABLE, MM_ND_OUT_NOALIGN,
+                                              SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010011012434UL)) {
+        // attention_mask:0, pse:1, drop:1, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_DISABLE, INPUT_ENABLE, INPUT_ENABLE, MM_ND_OUT_NOALIGN,
+                                              SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010101012434UL)) {
+        // attention_mask:1, pse:0, drop:1, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_ENABLE, INPUT_DISABLE, INPUT_ENABLE, MM_ND_OUT_NOALIGN,
+                                              SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010001012434UL)) {
+        // // attention_mask:0, pse:0, drop:1, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_DISABLE, INPUT_DISABLE, INPUT_ENABLE, MM_ND_OUT_NOALIGN,
+                                              SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010110012434UL)) {
+        // attention_mask:1, pse:1, drop:0, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_ENABLE, INPUT_ENABLE, INPUT_DISABLE, MM_ND_OUT_NOALIGN,
+                                              SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010010012434UL)) {
+        //  attention_mask:0, pse:1, drop:0, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_DISABLE, INPUT_ENABLE, INPUT_DISABLE, MM_ND_OUT_NOALIGN,
+                                              SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010100012434UL)) {
+        // attention_mask:1, pse:0, drop:0, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_ENABLE, INPUT_DISABLE, INPUT_DISABLE, MM_ND_OUT_NOALIGN,
+                                              SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010000012434UL)) {
+        //  attention_mask:0, pse:0, drop:0, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_DISABLE, INPUT_DISABLE, INPUT_DISABLE,
+                                              MM_ND_OUT_NOALIGN, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011111012434UL)) {
+        // attention_mask:1, pse:1, drop:1, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_ENABLE, INPUT_ENABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
+                                              SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011011012434UL)) {
+        // attention_mask:0, pse:1, drop:1, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_DISABLE, INPUT_ENABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
+                                              SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011101012434UL)) {
+        // attention_mask:1, pse:0, drop:1, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_ENABLE, INPUT_DISABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
+                                              SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011001012434UL)) {
+        // // attention_mask:0, pse:0, drop:1, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_DISABLE, INPUT_DISABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
+                                              SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011110012434UL)) {
+        // attention_mask:1, pse:1, drop:0, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_ENABLE, INPUT_ENABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
+                                              SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011010012434UL)) {
+        //  attention_mask:0, pse:1, drop:0, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_DISABLE, INPUT_ENABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
+                                              SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011100012434UL)) {
+        // attention_mask:1, pse:0, drop:0, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_ENABLE, INPUT_DISABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
+                                              SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011000012434UL)) {
+        //  attention_mask:0, pse:0, drop:0, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_DISABLE, INPUT_DISABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
+                                              SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+        // 2 for layout BNGSD
     } else if (TILING_KEY_IS(10000000000111022434UL)) {
         // attention_mask:1, pse:1, drop:1, mm_out:nd
         INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_ENABLE, INPUT_ENABLE, INPUT_ENABLE, MM_ND_OUT_NOALIGN,
@@ -1431,7 +1865,88 @@ extern "C" __global__ __aicore__ void flash_attention_score_grad(
         INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_DISABLE, INPUT_DISABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
                                               BNGSD, MM_ND_OUT_NOALIGN);
         return;
-        // 3
+        // mm2 out nz
+    } else if (TILING_KEY_IS(10000000010111022434UL)) {
+        // attention_mask:1, pse:1, drop:1, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_ENABLE, INPUT_ENABLE, INPUT_ENABLE, MM_ND_OUT_NOALIGN,
+                                              BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010011022434UL)) {
+        // attention_mask:0, pse:1, drop:1, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_DISABLE, INPUT_ENABLE, INPUT_ENABLE, MM_ND_OUT_NOALIGN,
+                                              BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010101022434UL)) {
+        // attention_mask:1, pse:0, drop:1, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_ENABLE, INPUT_DISABLE, INPUT_ENABLE, MM_ND_OUT_NOALIGN,
+                                              BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010001022434UL)) {
+        // // attention_mask:0, pse:0, drop:1, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_DISABLE, INPUT_DISABLE, INPUT_ENABLE, MM_ND_OUT_NOALIGN,
+                                              BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010110022434UL)) {
+        // attention_mask:1, pse:1, drop:0, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_ENABLE, INPUT_ENABLE, INPUT_DISABLE, MM_ND_OUT_NOALIGN,
+                                              BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010010022434UL)) {
+        //  attention_mask:0, pse:1, drop:0, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_DISABLE, INPUT_ENABLE, INPUT_DISABLE, MM_ND_OUT_NOALIGN,
+                                              BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010100022434UL)) {
+        // attention_mask:1, pse:0, drop:0, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_ENABLE, INPUT_DISABLE, INPUT_DISABLE, MM_ND_OUT_NOALIGN,
+                                              BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000010000022434UL)) {
+        //  attention_mask:0, pse:0, drop:0, mm_out:nd
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_DISABLE, INPUT_DISABLE, INPUT_DISABLE,
+                                              MM_ND_OUT_NOALIGN, BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011111022434UL)) {
+        // attention_mask:1, pse:1, drop:1, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_ENABLE, INPUT_ENABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
+                                              BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011011022434UL)) {
+        // attention_mask:0, pse:1, drop:1, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_DISABLE, INPUT_ENABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
+                                              BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011101022434UL)) {
+        // attention_mask:1, pse:0, drop:1, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_ENABLE, INPUT_DISABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
+                                              BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011001022434UL)) {
+        // // attention_mask:0, pse:0, drop:1, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_DISABLE, INPUT_DISABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
+                                              BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011110022434UL)) {
+        // attention_mask:1, pse:1, drop:0, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_ENABLE, INPUT_ENABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
+                                              BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011010022434UL)) {
+        //  attention_mask:0, pse:1, drop:0, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_DISABLE, INPUT_ENABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
+                                              BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011100022434UL)) {
+        // attention_mask:1, pse:0, drop:0, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_ENABLE, INPUT_DISABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
+                                              BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000011000022434UL)) {
+        //  attention_mask:0, pse:0, drop:0, mm_out:nz
+        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_DISABLE, INPUT_DISABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
+                                              BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+        // 3 for TND layout
     } else if (TILING_KEY_IS(10000000000111032434UL)) {
         // attention_mask:1, pse:1, drop:1, mm_out:nd
         INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_ENABLE, INPUT_ENABLE, INPUT_ENABLE, MM_ND_OUT_NOALIGN,
@@ -1472,47 +1987,6 @@ extern "C" __global__ __aicore__ void flash_attention_score_grad(
         INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_DISABLE, INPUT_DISABLE, INPUT_DISABLE,
                                               MM_ND_OUT_NOALIGN, TND, MM_ND_OUT_NOALIGN);
         return;
-    } else if (TILING_KEY_IS(10000000001111032434UL)) {
-        // attention_mask:1, pse:1, drop:1, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_ENABLE, INPUT_ENABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
-                                              TND, MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001011032434UL)) {
-        // attention_mask:0, pse:1, drop:1, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_DISABLE, INPUT_ENABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
-                                              TND, MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001101032434UL)) {
-        // attention_mask:1, pse:0, drop:1, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_ENABLE, INPUT_DISABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
-                                              TND, MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001001032434UL)) {
-        // // attention_mask:0, pse:0, drop:1, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_DISABLE, INPUT_DISABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
-                                              TND, MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001110032434UL)) {
-        // attention_mask:1, pse:1, drop:0, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_ENABLE, INPUT_ENABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
-                                              TND, MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001010032434UL)) {
-        //  attention_mask:0, pse:1, drop:0, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_DISABLE, INPUT_ENABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
-                                              TND, MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001100032434UL)) {
-        // attention_mask:1, pse:0, drop:0, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_ENABLE, INPUT_DISABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
-                                              TND, MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001000032434UL)) {
-        //  attention_mask:0, pse:0, drop:0, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_DISABLE, INPUT_DISABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
-                                              TND, MM_ND_OUT_NOALIGN);
-        return;
-
         // mm2 out nz
     } else if (TILING_KEY_IS(10000000010111032434UL)) {
         // attention_mask:1, pse:1, drop:1, mm_out:nd
@@ -1554,593 +2028,652 @@ extern "C" __global__ __aicore__ void flash_attention_score_grad(
         INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_DISABLE, INPUT_DISABLE, INPUT_DISABLE,
                                               MM_ND_OUT_NOALIGN, TND, MM_NZ_OUT_FORMAT);
         return;
-    } else if (TILING_KEY_IS(10000000011111032434UL)) {
-        // attention_mask:1, pse:1, drop:1, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_ENABLE, INPUT_ENABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
-                                              TND, MM_NZ_OUT_FORMAT);
-        return;
-    } else if (TILING_KEY_IS(10000000011011032434UL)) {
-        // attention_mask:0, pse:1, drop:1, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_DISABLE, INPUT_ENABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
-                                              TND, MM_NZ_OUT_FORMAT);
-        return;
-    } else if (TILING_KEY_IS(10000000011101032434UL)) {
-        // attention_mask:1, pse:0, drop:1, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_ENABLE, INPUT_DISABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
-                                              TND, MM_NZ_OUT_FORMAT);
-        return;
-    } else if (TILING_KEY_IS(10000000011001032434UL)) {
-        // // attention_mask:0, pse:0, drop:1, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_DISABLE, INPUT_DISABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
-                                              TND, MM_NZ_OUT_FORMAT);
-        return;
-    } else if (TILING_KEY_IS(10000000011110032434UL)) {
-        // attention_mask:1, pse:1, drop:0, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_ENABLE, INPUT_ENABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
-                                              TND, MM_NZ_OUT_FORMAT);
-        return;
-    } else if (TILING_KEY_IS(10000000011010032434UL)) {
-        //  attention_mask:0, pse:1, drop:0, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_DISABLE, INPUT_ENABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
-                                              TND, MM_NZ_OUT_FORMAT);
-        return;
-    } else if (TILING_KEY_IS(10000000011100032434UL)) {
-        // attention_mask:1, pse:0, drop:0, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_ENABLE, INPUT_DISABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
-                                              TND, MM_NZ_OUT_FORMAT);
-        return;
-    } else if (TILING_KEY_IS(10000000011000032434UL)) {
-        //  attention_mask:0, pse:0, drop:0, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(bfloat16_t, INPUT_DISABLE, INPUT_DISABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
-                                              TND, MM_NZ_OUT_FORMAT);
-        return;
         // -----------------------1.1 end---------------------------------
 
         // -----------------------1.2 start-------------------------------
         // For BSNGD
     } else if (TILING_KEY_IS(10000000000000002134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, BSNGD);
+                                                    INPUT_NONE, BSNGD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000000010002134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000000001002134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000000011002134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, BSNGD);
+                                                    INPUT_NONE, BSNGD, MM_ND_OUT_FORMAT);
         return;
         // pse单独存在
     } else if (TILING_KEY_IS(10000000000100002134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_NONE, INPUT_NONE, BSNGD);
+                                                    INPUT_NONE, INPUT_NONE, BSNGD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000000110002134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_NONE, INPUT_NONE, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000000101002134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_NONE, INPUT_NONE, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000000111002134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_NONE, INPUT_NONE, BSNGD);
+                                                    INPUT_NONE, INPUT_NONE, BSNGD, MM_ND_OUT_FORMAT);
         return;
         // atten_mask单独存在
     } else if (TILING_KEY_IS(10000000001000002134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE,
-                                                    INPUT_EXIST, INPUT_NONE, BSNGD);
+                                                    INPUT_EXIST, INPUT_NONE, BSNGD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000001010002134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE,
-                                                    INPUT_EXIST, INPUT_NONE, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000001001002134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE,
-                                                    INPUT_EXIST, INPUT_NONE, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000001011002134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE,
-                                                    INPUT_EXIST, INPUT_NONE, BSNGD);
+                                                    INPUT_EXIST, INPUT_NONE, BSNGD, MM_ND_OUT_FORMAT);
         return;
         // dropout单独存在
     } else if (TILING_KEY_IS(10000000010000002134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                         INPUT_EXIST, BSNGD);
+                                         INPUT_EXIST, BSNGD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000010010002134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                         INPUT_EXIST, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000010001002134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                         INPUT_EXIST, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000010011002134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                         INPUT_EXIST, BSNGD);
+                                         INPUT_EXIST, BSNGD, MM_ND_OUT_FORMAT);
         return;
         // pse atten_mask存在
     } else if (TILING_KEY_IS(10000000001100002134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_EXIST, INPUT_NONE, BSNGD);
+                                                    INPUT_EXIST, INPUT_NONE, BSNGD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000001110002134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_EXIST, INPUT_NONE, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000001101002134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_EXIST, INPUT_NONE, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000001111002134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_EXIST, INPUT_NONE, BSNGD);
+                                                    INPUT_EXIST, INPUT_NONE, BSNGD, MM_ND_OUT_FORMAT);
         return;
         // pse dropout存在
     } else if (TILING_KEY_IS(10000000010100002134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                         INPUT_EXIST, BSNGD);
+                                         INPUT_EXIST, BSNGD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000010110002134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                         INPUT_EXIST, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000010101002134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                         INPUT_EXIST, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000010111002134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                         INPUT_EXIST, BSNGD);
+                                         INPUT_EXIST, BSNGD, MM_ND_OUT_FORMAT);
         return;
         // atten_mask dropout存在
     } else if (TILING_KEY_IS(10000000011000002134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                         INPUT_EXIST, BSNGD);
+                                         INPUT_EXIST, BSNGD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000011010002134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                         INPUT_EXIST, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000011001002134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                         INPUT_EXIST, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000011011002134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                         INPUT_EXIST, BSNGD);
+                                         INPUT_EXIST, BSNGD, MM_ND_OUT_FORMAT);
         return;
         // 均存在
     } else if (TILING_KEY_IS(10000000011100002134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                         INPUT_EXIST, BSNGD);
+                                         INPUT_EXIST, BSNGD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000011110002134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                         INPUT_EXIST, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000011101002134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                         INPUT_EXIST, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000011111002134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                         INPUT_EXIST, BSNGD);
+                                         INPUT_EXIST, BSNGD, MM_ND_OUT_FORMAT);
         return;
         // For SBNGD
     } else if (TILING_KEY_IS(10000000000000012134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, SBNGD);
+                                                    INPUT_NONE, SBNGD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000000010012134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, SBNGD);
+                                                    INPUT_NONE, SBNGD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000000001012134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, SBNGD);
+                                                    INPUT_NONE, SBNGD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000000011012134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, SBNGD);
+                                                    INPUT_NONE, SBNGD, MM_ND_OUT_FORMAT);
         return;
         // pse单独存在
     } else if (TILING_KEY_IS(10000000000100012134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_NONE, INPUT_NONE, SBNGD);
+                                                    INPUT_NONE, INPUT_NONE, SBNGD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000000110012134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_NONE, INPUT_NONE, SBNGD);
+                                                    INPUT_NONE, INPUT_NONE, SBNGD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000000101012134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_NONE, INPUT_NONE, SBNGD);
+                                                    INPUT_NONE, INPUT_NONE, SBNGD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000000111012134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_NONE, INPUT_NONE, SBNGD);
+                                                    INPUT_NONE, INPUT_NONE, SBNGD, MM_ND_OUT_FORMAT);
         return;
         // atten_mask单独存在
     } else if (TILING_KEY_IS(10000000001000012134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE,
-                                                    INPUT_EXIST, INPUT_NONE, SBNGD);
+                                                    INPUT_EXIST, INPUT_NONE, SBNGD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000001010012134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE,
-                                                    INPUT_EXIST, INPUT_NONE, SBNGD);
+                                                    INPUT_EXIST, INPUT_NONE, SBNGD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000001001012134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE,
-                                                    INPUT_EXIST, INPUT_NONE, SBNGD);
+                                                    INPUT_EXIST, INPUT_NONE, SBNGD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000001011012134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE,
-                                                    INPUT_EXIST, INPUT_NONE, SBNGD);
+                                                    INPUT_EXIST, INPUT_NONE, SBNGD, MM_ND_OUT_FORMAT);
         return;
         // dropout单独存在
     } else if (TILING_KEY_IS(10000000010000012134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                         INPUT_EXIST, SBNGD);
+                                         INPUT_EXIST, SBNGD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000010010012134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                         INPUT_EXIST, SBNGD);
+                                         INPUT_EXIST, SBNGD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000010001012134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                         INPUT_EXIST, SBNGD);
+                                         INPUT_EXIST, SBNGD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000010011012134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                         INPUT_EXIST, SBNGD);
+                                         INPUT_EXIST, SBNGD, MM_ND_OUT_FORMAT);
         return;
         // pse atten_mask存在
     } else if (TILING_KEY_IS(10000000001100012134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_EXIST, INPUT_NONE, SBNGD);
+                                                    INPUT_EXIST, INPUT_NONE, SBNGD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000001110012134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_EXIST, INPUT_NONE, SBNGD);
+                                                    INPUT_EXIST, INPUT_NONE, SBNGD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000001101012134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_EXIST, INPUT_NONE, SBNGD);
+                                                    INPUT_EXIST, INPUT_NONE, SBNGD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000001111012134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_EXIST, INPUT_NONE, SBNGD);
+                                                    INPUT_EXIST, INPUT_NONE, SBNGD, MM_ND_OUT_FORMAT);
         return;
         // pse dropout存在
     } else if (TILING_KEY_IS(10000000010100012134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                         INPUT_EXIST, SBNGD);
+                                         INPUT_EXIST, SBNGD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000010110012134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                         INPUT_EXIST, SBNGD);
+                                         INPUT_EXIST, SBNGD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000010101012134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                         INPUT_EXIST, SBNGD);
+                                         INPUT_EXIST, SBNGD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000010111012134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                         INPUT_EXIST, SBNGD);
+                                         INPUT_EXIST, SBNGD, MM_ND_OUT_FORMAT);
         return;
         // atten_mask dropout存在
     } else if (TILING_KEY_IS(10000000011000012134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                         INPUT_EXIST, SBNGD);
+                                         INPUT_EXIST, SBNGD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000011010012134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                         INPUT_EXIST, SBNGD);
+                                         INPUT_EXIST, SBNGD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000011001012134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                         INPUT_EXIST, SBNGD);
+                                         INPUT_EXIST, SBNGD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000011011012134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                         INPUT_EXIST, SBNGD);
+                                         INPUT_EXIST, SBNGD, MM_ND_OUT_FORMAT);
         return;
         // 均存在
     } else if (TILING_KEY_IS(10000000011100012134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                         INPUT_EXIST, SBNGD);
+                                         INPUT_EXIST, SBNGD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000011110012134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                         INPUT_EXIST, SBNGD);
+                                         INPUT_EXIST, SBNGD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000011101012134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                         INPUT_EXIST, SBNGD);
+                                         INPUT_EXIST, SBNGD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000011111012134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                         INPUT_EXIST, SBNGD);
+                                         INPUT_EXIST, SBNGD, MM_ND_OUT_FORMAT);
         return;
         // For BNGSD
         // pse atten_mask dropout 均不存在
     } else if (TILING_KEY_IS(10000000000000022134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, BNGSD);
+                                                    INPUT_NONE, BNGSD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000000010022134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000000001022134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000000011022134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, BNGSD);
+                                                    INPUT_NONE, BNGSD, MM_ND_OUT_FORMAT);
         return;
         // pse单独存在
     } else if (TILING_KEY_IS(10000000000100022134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_NONE, INPUT_NONE, BNGSD);
+                                                    INPUT_NONE, INPUT_NONE, BNGSD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000000110022134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_NONE, INPUT_NONE, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000000101022134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_NONE, INPUT_NONE, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000000111022134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_NONE, INPUT_NONE, BNGSD);
+                                                    INPUT_NONE, INPUT_NONE, BNGSD, MM_ND_OUT_FORMAT);
         return;
         // atten_mask单独存在
     } else if (TILING_KEY_IS(10000000001000022134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE,
-                                                    INPUT_EXIST, INPUT_NONE, BNGSD);
+                                                    INPUT_EXIST, INPUT_NONE, BNGSD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000001010022134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE,
-                                                    INPUT_EXIST, INPUT_NONE, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000001001022134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE,
-                                                    INPUT_EXIST, INPUT_NONE, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000001011022134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE,
-                                                    INPUT_EXIST, INPUT_NONE, BNGSD);
+                                                    INPUT_EXIST, INPUT_NONE, BNGSD, MM_ND_OUT_FORMAT);
         return;
         // dropout单独存在
     } else if (TILING_KEY_IS(10000000010000022134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                         INPUT_EXIST, BNGSD);
+                                         INPUT_EXIST, BNGSD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000010010022134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                         INPUT_EXIST, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000010001022134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                         INPUT_EXIST, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000010011022134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                         INPUT_EXIST, BNGSD);
+                                         INPUT_EXIST, BNGSD, MM_ND_OUT_FORMAT);
         return;
         // pse atten_mask存在
     } else if (TILING_KEY_IS(10000000001100022134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_EXIST, INPUT_NONE, BNGSD);
+                                                    INPUT_EXIST, INPUT_NONE, BNGSD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000001110022134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_EXIST, INPUT_NONE, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000001101022134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_EXIST, INPUT_NONE, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000001111022134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_EXIST, INPUT_NONE, BNGSD);
+                                                    INPUT_EXIST, INPUT_NONE, BNGSD, MM_ND_OUT_FORMAT);
         return;
         // pse dropout存在
     } else if (TILING_KEY_IS(10000000010100022134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                         INPUT_EXIST, BNGSD);
+                                         INPUT_EXIST, BNGSD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000010110022134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                         INPUT_EXIST, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000010101022134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                         INPUT_EXIST, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000010111022134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                         INPUT_EXIST, BNGSD);
+                                         INPUT_EXIST, BNGSD, MM_ND_OUT_FORMAT);
         return;
         // atten_mask dropout存在
     } else if (TILING_KEY_IS(10000000011000022134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                         INPUT_EXIST, BNGSD);
+                                         INPUT_EXIST, BNGSD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000011010022134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                         INPUT_EXIST, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000011001022134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                         INPUT_EXIST, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000011011022134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                         INPUT_EXIST, BNGSD);
+                                         INPUT_EXIST, BNGSD, MM_ND_OUT_FORMAT);
         return;
         // 均存在
     } else if (TILING_KEY_IS(10000000011100022134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                         INPUT_EXIST, BNGSD);
+                                         INPUT_EXIST, BNGSD, MM_ND_OUT_FORMAT);
         return;
     } else if (TILING_KEY_IS(10000000011110022134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                         INPUT_EXIST, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000011101022134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                         INPUT_EXIST, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000011111022134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                         INPUT_EXIST, BNGSD);
+                                         INPUT_EXIST, BNGSD, MM_ND_OUT_FORMAT);
         return;
         // for TND
     } else if (TILING_KEY_IS(10000000000000032134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000000010032134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000000001032134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000000011032134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, TND);
+                                                    INPUT_NONE, TND, MM_ND_OUT_FORMAT);
         return;
         // pse单独存在
     } else if (TILING_KEY_IS(10000000000100032134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_NONE, INPUT_NONE, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000000110032134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_NONE, INPUT_NONE, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000000101032134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_NONE, INPUT_NONE, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000000111032134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_NONE, INPUT_NONE, TND);
+                                                    INPUT_NONE, INPUT_NONE, TND, MM_ND_OUT_FORMAT);
         return;
         // atten_mask单独存在
     } else if (TILING_KEY_IS(10000000001000032134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE,
-                                                    INPUT_EXIST, INPUT_NONE, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000001010032134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE,
-                                                    INPUT_EXIST, INPUT_NONE, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000001001032134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE,
-                                                    INPUT_EXIST, INPUT_NONE, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000001011032134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE,
-                                                    INPUT_EXIST, INPUT_NONE, TND);
+                                                    INPUT_EXIST, INPUT_NONE, TND, MM_ND_OUT_FORMAT);
         return;
         // dropout单独存在
     } else if (TILING_KEY_IS(10000000010000032134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                         INPUT_EXIST, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000010010032134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                         INPUT_EXIST, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000010001032134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                         INPUT_EXIST, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000010011032134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                         INPUT_EXIST, TND);
+                                         INPUT_EXIST, TND, MM_ND_OUT_FORMAT);
         return;
         // pse atten_mask存在
     } else if (TILING_KEY_IS(10000000001100032134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_EXIST, INPUT_NONE, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000001110032134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_EXIST, INPUT_NONE, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000001101032134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_EXIST, INPUT_NONE, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000001111032134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_EXIST, INPUT_NONE, TND);
+                                                    INPUT_EXIST, INPUT_NONE, TND, MM_ND_OUT_FORMAT);
         return;
         // pse dropout存在
     } else if (TILING_KEY_IS(10000000010100032134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                         INPUT_EXIST, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000010110032134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                         INPUT_EXIST, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000010101032134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                         INPUT_EXIST, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000010111032134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                         INPUT_EXIST, TND);
+                                         INPUT_EXIST, TND, MM_ND_OUT_FORMAT);
         return;
         // atten_mask dropout存在
     } else if (TILING_KEY_IS(10000000011000032134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                         INPUT_EXIST, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000011010032134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                         INPUT_EXIST, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000011001032134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                         INPUT_EXIST, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000011011032134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                         INPUT_EXIST, TND);
+                                         INPUT_EXIST, TND, MM_ND_OUT_FORMAT);
         return;
         // 均存在
     } else if (TILING_KEY_IS(10000000011100032134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                         INPUT_EXIST, TND);
+                                         INPUT_EXIST, TND, MM_ND_OUT_FORMAT);
         return;
-    } else if (TILING_KEY_IS(10000000011110032134UL)) {
+       // for mm345 NZ out
+        // -----------------------1.2 start-------------------------------
+        // For BSNGD
+    } else if (TILING_KEY_IS(10000000100000002134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
+                                                    INPUT_NONE, BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000100010002134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
+                                                    INPUT_NONE, BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+        // pse单独存在
+    } else if (TILING_KEY_IS(10000000100100002134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST,
+                                                    INPUT_NONE, INPUT_NONE, BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000100110002134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST,
+                                                    INPUT_NONE, INPUT_NONE, BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+        // atten_mask单独存在
+    } else if (TILING_KEY_IS(10000000101000002134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE,
+                                                    INPUT_EXIST, INPUT_NONE, BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000101010002134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE,
+                                                    INPUT_EXIST, INPUT_NONE, BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+        // dropout单独存在
+    } else if (TILING_KEY_IS(10000000110000002134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
+                                         INPUT_EXIST, BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000110010002134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
+                                         INPUT_EXIST, BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+        // pse atten_mask存在
+    } else if (TILING_KEY_IS(10000000101100002134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST,
+                                                    INPUT_EXIST, INPUT_NONE, BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000101110002134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST,
+                                                    INPUT_EXIST, INPUT_NONE, BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+        // pse dropout存在
+    } else if (TILING_KEY_IS(10000000110100002134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
+                                         INPUT_EXIST, BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000110110002134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
+                                         INPUT_EXIST, BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+        // atten_mask dropout存在
+    } else if (TILING_KEY_IS(10000000111000002134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
+                                         INPUT_EXIST, BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000111010002134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
+                                         INPUT_EXIST, BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+        // 均存在
+    } else if (TILING_KEY_IS(10000000111100002134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
+                                         INPUT_EXIST, BSNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000111110002134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                         INPUT_EXIST, TND);
+                                         INPUT_EXIST, BSNGD, MM_NZ_OUT_FORMAT);
         return;
-    } else if (TILING_KEY_IS(10000000011101032134UL)) {
+        // For SBNGD
+    } else if (TILING_KEY_IS(10000000100000012134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
+                                                    INPUT_NONE, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000100010012134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
+                                                    INPUT_NONE, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000100001012134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
+                                                    INPUT_NONE, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000100011012134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
+                                                    INPUT_NONE, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+        // pse单独存在
+    } else if (TILING_KEY_IS(10000000100100012134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST,
+                                                    INPUT_NONE, INPUT_NONE, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000100110012134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST,
+                                                    INPUT_NONE, INPUT_NONE, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000100101012134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST,
+                                                    INPUT_NONE, INPUT_NONE, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000100111012134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST,
+                                                    INPUT_NONE, INPUT_NONE, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+        // atten_mask单独存在
+    } else if (TILING_KEY_IS(10000000101000012134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE,
+                                                    INPUT_EXIST, INPUT_NONE, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000101010012134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE,
+                                                    INPUT_EXIST, INPUT_NONE, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000101001012134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE,
+                                                    INPUT_EXIST, INPUT_NONE, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000101011012134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE,
+                                                    INPUT_EXIST, INPUT_NONE, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+        // dropout单独存在
+    } else if (TILING_KEY_IS(10000000110000012134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
+                                         INPUT_EXIST, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000110010012134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
+                                         INPUT_EXIST, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000110001012134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
+                                         INPUT_EXIST, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000110011012134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
+                                         INPUT_EXIST, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+        // pse atten_mask存在
+    } else if (TILING_KEY_IS(10000000101100012134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST,
+                                                    INPUT_EXIST, INPUT_NONE, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000101110012134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST,
+                                                    INPUT_EXIST, INPUT_NONE, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000101101012134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST,
+                                                    INPUT_EXIST, INPUT_NONE, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000101111012134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST,
+                                                    INPUT_EXIST, INPUT_NONE, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+        // pse dropout存在
+    } else if (TILING_KEY_IS(10000000110100012134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
+                                         INPUT_EXIST, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000110110012134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
+                                         INPUT_EXIST, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000110101012134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
+                                         INPUT_EXIST, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000110111012134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
+                                         INPUT_EXIST, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+        // atten_mask dropout存在
+    } else if (TILING_KEY_IS(10000000111000012134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
+                                         INPUT_EXIST, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000111010012134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
+                                         INPUT_EXIST, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000111001012134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
+                                         INPUT_EXIST, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000111011012134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
+                                         INPUT_EXIST, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+        // 均存在
+    } else if (TILING_KEY_IS(10000000111100012134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
+                                         INPUT_EXIST, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000111110012134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
+                                         INPUT_EXIST, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000111101012134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                         INPUT_EXIST, TND);
+                                         INPUT_EXIST, SBNGD, MM_NZ_OUT_FORMAT);
         return;
-    } else if (TILING_KEY_IS(10000000011111032134UL)) {
+    } else if (TILING_KEY_IS(10000000111111012134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                         INPUT_EXIST, TND);
+                                         INPUT_EXIST, SBNGD, MM_NZ_OUT_FORMAT);
+        return;
+        // For BNGSD
+        // pse atten_mask dropout 均不存在
+    } else if (TILING_KEY_IS(10000000100000022134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
+                                                    INPUT_NONE, BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000100010022134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
+                                                    INPUT_NONE, BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+        // pse单独存在
+    } else if (TILING_KEY_IS(10000000100100022134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST,
+                                                    INPUT_NONE, INPUT_NONE, BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000100110022134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST,
+                                                    INPUT_NONE, INPUT_NONE, BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+        // atten_mask单独存在
+    } else if (TILING_KEY_IS(10000000101000022134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE,
+                                                    INPUT_EXIST, INPUT_NONE, BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000101010022134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE,
+                                                    INPUT_EXIST, INPUT_NONE, BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+        // dropout单独存在
+    } else if (TILING_KEY_IS(10000000110000022134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
+                                         INPUT_EXIST, BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000110010022134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
+                                         INPUT_EXIST, BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+        // pse atten_mask存在
+    } else if (TILING_KEY_IS(10000000101100022134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST,
+                                                    INPUT_EXIST, INPUT_NONE, BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000101110022134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST,
+                                                    INPUT_EXIST, INPUT_NONE, BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+        // pse dropout存在
+    } else if (TILING_KEY_IS(10000000110100022134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
+                                         INPUT_EXIST, BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000110110022134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
+                                         INPUT_EXIST, BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+        // atten_mask dropout存在
+    } else if (TILING_KEY_IS(10000000111000022134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
+                                         INPUT_EXIST, BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000111010022134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
+                                         INPUT_EXIST, BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+        // 均存在
+    } else if (TILING_KEY_IS(10000000111100022134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
+                                         INPUT_EXIST, BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+    } else if (TILING_KEY_IS(10000000111110022134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
+                                         INPUT_EXIST, BNGSD, MM_NZ_OUT_FORMAT);
+        return;
+        // for TND
+    } else if (TILING_KEY_IS(10000000100000032134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
+                                                    INPUT_NONE, TND, MM_NZ_OUT_FORMAT);
+        return;
+        // pse单独存在
+    } else if (TILING_KEY_IS(10000000100100032134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST,
+                                                    INPUT_NONE, INPUT_NONE, TND, MM_NZ_OUT_FORMAT);
+        return;
+        // atten_mask单独存在
+    } else if (TILING_KEY_IS(10000000101000032134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE,
+                                                    INPUT_EXIST, INPUT_NONE, TND, MM_NZ_OUT_FORMAT);
+        return;
+        // dropout单独存在
+    } else if (TILING_KEY_IS(10000000110000032134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
+                                         INPUT_EXIST, TND, MM_NZ_OUT_FORMAT);
+        return;
+        // pse atten_mask存在
+    } else if (TILING_KEY_IS(10000000101100032134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST,
+                                                    INPUT_EXIST, INPUT_NONE, TND, MM_NZ_OUT_FORMAT);
+        return;
+        // pse dropout存在
+    } else if (TILING_KEY_IS(10000000110100032134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
+                                         INPUT_EXIST, TND, MM_NZ_OUT_FORMAT);
+        return;
+        // atten_mask dropout存在
+    } else if (TILING_KEY_IS(10000000111000032134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
+                                         INPUT_EXIST, TND, MM_NZ_OUT_FORMAT);
+        return;
+        // 均存在
+    } else if (TILING_KEY_IS(10000000111100032134UL)) {
+        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(bfloat16_t, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
+                                         INPUT_EXIST, TND, MM_NZ_OUT_FORMAT);
         return;
         // -----------------------1.2 end---------------------------------
 
@@ -2219,46 +2752,6 @@ extern "C" __global__ __aicore__ void flash_attention_score_grad(
         INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_DISABLE, INPUT_DISABLE, INPUT_DISABLE,
                                               MM_ND_OUT_NOALIGN, BSNGD, MM_ND_OUT_NOALIGN);
         return;
-    } else if (TILING_KEY_IS(10000000001111001434UL)) {
-        // attention_mask:1, pse:1, drop:1, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_ENABLE, INPUT_ENABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
-                                              BSNGD, MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001011001434UL)) {
-        // attention_mask:0, pse:1, drop:1, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_DISABLE, INPUT_ENABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
-                                              BSNGD, MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001101001434UL)) {
-        // attention_mask:1, pse:0, drop:1, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_ENABLE, INPUT_DISABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
-                                              BSNGD, MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001001001434UL)) {
-        // // attention_mask:0, pse:0, drop:1, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_DISABLE, INPUT_DISABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
-                                              BSNGD, MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001110001434UL)) {
-        // attention_mask:1, pse:1, drop:0, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_ENABLE, INPUT_ENABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
-                                              BSNGD, MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001010001434UL)) {
-        //  attention_mask:0, pse:1, drop:0, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_DISABLE, INPUT_ENABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
-                                              BSNGD, MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001100001434UL)) {
-        // attention_mask:1, pse:0, drop:0, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_ENABLE, INPUT_DISABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
-                                              BSNGD, MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001000001434UL)) {
-        //  attention_mask:0, pse:0, drop:0, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_DISABLE, INPUT_DISABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
-                                              BSNGD, MM_ND_OUT_NOALIGN);
-        return;
         // 1
     } else if (TILING_KEY_IS(10000000000111011434UL)) {
         // attention_mask:1, pse:1, drop:1, mm_out:nd
@@ -2299,46 +2792,6 @@ extern "C" __global__ __aicore__ void flash_attention_score_grad(
         //  attention_mask:0, pse:0, drop:0, mm_out:nd
         INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_DISABLE, INPUT_DISABLE, INPUT_DISABLE,
                                               MM_ND_OUT_NOALIGN, SBNGD, MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001111011434UL)) {
-        // attention_mask:1, pse:1, drop:1, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_ENABLE, INPUT_ENABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
-                                              SBNGD, MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001011011434UL)) {
-        // attention_mask:0, pse:1, drop:1, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_DISABLE, INPUT_ENABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
-                                              SBNGD, MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001101011434UL)) {
-        // attention_mask:1, pse:0, drop:1, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_ENABLE, INPUT_DISABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
-                                              SBNGD, MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001001011434UL)) {
-        // // attention_mask:0, pse:0, drop:1, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_DISABLE, INPUT_DISABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
-                                              SBNGD, MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001110011434UL)) {
-        // attention_mask:1, pse:1, drop:0, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_ENABLE, INPUT_ENABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
-                                              SBNGD, MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001010011434UL)) {
-        //  attention_mask:0, pse:1, drop:0, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_DISABLE, INPUT_ENABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
-                                              SBNGD, MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001100011434UL)) {
-        // attention_mask:1, pse:0, drop:0, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_ENABLE, INPUT_DISABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
-                                              SBNGD, MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001000011434UL)) {
-        //  attention_mask:0, pse:0, drop:0, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_DISABLE, INPUT_DISABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
-                                              SBNGD, MM_ND_OUT_NOALIGN);
         return;
         // 2
     } else if (TILING_KEY_IS(10000000000111021434UL)) {
@@ -2381,46 +2834,6 @@ extern "C" __global__ __aicore__ void flash_attention_score_grad(
         INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_DISABLE, INPUT_DISABLE, INPUT_DISABLE,
                                               MM_ND_OUT_NOALIGN, BNGSD, MM_ND_OUT_NOALIGN);
         return;
-    } else if (TILING_KEY_IS(10000000001111021434UL)) {
-        // attention_mask:1, pse:1, drop:1, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_ENABLE, INPUT_ENABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
-                                              BNGSD, MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001011021434UL)) {
-        // attention_mask:0, pse:1, drop:1, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_DISABLE, INPUT_ENABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
-                                              BNGSD, MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001101021434UL)) {
-        // attention_mask:1, pse:0, drop:1, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_ENABLE, INPUT_DISABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
-                                              BNGSD, MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001001021434UL)) {
-        // // attention_mask:0, pse:0, drop:1, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_DISABLE, INPUT_DISABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
-                                              BNGSD, MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001110021434UL)) {
-        // attention_mask:1, pse:1, drop:0, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_ENABLE, INPUT_ENABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
-                                              BNGSD, MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001010021434UL)) {
-        //  attention_mask:0, pse:1, drop:0, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_DISABLE, INPUT_ENABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
-                                              BNGSD, MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001100021434UL)) {
-        // attention_mask:1, pse:0, drop:0, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_ENABLE, INPUT_DISABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
-                                              BNGSD, MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001000021434UL)) {
-        //  attention_mask:0, pse:0, drop:0, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_DISABLE, INPUT_DISABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
-                                              BNGSD, MM_ND_OUT_NOALIGN);
-        return;
         // 3
     } else if (TILING_KEY_IS(10000000000111031434UL)) {
         // attention_mask:1, pse:1, drop:1, mm_out:nd
@@ -2462,675 +2875,297 @@ extern "C" __global__ __aicore__ void flash_attention_score_grad(
         INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_DISABLE, INPUT_DISABLE, INPUT_DISABLE,
                                               MM_ND_OUT_NOALIGN, TND, MM_ND_OUT_NOALIGN);
         return;
-    } else if (TILING_KEY_IS(10000000001111031434UL)) {
-        // attention_mask:1, pse:1, drop:1, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_ENABLE, INPUT_ENABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
-                                              TND, MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001011031434UL)) {
-        // attention_mask:0, pse:1, drop:1, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_DISABLE, INPUT_ENABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
-                                              TND, MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001101031434UL)) {
-        // attention_mask:1, pse:0, drop:1, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_ENABLE, INPUT_DISABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
-                                              TND, MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001001031434UL)) {
-        // // attention_mask:0, pse:0, drop:1, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_DISABLE, INPUT_DISABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
-                                              TND, MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001110031434UL)) {
-        // attention_mask:1, pse:1, drop:0, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_ENABLE, INPUT_ENABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
-                                              TND, MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001010031434UL)) {
-        //  attention_mask:0, pse:1, drop:0, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_DISABLE, INPUT_ENABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
-                                              TND, MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001100031434UL)) {
-        // attention_mask:1, pse:0, drop:0, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_ENABLE, INPUT_DISABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
-                                              TND, MM_ND_OUT_NOALIGN);
-        return;
-    } else if (TILING_KEY_IS(10000000001000031434UL)) {
-        //  attention_mask:0, pse:0, drop:0, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_DISABLE, INPUT_DISABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
-                                              TND, MM_ND_OUT_NOALIGN);
-        return;
-
-        // mm2 out nz
-    } else if (TILING_KEY_IS(10000000010111031434UL)) {
-        // attention_mask:1, pse:1, drop:1, mm_out:nd
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_ENABLE, INPUT_ENABLE, INPUT_ENABLE, MM_ND_OUT_NOALIGN,
-                                              TND, MM_NZ_OUT_FORMAT);
-        return;
-    } else if (TILING_KEY_IS(10000000010011031434UL)) {
-        // attention_mask:0, pse:1, drop:1, mm_out:nd
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_DISABLE, INPUT_ENABLE, INPUT_ENABLE, MM_ND_OUT_NOALIGN,
-                                              TND, MM_NZ_OUT_FORMAT);
-        return;
-    } else if (TILING_KEY_IS(10000000010101031434UL)) {
-        // attention_mask:1, pse:0, drop:1, mm_out:nd
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_ENABLE, INPUT_DISABLE, INPUT_ENABLE, MM_ND_OUT_NOALIGN,
-                                              TND, MM_NZ_OUT_FORMAT);
-        return;
-    } else if (TILING_KEY_IS(10000000010001031434UL)) {
-        // // attention_mask:0, pse:0, drop:1, mm_out:nd
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_DISABLE, INPUT_DISABLE, INPUT_ENABLE, MM_ND_OUT_NOALIGN,
-                                              TND, MM_NZ_OUT_FORMAT);
-        return;
-    } else if (TILING_KEY_IS(10000000010110031434UL)) {
-        // attention_mask:1, pse:1, drop:0, mm_out:nd
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_ENABLE, INPUT_ENABLE, INPUT_DISABLE, MM_ND_OUT_NOALIGN,
-                                              TND, MM_NZ_OUT_FORMAT);
-        return;
-    } else if (TILING_KEY_IS(10000000010010031434UL)) {
-        //  attention_mask:0, pse:1, drop:0, mm_out:nd
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_DISABLE, INPUT_ENABLE, INPUT_DISABLE, MM_ND_OUT_NOALIGN,
-                                              TND, MM_NZ_OUT_FORMAT);
-        return;
-    } else if (TILING_KEY_IS(10000000010100031434UL)) {
-        // attention_mask:1, pse:0, drop:0, mm_out:nd
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_ENABLE, INPUT_DISABLE, INPUT_DISABLE, MM_ND_OUT_NOALIGN,
-                                              TND, MM_NZ_OUT_FORMAT);
-        return;
-    } else if (TILING_KEY_IS(10000000010000031434UL)) {
-        //  attention_mask:0, pse:0, drop:0, mm_out:nd
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_DISABLE, INPUT_DISABLE, INPUT_DISABLE,
-                                              MM_ND_OUT_NOALIGN, TND, MM_NZ_OUT_FORMAT);
-        return;
-    } else if (TILING_KEY_IS(10000000011111031434UL)) {
-        // attention_mask:1, pse:1, drop:1, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_ENABLE, INPUT_ENABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
-                                              TND, MM_NZ_OUT_FORMAT);
-        return;
-    } else if (TILING_KEY_IS(10000000011011031434UL)) {
-        // attention_mask:0, pse:1, drop:1, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_DISABLE, INPUT_ENABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
-                                              TND, MM_NZ_OUT_FORMAT);
-        return;
-    } else if (TILING_KEY_IS(10000000011101031434UL)) {
-        // attention_mask:1, pse:0, drop:1, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_ENABLE, INPUT_DISABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
-                                              TND, MM_NZ_OUT_FORMAT);
-        return;
-    } else if (TILING_KEY_IS(10000000011001031434UL)) {
-        // // attention_mask:0, pse:0, drop:1, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_DISABLE, INPUT_DISABLE, INPUT_ENABLE, MM_NZ_OUT_FORMAT,
-                                              TND, MM_NZ_OUT_FORMAT);
-        return;
-    } else if (TILING_KEY_IS(10000000011110031434UL)) {
-        // attention_mask:1, pse:1, drop:0, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_ENABLE, INPUT_ENABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
-                                              TND, MM_NZ_OUT_FORMAT);
-        return;
-    } else if (TILING_KEY_IS(10000000011010031434UL)) {
-        //  attention_mask:0, pse:1, drop:0, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_DISABLE, INPUT_ENABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
-                                              TND, MM_NZ_OUT_FORMAT);
-        return;
-    } else if (TILING_KEY_IS(10000000011100031434UL)) {
-        // attention_mask:1, pse:0, drop:0, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_ENABLE, INPUT_DISABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
-                                              TND, MM_NZ_OUT_FORMAT);
-        return;
-    } else if (TILING_KEY_IS(10000000011000031434UL)) {
-        //  attention_mask:0, pse:0, drop:0, mm_out:nz
-        INVOKE_FAG_GENERAL_S1S2_BN2GS1S2_IMPL(float, INPUT_DISABLE, INPUT_DISABLE, INPUT_DISABLE, MM_NZ_OUT_FORMAT,
-                                              TND, MM_NZ_OUT_FORMAT);
-        return;
         // -----------------------1.1 end---------------------------------
 
         // -----------------------1.2 start-------------------------------
         // For BSNGD
     } else if (TILING_KEY_IS(10000000000000001134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000000010001134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, BSNGD);
+                                                    INPUT_NONE, BSNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000000001001134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000000011001134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, BSNGD);
+                                                    INPUT_NONE, BSNGD, MM_ND_OUT_NOALIGN);
         return;
         // pse单独存在
     } else if (TILING_KEY_IS(10000000000100001134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_NONE, INPUT_NONE, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000000110001134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_NONE, INPUT_NONE, BSNGD);
+                                                    INPUT_NONE, INPUT_NONE, BSNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000000101001134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_NONE, INPUT_NONE, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000000111001134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_NONE, INPUT_NONE, BSNGD);
+                                                    INPUT_NONE, INPUT_NONE, BSNGD, MM_ND_OUT_NOALIGN);
         return;
         // atten_mask单独存在
     } else if (TILING_KEY_IS(10000000001000001134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE,
-                                                    INPUT_EXIST, INPUT_NONE, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000001010001134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE,
-                                                    INPUT_EXIST, INPUT_NONE, BSNGD);
+                                                    INPUT_EXIST, INPUT_NONE, BSNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000001001001134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE,
-                                                    INPUT_EXIST, INPUT_NONE, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000001011001134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE,
-                                                    INPUT_EXIST, INPUT_NONE, BSNGD);
+                                                    INPUT_EXIST, INPUT_NONE, BSNGD, MM_ND_OUT_NOALIGN);
         return;
         // dropout单独存在
     } else if (TILING_KEY_IS(10000000010000001134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                         INPUT_EXIST, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000010010001134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                         INPUT_EXIST, BSNGD);
+                                         INPUT_EXIST, BSNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000010001001134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                         INPUT_EXIST, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000010011001134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                         INPUT_EXIST, BSNGD);
+                                         INPUT_EXIST, BSNGD, MM_ND_OUT_NOALIGN);
         return;
         // pse atten_mask存在
     } else if (TILING_KEY_IS(10000000001100001134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_EXIST, INPUT_NONE, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000001110001134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_EXIST, INPUT_NONE, BSNGD);
+                                                    INPUT_EXIST, INPUT_NONE, BSNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000001101001134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_EXIST, INPUT_NONE, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000001111001134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_EXIST, INPUT_NONE, BSNGD);
+                                                    INPUT_EXIST, INPUT_NONE, BSNGD, MM_ND_OUT_NOALIGN);
         return;
         // pse dropout存在
     } else if (TILING_KEY_IS(10000000010100001134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                         INPUT_EXIST, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000010110001134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                         INPUT_EXIST, BSNGD);
+                                         INPUT_EXIST, BSNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000010101001134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                         INPUT_EXIST, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000010111001134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                         INPUT_EXIST, BSNGD);
+                                         INPUT_EXIST, BSNGD, MM_ND_OUT_NOALIGN);
         return;
         // atten_mask dropout存在
     } else if (TILING_KEY_IS(10000000011000001134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                         INPUT_EXIST, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000011010001134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                         INPUT_EXIST, BSNGD);
+                                         INPUT_EXIST, BSNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000011001001134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                         INPUT_EXIST, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000011011001134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                         INPUT_EXIST, BSNGD);
+                                         INPUT_EXIST, BSNGD, MM_ND_OUT_NOALIGN);
         return;
         // 均存在
     } else if (TILING_KEY_IS(10000000011100001134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                         INPUT_EXIST, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000011110001134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                         INPUT_EXIST, BSNGD);
+                                         INPUT_EXIST, BSNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000011101001134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                         INPUT_EXIST, BSNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000011111001134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                         INPUT_EXIST, BSNGD);
+                                         INPUT_EXIST, BSNGD, MM_ND_OUT_NOALIGN);
         return;
         // For SBNGD
     } else if (TILING_KEY_IS(10000000000000011134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, SBNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000000010011134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, SBNGD);
+                                                    INPUT_NONE, SBNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000000001011134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, SBNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000000011011134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, SBNGD);
+                                                    INPUT_NONE, SBNGD, MM_ND_OUT_NOALIGN);
         return;
         // pse单独存在
     } else if (TILING_KEY_IS(10000000000100011134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_NONE, INPUT_NONE, SBNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000000110011134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_NONE, INPUT_NONE, SBNGD);
+                                                    INPUT_NONE, INPUT_NONE, SBNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000000101011134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_NONE, INPUT_NONE, SBNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000000111011134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_NONE, INPUT_NONE, SBNGD);
+                                                    INPUT_NONE, INPUT_NONE, SBNGD, MM_ND_OUT_NOALIGN);
         return;
         // atten_mask单独存在
     } else if (TILING_KEY_IS(10000000001000011134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE,
-                                                    INPUT_EXIST, INPUT_NONE, SBNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000001010011134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE,
-                                                    INPUT_EXIST, INPUT_NONE, SBNGD);
+                                                    INPUT_EXIST, INPUT_NONE, SBNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000001001011134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE,
-                                                    INPUT_EXIST, INPUT_NONE, SBNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000001011011134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE,
-                                                    INPUT_EXIST, INPUT_NONE, SBNGD);
+                                                    INPUT_EXIST, INPUT_NONE, SBNGD, MM_ND_OUT_NOALIGN);
         return;
         // dropout单独存在
     } else if (TILING_KEY_IS(10000000010000011134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                         INPUT_EXIST, SBNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000010010011134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                         INPUT_EXIST, SBNGD);
+                                         INPUT_EXIST, SBNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000010001011134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                         INPUT_EXIST, SBNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000010011011134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                         INPUT_EXIST, SBNGD);
+                                         INPUT_EXIST, SBNGD, MM_ND_OUT_NOALIGN);
         return;
         // pse atten_mask存在
     } else if (TILING_KEY_IS(10000000001100011134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_EXIST, INPUT_NONE, SBNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000001110011134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_EXIST, INPUT_NONE, SBNGD);
+                                                    INPUT_EXIST, INPUT_NONE, SBNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000001101011134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_EXIST, INPUT_NONE, SBNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000001111011134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_EXIST, INPUT_NONE, SBNGD);
+                                                    INPUT_EXIST, INPUT_NONE, SBNGD, MM_ND_OUT_NOALIGN);
         return;
         // pse dropout存在
     } else if (TILING_KEY_IS(10000000010100011134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                         INPUT_EXIST, SBNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000010110011134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                         INPUT_EXIST, SBNGD);
+                                         INPUT_EXIST, SBNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000010101011134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                         INPUT_EXIST, SBNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000010111011134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                         INPUT_EXIST, SBNGD);
+                                         INPUT_EXIST, SBNGD, MM_ND_OUT_NOALIGN);
         return;
         // atten_mask dropout存在
     } else if (TILING_KEY_IS(10000000011000011134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                         INPUT_EXIST, SBNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000011010011134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                         INPUT_EXIST, SBNGD);
+                                         INPUT_EXIST, SBNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000011001011134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                         INPUT_EXIST, SBNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000011011011134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                         INPUT_EXIST, SBNGD);
+                                         INPUT_EXIST, SBNGD, MM_ND_OUT_NOALIGN);
         return;
         // 均存在
     } else if (TILING_KEY_IS(10000000011100011134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                         INPUT_EXIST, SBNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000011110011134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                         INPUT_EXIST, SBNGD);
+                                         INPUT_EXIST, SBNGD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000011101011134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                         INPUT_EXIST, SBNGD);
-        return;
-    } else if (TILING_KEY_IS(10000000011111011134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                         INPUT_EXIST, SBNGD);
+                                         INPUT_EXIST, SBNGD, MM_ND_OUT_NOALIGN);
         return;
         // For BNGSD
         // pse atten_mask dropout 均不存在
     } else if (TILING_KEY_IS(10000000000000021134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000000010021134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, BNGSD);
+                                                    INPUT_NONE, BNGSD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000000001021134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000000011021134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, BNGSD);
+                                                    INPUT_NONE, BNGSD, MM_ND_OUT_NOALIGN);
         return;
         // pse单独存在
     } else if (TILING_KEY_IS(10000000000100021134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_NONE, INPUT_NONE, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000000110021134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_NONE, INPUT_NONE, BNGSD);
+                                                    INPUT_NONE, INPUT_NONE, BNGSD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000000101021134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_NONE, INPUT_NONE, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000000111021134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_NONE, INPUT_NONE, BNGSD);
+                                                    INPUT_NONE, INPUT_NONE, BNGSD, MM_ND_OUT_NOALIGN);
         return;
         // atten_mask单独存在
     } else if (TILING_KEY_IS(10000000001000021134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE,
-                                                    INPUT_EXIST, INPUT_NONE, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000001010021134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE,
-                                                    INPUT_EXIST, INPUT_NONE, BNGSD);
+                                                    INPUT_EXIST, INPUT_NONE, BNGSD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000001001021134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE,
-                                                    INPUT_EXIST, INPUT_NONE, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000001011021134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE,
-                                                    INPUT_EXIST, INPUT_NONE, BNGSD);
+                                                    INPUT_EXIST, INPUT_NONE, BNGSD, MM_ND_OUT_NOALIGN);
         return;
         // dropout单独存在
     } else if (TILING_KEY_IS(10000000010000021134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                         INPUT_EXIST, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000010010021134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                         INPUT_EXIST, BNGSD);
+                                         INPUT_EXIST, BNGSD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000010001021134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                         INPUT_EXIST, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000010011021134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                         INPUT_EXIST, BNGSD);
+                                         INPUT_EXIST, BNGSD, MM_ND_OUT_NOALIGN);
         return;
         // pse atten_mask存在
     } else if (TILING_KEY_IS(10000000001100021134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_EXIST, INPUT_NONE, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000001110021134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_EXIST, INPUT_NONE, BNGSD);
+                                                    INPUT_EXIST, INPUT_NONE, BNGSD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000001101021134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_EXIST, INPUT_NONE, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000001111021134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_EXIST, INPUT_NONE, BNGSD);
+                                                    INPUT_EXIST, INPUT_NONE, BNGSD, MM_ND_OUT_NOALIGN);
         return;
         // pse dropout存在
     } else if (TILING_KEY_IS(10000000010100021134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                         INPUT_EXIST, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000010110021134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                         INPUT_EXIST, BNGSD);
+                                         INPUT_EXIST, BNGSD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000010101021134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                         INPUT_EXIST, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000010111021134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                         INPUT_EXIST, BNGSD);
+                                         INPUT_EXIST, BNGSD, MM_ND_OUT_NOALIGN);
         return;
         // atten_mask dropout存在
     } else if (TILING_KEY_IS(10000000011000021134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                         INPUT_EXIST, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000011010021134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                         INPUT_EXIST, BNGSD);
+                                         INPUT_EXIST, BNGSD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000011001021134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                         INPUT_EXIST, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000011011021134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                         INPUT_EXIST, BNGSD);
+                                         INPUT_EXIST, BNGSD, MM_ND_OUT_NOALIGN);
         return;
         // 均存在
     } else if (TILING_KEY_IS(10000000011100021134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                         INPUT_EXIST, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000011110021134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                         INPUT_EXIST, BNGSD);
+                                         INPUT_EXIST, BNGSD, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000011101021134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                         INPUT_EXIST, BNGSD);
-        return;
-    } else if (TILING_KEY_IS(10000000011111021134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                         INPUT_EXIST, BNGSD);
+                                         INPUT_EXIST, BNGSD, MM_ND_OUT_NOALIGN);
         return;
         // for TND
     } else if (TILING_KEY_IS(10000000000000031134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000000010031134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, TND);
+                                                    INPUT_NONE, TND, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000000001031134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000000011031134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                                    INPUT_NONE, TND);
+                                                    INPUT_NONE, TND, MM_ND_OUT_NOALIGN);
         return;
         // pse单独存在
     } else if (TILING_KEY_IS(10000000000100031134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_NONE, INPUT_NONE, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000000110031134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_NONE, INPUT_NONE, TND);
+                                                    INPUT_NONE, INPUT_NONE, TND, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000000101031134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_NONE, INPUT_NONE, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000000111031134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_NONE, INPUT_NONE, TND);
+                                                    INPUT_NONE, INPUT_NONE, TND, MM_ND_OUT_NOALIGN);
         return;
         // atten_mask单独存在
     } else if (TILING_KEY_IS(10000000001000031134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE,
-                                                    INPUT_EXIST, INPUT_NONE, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000001010031134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE,
-                                                    INPUT_EXIST, INPUT_NONE, TND);
+                                                    INPUT_EXIST, INPUT_NONE, TND, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000001001031134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE,
-                                                    INPUT_EXIST, INPUT_NONE, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000001011031134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE,
-                                                    INPUT_EXIST, INPUT_NONE, TND);
+                                                    INPUT_EXIST, INPUT_NONE, TND, MM_ND_OUT_NOALIGN);
         return;
         // dropout单独存在
     } else if (TILING_KEY_IS(10000000010000031134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                         INPUT_EXIST, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000010010031134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                         INPUT_EXIST, TND);
+                                         INPUT_EXIST, TND, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000010001031134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                         INPUT_EXIST, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000010011031134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_NONE,
-                                         INPUT_EXIST, TND);
+                                         INPUT_EXIST, TND, MM_ND_OUT_NOALIGN);
         return;
         // pse atten_mask存在
     } else if (TILING_KEY_IS(10000000001100031134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_EXIST, INPUT_NONE, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000001110031134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_EXIST, INPUT_NONE, TND);
+                                                    INPUT_EXIST, INPUT_NONE, TND, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000001101031134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_EXIST, INPUT_NONE, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000001111031134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_NO_DROPOUT_IMPL(float, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST,
-                                                    INPUT_EXIST, INPUT_NONE, TND);
+                                                    INPUT_EXIST, INPUT_NONE, TND, MM_ND_OUT_NOALIGN);
         return;
         // pse dropout存在
     } else if (TILING_KEY_IS(10000000010100031134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                         INPUT_EXIST, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000010110031134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                         INPUT_EXIST, TND);
+                                         INPUT_EXIST, TND, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000010101031134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                         INPUT_EXIST, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000010111031134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_NONE,
-                                         INPUT_EXIST, TND);
+                                         INPUT_EXIST, TND, MM_ND_OUT_NOALIGN);
         return;
         // atten_mask dropout存在
     } else if (TILING_KEY_IS(10000000011000031134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                         INPUT_EXIST, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000011010031134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                         INPUT_EXIST, TND);
+                                         INPUT_EXIST, TND, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000011001031134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                         INPUT_EXIST, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000011011031134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_NONE, INPUT_EXIST,
-                                         INPUT_EXIST, TND);
+                                         INPUT_EXIST, TND, MM_ND_OUT_NOALIGN);
         return;
         // 均存在
     } else if (TILING_KEY_IS(10000000011100031134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_NORMAL, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                         INPUT_EXIST, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000011110031134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_NORMAL, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                         INPUT_EXIST, TND);
+                                         INPUT_EXIST, TND, MM_ND_OUT_NOALIGN);
         return;
     } else if (TILING_KEY_IS(10000000011101031134UL)) {
         INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_EXCEED, MM_ND_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                         INPUT_EXIST, TND);
-        return;
-    } else if (TILING_KEY_IS(10000000011111031134UL)) {
-        INVOKE_FAG_GENERAL_S1S2_BN2_IMPL(float, MM_CFG_EXCEED, MM_NZ_OUT_FORMAT, INPUT_EXIST, INPUT_EXIST,
-                                         INPUT_EXIST, TND);
+                                         INPUT_EXIST, TND, MM_ND_OUT_NOALIGN);
         return;
         // -----------------------1.2 end---------------------------------
     } else if (TILING_KEY_IS(10000000000000001199UL)) { // BSH BSNGD & FLOAT16_PRECISION

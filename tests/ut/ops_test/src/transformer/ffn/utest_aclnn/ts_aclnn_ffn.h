@@ -20,8 +20,8 @@
 #include "ffn_case.h"
 #include "aclnn_ffn_case.h"
 
-using ops::adv::tests::ffn::GenTensor;
 using ops::adv::tests::ffn::AclnnFFNCase;
+using ops::adv::tests::ffn::GenTensor;
 using AclnnFFNParam = ops::adv::tests::ffn::AclnnFFNParam;
 using FunctionType = ops::adv::tests::ffn::AclnnFFNParam::FunctionType;
 using AclnnFFNVersion = ops::adv::tests::ffn::AclnnFFNParam::AclnnFFNVersion;

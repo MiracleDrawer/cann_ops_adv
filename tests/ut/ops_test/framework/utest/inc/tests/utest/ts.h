@@ -16,6 +16,7 @@
 #pragma once
 
 #include <gtest/gtest.h>
+#include "tests/utils/log.h"
 #include "tests/utils/case.h"
 #include "tests/utils/tensor.h"
 #include "tests/utils/op_info.h"
@@ -57,6 +58,7 @@ protected:
         case_ = nullptr;
         platform_ = nullptr;
         socVersion_ = SocVersion::Ascend910B2;
+        ASSERT_TRUE(ops::adv::tests::utils::ChkLogErrCnt());
     }
 
     [[maybe_unused]] [[nodiscard]] int64_t GetCoreNum() const
@@ -92,13 +94,13 @@ protected:
     }
 };
 
-template <class C>
-class Ts_Ascend310P3 : public Ts<C> {
- protected:
-  void SetUp() override {
-    Ts<C>::socVersion_ = SocVersion::Ascend310P3;
-    Ts<C>::SetUp();
-  }
+template <class C> class Ts_Ascend310P3 : public Ts<C> {
+protected:
+    void SetUp() override
+    {
+        Ts<C>::socVersion_ = SocVersion::Ascend310P3;
+        Ts<C>::SetUp();
+    }
 };
 
 /**
@@ -143,11 +145,11 @@ protected:
 };
 
 
-template <class C>
-class Ts_WithParam_Ascend310P3 : public Ts_WithParam<C> {
- protected:
-  void SetUp() override {
-    Ts_WithParam<C>::socVersion_ = SocVersion::Ascend310P3;
-    Ts_WithParam<C>::SetUp();
-  }
+template <class C> class Ts_WithParam_Ascend310P3 : public Ts_WithParam<C> {
+protected:
+    void SetUp() override
+    {
+        Ts_WithParam<C>::socVersion_ = SocVersion::Ascend310P3;
+        Ts_WithParam<C>::SetUp();
+    }
 };

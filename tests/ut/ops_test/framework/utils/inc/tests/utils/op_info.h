@@ -27,28 +27,29 @@ public:
     /**
      * 算子名
      */
-    std::string name;
+    std::string mName;
 
     /**
      * 控制信息
      */
-    ControlInfo ctr;
+    ControlInfo mCtr;
 
     /**
      * 期望结果
      */
-    ExpectInfo exp;
+    ExpectInfo mExp;
 
     /**
      * 运行上下文
      */
-    ContextIntf *ctx;
+    ContextIntf *mCtx;
 
 public:
     OpInfo();
     explicit OpInfo(const ControlInfo &ctr);
     OpInfo(const ControlInfo &ctr, const ExpectInfo &exp);
     OpInfo(const char *name, const ControlInfo &ctr, const ExpectInfo &exp);
+    virtual ~OpInfo() = default;
 
     bool SetContext(ContextIntf *ctxParam);
 

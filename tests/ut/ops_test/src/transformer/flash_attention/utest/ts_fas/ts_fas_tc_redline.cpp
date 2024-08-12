@@ -21,13 +21,13 @@ class Ts_Fas_Ascend910B3_Redline_FullCore : public Ts_Fas_WithParam_Ascend910B3 
 TEST_P(Ts_Fas_Ascend910B2_Redline_FullCore, Tc_Redline_FullCore)
 {
     ASSERT_TRUE(case_->Init());
-    ASSERT_EQ(case_->Run(), case_->forward.exp.success);
+    ASSERT_EQ(case_->Run(), case_->mForward.mExp.mSuccess);
 }
 
 TEST_P(Ts_Fas_Ascend910B3_Redline_FullCore, Tc_Redline_FullCore)
 {
     ASSERT_TRUE(case_->Init());
-    ASSERT_EQ(case_->Run(), case_->forward.exp.success);
+    ASSERT_EQ(case_->Run(), case_->mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Redline_FullCore_SpecCase_001)
@@ -54,9 +54,9 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Redline_FullCore_SpecCase_001)
     );
 
     ASSERT_TRUE(cs.Init());
-    cs.param.attenMask = Tensor("attenMask", {cs.param.s1 * cs.param.b, cs.param.s2 * cs.param.b},
-                                "attenMaskInvalidShape", cs.param.attenMaskDtype, ge::FORMAT_ND);
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    cs.mParam.attenMask = Tensor("attenMask", {cs.mParam.s1 * cs.mParam.b, cs.mParam.s2 * cs.mParam.b},
+                                 "attenMaskInvalidShape", cs.mParam.attenMaskDtype, ge::FORMAT_ND);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Redline_Pse_001)
@@ -83,8 +83,8 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Redline_Pse_001)
     );
 
     ASSERT_TRUE(cs.Init());
-    cs.param.pse = Tensor("pse", {503316480}, "PseShape", cs.param.dtype, ge::FORMAT_ND);
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    cs.mParam.pse = Tensor("pse", {503316480}, "PseShape", cs.mParam.dtype, ge::FORMAT_ND);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Redline_Pse_002)
@@ -111,8 +111,8 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Redline_Pse_002)
     );
 
     ASSERT_TRUE(cs.Init());
-    cs.param.pse = Tensor("pse", {245760}, "PseShape", cs.param.dtype, ge::FORMAT_ND);
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    cs.mParam.pse = Tensor("pse", {245760}, "PseShape", cs.mParam.dtype, ge::FORMAT_ND);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Redline_Pse_003)
@@ -139,9 +139,9 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Redline_Pse_003)
     );
 
     ASSERT_TRUE(cs.Init());
-    cs.param.pse =
-        Tensor("pse", {1, cs.param.n2 * cs.param.g, 1024, cs.param.s2}, "PseShape", cs.param.dtype, ge::FORMAT_ND);
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    cs.mParam.pse =
+        Tensor("pse", {1, cs.mParam.n2 * cs.mParam.g, 1024, cs.mParam.s2}, "PseShape", cs.mParam.dtype, ge::FORMAT_ND);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Redline_Pse_004)
@@ -168,8 +168,8 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Redline_Pse_004)
     );
 
     ASSERT_TRUE(cs.Init());
-    cs.param.pse = Tensor("pse", {10}, "PseInvaildShape", cs.param.dtype, ge::FORMAT_ND);
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    cs.mParam.pse = Tensor("pse", {10}, "PseInvaildShape", cs.mParam.dtype, ge::FORMAT_ND);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Redline_Pse_005)
@@ -177,14 +177,14 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Redline_Pse_005)
     FasCase cs("Fas_Redline_Pse_005", true,                         /* CaseName, Enable */
                "",                                                  /* DebugInfo */
                OpInfo(ControlInfo(true, false),                     /* RunTiling, RunKernel */
-                      ExpectInfo(false,                              /* ExpectSuccess */
+                      ExpectInfo(false,                             /* ExpectSuccess */
                                  10000001111221320943UL,            /* ExpectTilingKey */
                                  ExpectInfo::kFullTilingBlockDim)), /* ExpectTilingBlockDim */
                FaParam(234, 1, 227, 25283, 2133, 32,                /* B, N2, G, S1, S2, D */
                        ge::DataType::DT_BF16, LayoutType::BNSD,     /* Dtype, Layout */
                        0.08838f, 0.9f, 861021531, 278722863,        /* Scale, KeepProb, PreTokens, NxtTokens */
                        1, 0,                                        /* InnerPrecise, SparseMode */
-                       PseShapeType::B_N1_ALIBI_S1_S2,                    /* PseShapeType */
+                       PseShapeType::B_N1_ALIBI_S1_S2,              /* PseShapeType */
                        DropMaskShapeType::B_N1_S1_S2,               /* DropMaskShapeType */
                        PaddingMaskShapeType::NONE,                  /* PaddingMaskShapeType */
                        AttenMaskShapeType::B_1_S1_S2,               /* AttentionMaskShapeType */
@@ -193,9 +193,9 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Redline_Pse_005)
     );
 
     ASSERT_TRUE(cs.Init());
-    cs.param.pse =
-        Tensor("pse", {1, cs.param.n2 * cs.param.g, 1024, cs.param.s2}, "PseShape", cs.param.dtype, ge::FORMAT_ND);
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    cs.mParam.pse =
+        Tensor("pse", {1, cs.mParam.n2 * cs.mParam.g, 1024, cs.mParam.s2}, "PseShape", cs.mParam.dtype, ge::FORMAT_ND);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Redline_Pse_006)
@@ -203,7 +203,7 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Redline_Pse_006)
     FasCase cs("Fas_Redline_Pse_006", true,                         /* CaseName, Enable */
                "",                                                  /* DebugInfo */
                OpInfo(ControlInfo(true, false),                     /* RunTiling, RunKernel */
-                      ExpectInfo(false,                              /* ExpectSuccess */
+                      ExpectInfo(false,                             /* ExpectSuccess */
                                  10000001111221320943UL,            /* ExpectTilingKey */
                                  ExpectInfo::kFullTilingBlockDim)), /* ExpectTilingBlockDim */
                FaParam(2, 5, 1, 2048, 768, 64,                      /* B, N2, G, S1, S2, D */
@@ -218,7 +218,7 @@ TEST_F(Ts_Fas_Ascend910B2, Tc_Fas_Redline_Pse_006)
                        PrefixShapeType::NONE)                       /* PrefixShapeType */
     );
     ASSERT_TRUE(cs.Init());
-    ASSERT_EQ(cs.Run(), cs.forward.exp.success);
+    ASSERT_EQ(cs.Run(), cs.mForward.mExp.mSuccess);
 }
 
 const auto Tc_Fas_Redline_FullCore_Case = ::testing::Values(
@@ -394,14 +394,13 @@ const auto Tc_Fas_Redline_FullCore_Case = ::testing::Values(
                     AttenMaskShapeType::B_1_S1_S2,               /* AttentionMaskShapeType*/
                     ge::DataType::DT_BOOL,                       /* AttentionMaskDtype*/
                     PrefixShapeType::B,                          /* PrefixShapeType */
-                    {512, 512, 512, 512, 512, 512, 512, 512,
-                     512, 512, 512, 512, 512, 512, 512, 512,
-                     512, 512, 512, 512, 512, 512, 512, 512,
-                     512, 512, 512, 512, 512, 512, 512, 512,
-                     512,},                                      /* PrefixTensorData */
-                    {},                                          /* ActualSeqQTensorData */
-                    {})                                          /* ActualSeqKVTensorData */
-    ),
+                    {
+                        512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512,
+                        512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512, 512,
+                    },  /* PrefixTensorData */
+                    {}, /* ActualSeqQTensorData */
+                    {}) /* ActualSeqKVTensorData */
+            ),
     FasCase("Fas_Redline_Redline_FullCore_Case_011", true,       /* CaseName, Enable */
             "",                                                  /* DebugInfo */
             OpInfo(ControlInfo(true, false),                     /* RunTiling, RunKernel */
@@ -739,7 +738,7 @@ const auto Tc_Fas_Redline_FullCore_Case = ::testing::Values(
     FasCase("Fas_Redline_Redline_FullCore_Case_028", true,       /* CaseName, Enable */
             "",                                                  /* DebugInfo */
             OpInfo(ControlInfo(true, false),                     /* RunTiling, RunKernel */
-                   ExpectInfo(true,                             /* ExpectSuccess */
+                   ExpectInfo(true,                              /* ExpectSuccess */
                               10000000011022430943UL,            /* ExpectTilingKey */
                               ExpectInfo::kFullTilingBlockDim)), /* ExpectTilingBlockDim */
             FaParam(3, 40, 1, 2048, 2048, 128,                   /* B, N2, G, S1, S2, D */
@@ -761,11 +760,11 @@ const auto Tc_Fas_Redline_FullCore_Case = ::testing::Values(
     FasCase("Fas_Redline_Redline_FullCore_Case_029", true,       /* CaseName, Enable */
             "",                                                  /* DebugInfo */
             OpInfo(ControlInfo(true, false),                     /* RunTiling, RunKernel */
-                   ExpectInfo(true,                             /* ExpectSuccess */
+                   ExpectInfo(true,                              /* ExpectSuccess */
                               10000001110220130943UL,            /* ExpectTilingKey */
                               ExpectInfo::kFullTilingBlockDim)), /* ExpectTilingBlockDim */
             FaParam(3, 40, 1, 2048, 2048, 128,                   /* B, N2, G, S1, S2, D */
-                    ge::DataType::DT_FLOAT16, LayoutType::BSND,   /* Dtype, Layout */
+                    ge::DataType::DT_FLOAT16, LayoutType::BSND,  /* Dtype, Layout */
                     0.08838f, 0.9f, 256, 8,                      /* Scale, KeepProb, PreTokens, NxtTokens */
                     0, 3, 3,                                     /* InnerPrecise, Sparsemode, pseType */
                     PseShapeType::SLOPE_B_N1,                    /* PseShapeType */
@@ -780,36 +779,36 @@ const auto Tc_Fas_Redline_FullCore_Case = ::testing::Values(
                     {1},                                         /* qStartIdxTensorData */
                     {2})                                         /* kvStartIdxTensorData */
             ),
-    FasCase("Fas_Redline_Redline_FullCore_Case_030", true,       /* CaseName, Enable */
-            "",                                                  /* DebugInfo */
-            OpInfo(ControlInfo(true, false),                     /* RunTiling, RunKernel */
-                   ExpectInfo(true,                              /* ExpectSuccess */
-                              10000000011021130099UL,            /* ExpectTilingKey */
-                              2)),                               /* ExpectTilingBlockDim */
-            FaParam(3, 1, 1, 16, 16, 128,                        /* B, N2, G, S1, S2, D */
-                    ge::DataType::DT_FLOAT16, LayoutType::BSND,  /* Dtype, Layout */
-                    0.08838f, 0.9f, 256, 8,                      /* Scale, KeepProb, PreTokens, NxtTokens */
-                    0, 0, 3,                                     /* InnerPrecise, Sparsemode, pseType */
-                    PseShapeType::SLOPE_B_N1,                    /* PseShapeType */
-                    DropMaskShapeType::NONE,                     /* DropMaskShapeType */
-                    PaddingMaskShapeType::NONE,                  /* PaddingMaskShapeType */
-                    AttenMaskShapeType::S1_S2,                   /* AttentionMaskShapeType*/
-                    ge::DataType::DT_BOOL,                       /* AttentionMaskDtype*/
-                    PrefixShapeType::NONE,                       /* PrefixShapeType */
-                    {},                                          /* PrefixTensorData */
-                    {},                                          /* ActualSeqQTensorData */
-                    {},                                          /* ActualSeqKVTensorData */
-                    {1},                                         /* qStartIdxTensorData */
-                    {2})                                         /* kvStartIdxTensorData */
+    FasCase("Fas_Redline_Redline_FullCore_Case_030", true,      /* CaseName, Enable */
+            "",                                                 /* DebugInfo */
+            OpInfo(ControlInfo(true, false),                    /* RunTiling, RunKernel */
+                   ExpectInfo(true,                             /* ExpectSuccess */
+                              10000000011021130099UL,           /* ExpectTilingKey */
+                              2)),                              /* ExpectTilingBlockDim */
+            FaParam(3, 1, 1, 16, 16, 128,                       /* B, N2, G, S1, S2, D */
+                    ge::DataType::DT_FLOAT16, LayoutType::BSND, /* Dtype, Layout */
+                    0.08838f, 0.9f, 256, 8,                     /* Scale, KeepProb, PreTokens, NxtTokens */
+                    0, 0, 3,                                    /* InnerPrecise, Sparsemode, pseType */
+                    PseShapeType::SLOPE_B_N1,                   /* PseShapeType */
+                    DropMaskShapeType::NONE,                    /* DropMaskShapeType */
+                    PaddingMaskShapeType::NONE,                 /* PaddingMaskShapeType */
+                    AttenMaskShapeType::S1_S2,                  /* AttentionMaskShapeType*/
+                    ge::DataType::DT_BOOL,                      /* AttentionMaskDtype*/
+                    PrefixShapeType::NONE,                      /* PrefixShapeType */
+                    {},                                         /* PrefixTensorData */
+                    {},                                         /* ActualSeqQTensorData */
+                    {},                                         /* ActualSeqKVTensorData */
+                    {1},                                        /* qStartIdxTensorData */
+                    {2})                                        /* kvStartIdxTensorData */
             ),
     FasCase("Fas_Redline_Redline_FullCore_Case_031", true,       /* CaseName, Enable */
             "",                                                  /* DebugInfo */
             OpInfo(ControlInfo(true, false),                     /* RunTiling, RunKernel */
-                   ExpectInfo(true,                             /* ExpectSuccess */
+                   ExpectInfo(true,                              /* ExpectSuccess */
                               10000001102200130953UL,            /* ExpectTilingKey */
                               ExpectInfo::kFullTilingBlockDim)), /* ExpectTilingBlockDim */
             FaParam(3, 40, 1, 256, 256, 128,                     /* B, N2, G, S1, S2, D */
-                    ge::DataType::DT_FLOAT16, LayoutType::BSND,   /* Dtype, Layout */
+                    ge::DataType::DT_FLOAT16, LayoutType::BSND,  /* Dtype, Layout */
                     0.08838f, 0.9f, 256, 8,                      /* Scale, KeepProb, PreTokens, NxtTokens */
                     0, 0, 3,                                     /* InnerPrecise, Sparsemode, pseType */
                     PseShapeType::SLOPE_B_N1,                    /* PseShapeType */
@@ -849,7 +848,7 @@ const auto Tc_Fas_Redline_FullCore_Case = ::testing::Values(
     FasCase("Fas_Redline_Redline_FullCore_Case_033", true,       /* CaseName, Enable */
             "",                                                  /* DebugInfo */
             OpInfo(ControlInfo(true, false),                     /* RunTiling, RunKernel */
-                   ExpectInfo(false,                              /* ExpectSuccess */
+                   ExpectInfo(false,                             /* ExpectSuccess */
                               10000001102200130953UL,            /* ExpectTilingKey */
                               ExpectInfo::kFullTilingBlockDim)), /* ExpectTilingBlockDim */
             FaParam(3, 40, 1, 256, 256, 128,                     /* B, N2, G, S1, S2, D */
@@ -985,7 +984,7 @@ const auto Tc_Fas_Redline_FullCore_Case = ::testing::Values(
                               10000001110220130943UL,            /* ExpectTilingKey */
                               ExpectInfo::kFullTilingBlockDim)), /* ExpectTilingBlockDim */
             FaParam(3, 40, 1, 2048, 2048, 128,                   /* B, N2, G, S1, S2, D */
-                    ge::DataType::DT_FLOAT16, LayoutType::BSND,   /* Dtype, Layout */
+                    ge::DataType::DT_FLOAT16, LayoutType::BSND,  /* Dtype, Layout */
                     0.08838f, 0.9f, 256, 8,                      /* Scale, KeepProb, PreTokens, NxtTokens */
                     0, 0, 3,                                     /* InnerPrecise, Sparsemode, pseType */
                     PseShapeType::SLOPE_B_N1,                    /* PseShapeType */
@@ -999,8 +998,7 @@ const auto Tc_Fas_Redline_FullCore_Case = ::testing::Values(
                     {},                                          /* ActualSeqKVTensorData */
                     {1},                                         /* qStartIdxTensorData */
                     {2})                                         /* kvStartIdxTensorData */
-            )
-);
+            ));
 INSTANTIATE_TEST_SUITE_P(Fas, Ts_Fas_Ascend910B2_Redline_FullCore, Tc_Fas_Redline_FullCore_Case);
 INSTANTIATE_TEST_SUITE_P(Fas, Ts_Fas_Ascend910B3_Redline_FullCore, Tc_Fas_Redline_FullCore_Case);
 
@@ -1010,13 +1008,13 @@ class Ts_Fas_Ascend910B3_Redline_SpecCore : public Ts_Fas_WithParam_Ascend910B3 
 TEST_P(Ts_Fas_Ascend910B2_Redline_SpecCore, Tc_Redline_SpecCore)
 {
     ASSERT_TRUE(case_->Init());
-    ASSERT_EQ(case_->Run(), case_->forward.exp.success);
+    ASSERT_EQ(case_->Run(), case_->mForward.mExp.mSuccess);
 }
 
 TEST_P(Ts_Fas_Ascend910B3_Redline_SpecCore, Tc_Redline_SpecCore)
 {
     ASSERT_TRUE(case_->Init());
-    ASSERT_EQ(case_->Run(), case_->forward.exp.success);
+    ASSERT_EQ(case_->Run(), case_->mForward.mExp.mSuccess);
 }
 
 const auto Tc_Fas_Redline_SpecCore_Case = ::testing::Values(
@@ -1586,56 +1584,56 @@ const auto Tc_Fas_Redline_SpecCore_Case = ::testing::Values(
                     PrefixShapeType::B,                          /* PrefixShapeType */
                     {100, 0, 200}, {}, {})                       /* PrefixTensorData */
             ),
-    FasCase("Fas_Redline_SpecCore_Case_031", true,             /* CaseName, Enable */
-            "",                                                /* DebugInfo */
-            OpInfo(ControlInfo(true, false),                   /* RunTiling, RunKernel */
-                   ExpectInfo(true,                            /* ExpectSuccess */
-                              10000000010220212943UL,          /* ExpectTilingKey */
-                              16)),                            /* ExpectTilingBlockDim */
-            FaParam(1, 2, 1, 2048, 2048, 128,                  /* B, N2, G, S1, S2, D */
-                    ge::DataType::DT_FLOAT, LayoutType::SBH,   /* Dtype, Layout */
-                    0.08838f, 0.9f, 1024, -900,                /* Scale, KeepProb, PreTokens, NxtTokens */
-                    0, 4,                                      /* InnerPrecise, SparseMode */
-                    PseShapeType::NONE,                        /* PseShapeType */
-                    DropMaskShapeType::NONE,                   /* DropMaskShapeType */
-                    PaddingMaskShapeType::NONE,                /* PaddingMaskShapeType */
-                    AttenMaskShapeType::B_1_S1_S2,             /* AttentionMaskShapeType */
-                    ge::DataType::DT_BOOL,                     /* AttentionMaskDtype */
-                    PrefixShapeType::NONE)                     /* PrefixShapeType */
+    FasCase("Fas_Redline_SpecCore_Case_031", true,           /* CaseName, Enable */
+            "",                                              /* DebugInfo */
+            OpInfo(ControlInfo(true, false),                 /* RunTiling, RunKernel */
+                   ExpectInfo(true,                          /* ExpectSuccess */
+                              10000000010220212943UL,        /* ExpectTilingKey */
+                              16)),                          /* ExpectTilingBlockDim */
+            FaParam(1, 2, 1, 2048, 2048, 128,                /* B, N2, G, S1, S2, D */
+                    ge::DataType::DT_FLOAT, LayoutType::SBH, /* Dtype, Layout */
+                    0.08838f, 0.9f, 1024, -900,              /* Scale, KeepProb, PreTokens, NxtTokens */
+                    0, 4,                                    /* InnerPrecise, SparseMode */
+                    PseShapeType::NONE,                      /* PseShapeType */
+                    DropMaskShapeType::NONE,                 /* DropMaskShapeType */
+                    PaddingMaskShapeType::NONE,              /* PaddingMaskShapeType */
+                    AttenMaskShapeType::B_1_S1_S2,           /* AttentionMaskShapeType */
+                    ge::DataType::DT_BOOL,                   /* AttentionMaskDtype */
+                    PrefixShapeType::NONE)                   /* PrefixShapeType */
             ),
-    FasCase("Fas_Redline_SpecCore_Case_032", true,             /* CaseName, Enable */
-            "",                                                /* DebugInfo */
-            OpInfo(ControlInfo(true, false),                   /* RunTiling, RunKernel */
-                   ExpectInfo(true,                            /* ExpectSuccess */
-                              10000000010220212943UL,          /* ExpectTilingKey */
-                              16)),                            /* ExpectTilingBlockDim */
-            FaParam(1, 2, 1, 2048, 2048, 128,                  /* B, N2, G, S1, S2, D */
-                    ge::DataType::DT_FLOAT, LayoutType::SBH,   /* Dtype, Layout */
-                    0.08838f, 0.9f, -900, 1024,                /* Scale, KeepProb, PreTokens, NxtTokens */
-                    0, 4,                                      /* InnerPrecise, SparseMode */
-                    PseShapeType::NONE,                        /* PseShapeType */
-                    DropMaskShapeType::NONE,                   /* DropMaskShapeType */
-                    PaddingMaskShapeType::NONE,                /* PaddingMaskShapeType */
-                    AttenMaskShapeType::B_1_S1_S2,             /* AttentionMaskShapeType */
-                    ge::DataType::DT_BOOL,                     /* AttentionMaskDtype */
-                    PrefixShapeType::NONE)                     /* PrefixShapeType */
+    FasCase("Fas_Redline_SpecCore_Case_032", true,           /* CaseName, Enable */
+            "",                                              /* DebugInfo */
+            OpInfo(ControlInfo(true, false),                 /* RunTiling, RunKernel */
+                   ExpectInfo(true,                          /* ExpectSuccess */
+                              10000000010220212943UL,        /* ExpectTilingKey */
+                              16)),                          /* ExpectTilingBlockDim */
+            FaParam(1, 2, 1, 2048, 2048, 128,                /* B, N2, G, S1, S2, D */
+                    ge::DataType::DT_FLOAT, LayoutType::SBH, /* Dtype, Layout */
+                    0.08838f, 0.9f, -900, 1024,              /* Scale, KeepProb, PreTokens, NxtTokens */
+                    0, 4,                                    /* InnerPrecise, SparseMode */
+                    PseShapeType::NONE,                      /* PseShapeType */
+                    DropMaskShapeType::NONE,                 /* DropMaskShapeType */
+                    PaddingMaskShapeType::NONE,              /* PaddingMaskShapeType */
+                    AttenMaskShapeType::B_1_S1_S2,           /* AttentionMaskShapeType */
+                    ge::DataType::DT_BOOL,                   /* AttentionMaskDtype */
+                    PrefixShapeType::NONE)                   /* PrefixShapeType */
             ),
-    FasCase("Fas_Redline_SpecCore_Case_033", true,             /* CaseName, Enable */
-            "",                                                /* DebugInfo */
-            OpInfo(ControlInfo(true, false),                   /* RunTiling, RunKernel */
-                   ExpectInfo(true,                            /* ExpectSuccess */
-                              10000000010220210943UL,          /* ExpectTilingKey */
-                              16)),                            /* ExpectTilingBlockDim */
-            FaParam(1, 2, 1, 2048, 2048, 128,                  /* B, N2, G, S1, S2, D */
-                    ge::DataType::DT_FLOAT, LayoutType::SBH,   /* Dtype, Layout */
-                    0.08838f, 0.9f, 2048, 2049,                /* Scale, KeepProb, PreTokens, NxtTokens */
-                    0, 4,                                      /* InnerPrecise, SparseMode */
-                    PseShapeType::NONE,                        /* PseShapeType */
-                    DropMaskShapeType::NONE,                   /* DropMaskShapeType */
-                    PaddingMaskShapeType::NONE,                /* PaddingMaskShapeType */
-                    AttenMaskShapeType::B_1_S1_S2,             /* AttentionMaskShapeType */
-                    ge::DataType::DT_BOOL,                     /* AttentionMaskDtype */
-                    PrefixShapeType::NONE)                     /* PrefixShapeType */
+    FasCase("Fas_Redline_SpecCore_Case_033", true,           /* CaseName, Enable */
+            "",                                              /* DebugInfo */
+            OpInfo(ControlInfo(true, false),                 /* RunTiling, RunKernel */
+                   ExpectInfo(true,                          /* ExpectSuccess */
+                              10000000010220210943UL,        /* ExpectTilingKey */
+                              16)),                          /* ExpectTilingBlockDim */
+            FaParam(1, 2, 1, 2048, 2048, 128,                /* B, N2, G, S1, S2, D */
+                    ge::DataType::DT_FLOAT, LayoutType::SBH, /* Dtype, Layout */
+                    0.08838f, 0.9f, 2048, 2049,              /* Scale, KeepProb, PreTokens, NxtTokens */
+                    0, 4,                                    /* InnerPrecise, SparseMode */
+                    PseShapeType::NONE,                      /* PseShapeType */
+                    DropMaskShapeType::NONE,                 /* DropMaskShapeType */
+                    PaddingMaskShapeType::NONE,              /* PaddingMaskShapeType */
+                    AttenMaskShapeType::B_1_S1_S2,           /* AttentionMaskShapeType */
+                    ge::DataType::DT_BOOL,                   /* AttentionMaskDtype */
+                    PrefixShapeType::NONE)                   /* PrefixShapeType */
             ),
     FasCase("Fas_Redline_SpecCore_Case_034", true,               /* CaseName, Enable */
             "",                                                  /* DebugInfo */
@@ -1692,62 +1690,152 @@ const auto Tc_Fas_Redline_SpecCore_Case = ::testing::Values(
                     ge::DataType::DT_BOOL,                       /* AttentionMaskDtype */
                     PrefixShapeType::NONE)                       /* PrefixShapeType */
             ),
-    FasCase("Fas_Redline_SpecCore_Case_037", true,               /* CaseName, Enable */
-            "",                                                  /* DebugInfo */
+    FasCase("Fas_Redline_SpecCore_Case_037", true,           /* CaseName, Enable */
+            "",                                              /* DebugInfo */
+            OpInfo(ControlInfo(true, true),                  /* RunTiling, RunKernel */
+                   ExpectInfo(true,                          /* ExpectSuccess */
+                              10000000001022410943UL,        /* ExpectTilingKey */
+                              5)),                           /* ExpectTilingBlockDim */
+            FaParam(1, 1, 1, 1, 1026, 16,                    /* B, N2, G, S1, S2, D */
+                    ge::DataType::DT_FLOAT, LayoutType::TND, /* Dtype, Layout */
+                    0.08838f, 0.9f, 65535, 0,                /* Scale, KeepProb, PreTokens, NxtTokens */
+                    0, 6,                                    /* InnerPrecise, SparseMode */
+                    PseShapeType::NONE,                      /* PseShapeType */
+                    DropMaskShapeType::NONE,                 /* DropMaskShapeType */
+                    PaddingMaskShapeType::NONE,              /* PaddingMaskShapeType */
+                    AttenMaskShapeType::PREFIXCOMPRESS,      /* AttentionMaskShapeType */
+                    ge::DataType::DT_BOOL,                   /* AttentionMaskDtype */
+                    PrefixShapeType::B,                      /* PrefixShapeType */
+                    {300},                                   /* PrefixTensorData */
+                    {1026},                                  /* ActualSeqQTensorData */
+                    {1026})                                  /* ActualSeqKVTensorData */
+            ),
+    FasCase("Fas_Redline_SpecCore_Case_038", true,           /* CaseName, Enable */
+            "",                                              /* DebugInfo */
+            OpInfo(ControlInfo(true, true),                  /* RunTiling, RunKernel */
+                   ExpectInfo(true,                          /* ExpectSuccess */
+                              10000000001021110099UL,        /* ExpectTilingKey */
+                              1)),                           /* ExpectTilingBlockDim */
+            FaParam(1, 1, 1, 16, 16, 16,                     /* B, N2, G, S1, S2, D */
+                    ge::DataType::DT_FLOAT, LayoutType::BSH, /* Dtype, Layout */
+                    0.08838f, 0.9f, 65535, 0,                /* Scale, KeepProb, PreTokens, NxtTokens */
+                    0, 6,                                    /* InnerPrecise, SparseMode */
+                    PseShapeType::NONE,                      /* PseShapeType */
+                    DropMaskShapeType::NONE,                 /* DropMaskShapeType */
+                    PaddingMaskShapeType::NONE,              /* PaddingMaskShapeType */
+                    AttenMaskShapeType::PREFIXCOMPRESS,      /* AttentionMaskShapeType */
+                    ge::DataType::DT_BOOL,                   /* AttentionMaskDtype */
+                    PrefixShapeType::B,                      /* PrefixShapeType */
+                    {8}, {}, {})                             /* PrefixTensorData */
+            ),
+    FasCase("Fas_Redline_SpecCore_Case_039", true,           /* CaseName, Enable */
+            "",                                              /* DebugInfo */
+            OpInfo(ControlInfo(true, true),                  /* RunTiling, RunKernel */
+                   ExpectInfo(true,                          /* ExpectSuccess */
+                              10000000010221110943UL,        /* ExpectTilingKey */
+                              1)),                           /* ExpectTilingBlockDim */
+            FaParam(1, 1, 1, 1, 1025, 16,                    /* B, N2, G, S1, S2, D */
+                    ge::DataType::DT_FLOAT, LayoutType::BSH, /* Dtype, Layout */
+                    0.08838f, 0.9f, 65535, 0,                /* Scale, KeepProb, PreTokens, NxtTokens */
+                    0, 6,                                    /* InnerPrecise, SparseMode */
+                    PseShapeType::NONE,                      /* PseShapeType */
+                    DropMaskShapeType::NONE,                 /* DropMaskShapeType */
+                    PaddingMaskShapeType::NONE,              /* PaddingMaskShapeType */
+                    AttenMaskShapeType::PREFIXCOMPRESS,      /* AttentionMaskShapeType */
+                    ge::DataType::DT_BOOL,                   /* AttentionMaskDtype */
+                    PrefixShapeType::B,                      /* PrefixShapeType */
+                    {1025}, {}, {})                          /* PrefixTensorData */
+            ),
+    FasCase("Fas_Redline_SpecCore_Case_040", true,           /* CaseName, Enable */
+            "",                                              /* DebugInfo */
+            OpInfo(ControlInfo(true, false),                 /* RunTiling, RunKernel */
+                   ExpectInfo(false,                         /* ExpectSuccess */
+                              92UL,                          /* ExpectTilingKey */
+                              1)),                           /* ExpectTilingBlockDim */
+            FaParam(1, 1, 1, 1, 0, 16,                       /* B, N2, G, S1, S2, D */
+                    ge::DataType::DT_FLOAT, LayoutType::BSH, /* Dtype, Layout */
+                    0.08838f, 0.9f, 65535, 0,                /* Scale, KeepProb, PreTokens, NxtTokens */
+                    0, 1,                                    /* InnerPrecise, SparseMode */
+                    PseShapeType::NONE,                      /* PseShapeType */
+                    DropMaskShapeType::NONE,                 /* DropMaskShapeType */
+                    PaddingMaskShapeType::NONE,              /* PaddingMaskShapeType */
+                    AttenMaskShapeType::PREFIXCOMPRESS,      /* AttentionMaskShapeType */
+                    ge::DataType::DT_BOOL,                   /* AttentionMaskDtype */
+                    PrefixShapeType::NONE)                   /* PrefixShapeType */
+            ),
+    FasCase("Fas_Redline_SpecCore_Case_bf16_run_kernel_unpad)", /* CaseName */
+            true, "",                                           /* Enable, DebugInfo */
             OpInfo(ControlInfo(true, true),                     /* RunTiling, RunKernel */
-                   ExpectInfo(true,                              /* ExpectSuccess */
-                              10000000001022410943UL,            /* ExpectTilingKey */
-                              5)), /* ExpectTilingBlockDim */
-            FaParam(1, 1, 1, 1, 1026, 16,                        /* B, N2, G, S1, S2, D */
-                    ge::DataType::DT_FLOAT, LayoutType::TND,     /* Dtype, Layout */
-                    0.08838f, 0.9f, 65535, 0,                    /* Scale, KeepProb, PreTokens, NxtTokens */
-                    0, 6,                                        /* InnerPrecise, SparseMode */
-                    PseShapeType::NONE,                          /* PseShapeType */
-                    DropMaskShapeType::NONE,                     /* DropMaskShapeType */
-                    PaddingMaskShapeType::NONE,                  /* PaddingMaskShapeType */
-                    AttenMaskShapeType::PREFIXCOMPRESS,          /* AttentionMaskShapeType */
-                    ge::DataType::DT_BOOL,                       /* AttentionMaskDtype */
-                    PrefixShapeType::B,                          /* PrefixShapeType */
-                    {300},                                      /* PrefixTensorData */
-                    {1026},                          /* ActualSeqQTensorData */
-                    {1026})                          /* ActualSeqKVTensorData */
-    ),
-    FasCase("Fas_Redline_SpecCore_Case_038", true,               /* CaseName, Enable */
+                   ExpectInfo(true,                             /* ExpectSuccess */
+                              10000000001022430943UL,           /* ExpectTilingKey */
+                              1)),                              /* ExpectTilingBlockDim */
+            FaParam(1, 1, 1, 2048, 2048, 32,                    /* B, N2, G, S1, S2, D */
+                    ge::DataType::DT_FLOAT16, LayoutType::TND,  /* Dtype, Layout */
+                    0.08838f, 1.0f, 65535, 0,                   /* Scale, KeepProb, PreTokens, NxtTokens */
+                    0, 2,                                       /* InnerPrecise, SparseMode */
+                    PseShapeType::NONE,                         /* PseShapeType */
+                    DropMaskShapeType::NONE,                    /* DropMaskShapeType */
+                    PaddingMaskShapeType::NONE,                 /* PaddingMaskShapeType */
+                    AttenMaskShapeType::S1_S2,                  /* AttentionMaskShapeType */
+                    ge::DataType::DT_BOOL,                      /* AttentionMaskDtype */
+                    PrefixShapeType::NONE,                      /* PrefixShapeType */
+                    {},                                         /* PrefixTensorData */
+                    {256},                                      /* ActualSeqQTensorData */
+                    {65})                                       /* ActualSeqKVTensorData */
+            ),
+    FasCase("Fas_Redline_SpecCore_Case_run_kernel_s1s2", true,   /* CaseName, Enable */
             "",                                                  /* DebugInfo */
-            OpInfo(ControlInfo(true, true),                     /* RunTiling, RunKernel */
+            OpInfo(ControlInfo(true, true),                      /* RunTiling, RunKernel */
                    ExpectInfo(true,                              /* ExpectSuccess */
-                              10000000001021110099UL,            /* ExpectTilingKey */
-                              1)), /* ExpectTilingBlockDim */
-            FaParam(1, 1, 1, 16, 16, 16,                        /* B, N2, G, S1, S2, D */
-                    ge::DataType::DT_FLOAT, LayoutType::BSH,     /* Dtype, Layout */
-                    0.08838f, 0.9f, 65535, 0,                    /* Scale, KeepProb, PreTokens, NxtTokens */
-                    0, 6,                                        /* InnerPrecise, SparseMode */
+                              10000000011221212943UL,            /* ExpectTilingKey */
+                              ExpectInfo::kFullTilingBlockDim)), /* ExpectTilingBlockDim */
+            FaParam(1, 1, 1, 256, 1025, 32,                      /* B, N2, G, S1, S2, D */
+                    ge::DataType::DT_FLOAT, LayoutType::SBH,     /* Dtype, Layout */
+                    0.08838f, 0.9f, -200, 1024,                  /* Scale, KeepProb, PreTokens, NxtTokens */
+                    0, 4,                                        /* InnerPrecise, SparseMode */
                     PseShapeType::NONE,                          /* PseShapeType */
-                    DropMaskShapeType::NONE,                     /* DropMaskShapeType */
+                    DropMaskShapeType::B_N1_S1_S2,               /* DropMaskShapeType */
                     PaddingMaskShapeType::NONE,                  /* PaddingMaskShapeType */
-                    AttenMaskShapeType::PREFIXCOMPRESS,          /* AttentionMaskShapeType */
+                    AttenMaskShapeType::SPARSE,                  /* AttentionMaskShapeType */
                     ge::DataType::DT_BOOL,                       /* AttentionMaskDtype */
-                    PrefixShapeType::B,                          /* PrefixShapeType */
-                    {8},{},{})                                      /* PrefixTensorData */
-    ),
-    FasCase("Fas_Redline_SpecCore_Case_039", true,               /* CaseName, Enable */
-            "",                                                  /* DebugInfo */
-            OpInfo(ControlInfo(true, true),                     /* RunTiling, RunKernel */
-                   ExpectInfo(true,                              /* ExpectSuccess */
-                              10000000010221110943UL,            /* ExpectTilingKey */
-                              1)), /* ExpectTilingBlockDim */
-            FaParam(1, 1, 1, 1, 1025, 16,                        /* B, N2, G, S1, S2, D */
-                    ge::DataType::DT_FLOAT, LayoutType::BSH,     /* Dtype, Layout */
-                    0.08838f, 0.9f, 65535, 0,                    /* Scale, KeepProb, PreTokens, NxtTokens */
-                    0, 6,                                        /* InnerPrecise, SparseMode */
-                    PseShapeType::NONE,                          /* PseShapeType */
-                    DropMaskShapeType::NONE,                     /* DropMaskShapeType */
-                    PaddingMaskShapeType::NONE,                  /* PaddingMaskShapeType */
-                    AttenMaskShapeType::PREFIXCOMPRESS,          /* AttentionMaskShapeType */
-                    ge::DataType::DT_BOOL,                       /* AttentionMaskDtype */
-                    PrefixShapeType::B,                          /* PrefixShapeType */
-                    {1025},{},{})                                     /* PrefixTensorData */
-
+                    PrefixShapeType::NONE,                       /* PrefixShapeType */
+                    {},                                          /* PrefixTensorData */
+                    {256},                                       /* ActualSeqQTensorData */
+                    {65})                                        /* ActualSeqKVTensorData */
+            ),
+    FasCase("Fas_Redline_SpecCore_Case_run_kernel_s1s2", true, /* CaseName, Enable */
+            "",                                                /* DebugInfo */
+            OpInfo(ControlInfo(true, true),                    /* RunTiling, RunKernel */
+                   ExpectInfo(true,                            /* ExpectSuccess */
+                              10000000011221212943UL,          /* ExpectTilingKey */
+                              ExpectInfo::kFullTilingBlockDim)),                             /* ExpectTilingBlockDim */
+            FaParam(1, 1, 1, 256, 1025, 32,                    /* B, N2, G, S1, S2, D */
+                    ge::DataType::DT_FLOAT, LayoutType::SBH,   /* Dtype, Layout */
+                    0.08838f, 0.9f, -200, 1024,                /* Scale, KeepProb, PreTokens, NxtTokens */
+                    0, 4,                                      /* InnerPrecise, SparseMode */
+                    PseShapeType::NONE,                        /* PseShapeType */
+                    DropMaskShapeType::B_N1_S1_S2,             /* DropMaskShapeType */
+                    PaddingMaskShapeType::NONE,                /* PaddingMaskShapeType */
+                    AttenMaskShapeType::SPARSE,                /* AttentionMaskShapeType */
+                    ge::DataType::DT_BOOL,                     /* AttentionMaskDtype */
+                    PrefixShapeType::NONE)                     /* PrefixShapeType */
+            ),
+    FasCase("Fas_Redline_SpecCore_Case_run_kernel_s1", true, /* CaseName, Enable */
+            "",                                                /* DebugInfo */
+            OpInfo(ControlInfo(true, true),                    /* RunTiling, RunKernel */
+                   ExpectInfo(true,                            /* ExpectSuccess */
+                              10000000112200230953UL,          /* ExpectTilingKey */
+                              ExpectInfo::kFullTilingBlockDim)),                             /* ExpectTilingBlockDim */
+            FaParam(1, 1, 1, 256, 129, 32,                    /* B, N2, G, S1, S2, D */
+                    ge::DataType::DT_FLOAT16, LayoutType::SBH,   /* Dtype, Layout */
+                    0.08838f, 0.9f, 65536, 65536,                /* Scale, KeepProb, PreTokens, NxtTokens */
+                    0, 1,                                      /* InnerPrecise, SparseMode */
+                    PseShapeType::NONE,                        /* PseShapeType */
+                    DropMaskShapeType::B_N1_S1_S2,             /* DropMaskShapeType */
+                    PaddingMaskShapeType::NONE,                /* PaddingMaskShapeType */
+                    AttenMaskShapeType::S1_S2,                /* AttentionMaskShapeType */
+                    ge::DataType::DT_BOOL,                     /* AttentionMaskDtype */
+                    PrefixShapeType::NONE)                     /* PrefixShapeType */
     )
 );
 INSTANTIATE_TEST_SUITE_P(Fas, Ts_Fas_Ascend910B2_Redline_SpecCore, Tc_Fas_Redline_SpecCore_Case);

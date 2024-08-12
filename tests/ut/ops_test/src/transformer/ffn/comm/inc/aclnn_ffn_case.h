@@ -30,15 +30,15 @@ public:
 
 public:
     /* 算子控制信息 */
-    AclnnContext aclnnCtx;
+    AclnnContext mAclnnCtx;
 
     /* 输入/输出 参数 */
-    AclnnFFNParam aclnnParam;
+    AclnnFFNParam mAclnnParam;
 
 public:
     AclnnFFNCase();
-    AclnnFFNCase(const char *name, bool enable, const char *dbgInfo, OpInfo opInfo,
-                 AclnnFFNParam param, int32_t tilingTemplatePriority = kTilingTemplatePriority_Invalid);
+    AclnnFFNCase(const char *name, bool enable, const char *dbgInfo, OpInfo opInfo, AclnnFFNParam param,
+                 int32_t tilingTemplatePriority = kTilingTemplatePriority_Invalid);
     bool Run() override;
 
 protected:

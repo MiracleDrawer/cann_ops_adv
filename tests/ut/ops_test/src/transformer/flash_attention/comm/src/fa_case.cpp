@@ -61,7 +61,7 @@ ASCENDC_EXTERN_C ge::graphStatus FlashAttentionScoreTilingFuncStub(gert::TilingC
         if (faCase->DoOpTiling(p)) {
             return p.ret;
         }
-        return faCase->fasOriginTilingFunc(context);
+        return faCase->mFasOriginTilingFunc(context);
     }
     return ge::GRAPH_FAILED;
 }
@@ -81,7 +81,7 @@ ASCENDC_EXTERN_C ge::graphStatus FlashAttentionScoreGradTilingFuncStub(gert::Til
         if (faCase->DoOpTiling(p)) {
             return p.ret;
         }
-        return faCase->fagOriginTilingFunc(context);
+        return faCase->mFagOriginTilingFunc(context);
     }
     return ge::GRAPH_FAILED;
 }
@@ -186,28 +186,28 @@ FaCase::FaCase() : FaCase("Undefined", true, "", OpInfo(), OpInfo(), FaParam(), 
 
 FaCase::FaCase(const char *name, bool enable, const char *dbgInfo, OpInfo forward, OpInfo reverse, FaParam param,
                int32_t tilingTemplatePriority)
-    : Case(name, enable, dbgInfo, tilingTemplatePriority), forward(std::move(forward)), reverse(std::move(reverse)),
-      param(std::move(param))
+    : Case(name, enable, dbgInfo, tilingTemplatePriority), mForward(std::move(forward)), mReverse(std::move(reverse)),
+      mParam(std::move(param))
 {
-    this->forward.name = "FlashAttentionScore";
-    this->reverse.name = "FlashAttentionScoreGrad";
+    mForward.mName = "FlashAttentionScore";
+    mReverse.mName = "FlashAttentionScoreGrad";
 }
 
 bool FaCase::Run()
 {
-    if (!enable) {
+    if (!mEnable) {
         return true;
     }
-    if (!forward.ProcessTiling(name)) {
+    if (!mForward.ProcessTiling(mName)) {
         return false;
     }
-    if (!forward.ProcessKernel(name)) {
+    if (!mForward.ProcessKernel(mName)) {
         return false;
     }
-    if (!reverse.ProcessTiling(name)) {
+    if (!mReverse.ProcessTiling(mName)) {
         return false;
     }
-    if (!reverse.ProcessKernel(name)) {
+    if (!mReverse.ProcessKernel(mName)) {
         return false;
     }
     return true;
@@ -215,7 +215,7 @@ bool FaCase::Run()
 
 bool FaCase::InitParam()
 {
-    if (!param.Init()) {
+    if (!mParam.Init()) {
         return false;
     }
     return true;
@@ -225,52 +225,54 @@ bool FaCase::InitOpInfo()
 {
     auto *fasKernelFunc = (void *)flash_attention_score_bf16;
     auto *fagKernelFunc = (void *)flash_attention_score_grad_bf16;
-    if (param.dtype == ge::DataType::DT_FLOAT16) {
+    if (mParam.dtype == ge::DataType::DT_FLOAT16) {
         fasKernelFunc = (void *)flash_attention_score_fp16;
         fagKernelFunc = (void *)flash_attention_score_grad_fp16;
-    } else if (param.dtype == ge::DataType::DT_FLOAT) {
+    } else if (mParam.dtype == ge::DataType::DT_FLOAT) {
         fasKernelFunc = (void *)flash_attention_score_fp32;
         fagKernelFunc = (void *)flash_attention_score_grad_fp32;
     }
 
-    bool rst = forwardCtx.SetOpName(forward.name.c_str());
-    rst = rst && forwardCtx.SetDeterministic(forward.ctr.deterministic);
-    rst = rst && forwardCtx.SetInputs({&param.query, &param.key, &param.value, &param.pse, &param.dropMask,
-                                       &param.paddingMask, &param.attenMask, &param.prefix, &param.actualSeqQLen,
-                                       &param.actualSeqKvLen, &param.qStartIdx, &param.kvStartIdx});
-    rst = rst && forwardCtx.SetOutputs({&param.softmaxMax, &param.softmaxSum, &param.softmaxRes, &param.attenRes});
-    rst = rst && forwardCtx.SetAttrs({{"scale_value", param.scale},
-                                      {"keep_prob", param.keepProb},
-                                      {"pre_tockens", param.preTokens},
-                                      {"next_tockens", param.nxtTokens},
-                                      {"head_num", param.n1},
-                                      {"input_layout", param.layout},
-                                      {"inner_precise", param.innerPrecise},
-                                      {"sparse_mode", param.sparseMode},
-                                      {"pse_type", param.pseType}});
-    rst = rst && forwardCtx.SetKernelRunCbf(RunFlashAttention);
-    rst = rst && forwardCtx.SetKernelMainFunc((void *)fasKernelFunc);
-    rst = rst && forward.SetContext(&forwardCtx);
-    rst = rst && reverseCtx.SetOpName(reverse.name.c_str());
-    rst = rst && reverseCtx.SetDeterministic(reverse.ctr.deterministic);
-    rst = rst && reverseCtx.SetInputs({&param.query, &param.key, &param.value, &param.dy, &param.pse, &param.dropMask,
-                                       &param.paddingMask, &param.attenMask, &param.softmaxMax, &param.softmaxSum,
-                                       &param.softmaxRes, &param.attenRes, &param.prefix, &param.actualSeqQLen,
-                                       &param.actualSeqKvLen, &param.qStartIdx, &param.kvStartIdx});
-    rst = rst && reverseCtx.SetOutputs({&param.dq, &param.dk, &param.dv, &param.dPse});
-    rst = rst && reverseCtx.SetAttrs({{"scale_value", param.scale},
-                                      {"keep_prob", param.keepProb},
-                                      {"pre_tockens", param.preTokens},
-                                      {"next_tockens", param.nxtTokens},
-                                      {"head_num", param.n1},
-                                      {"input_layout", param.layout},
-                                      {"inner_precise", param.innerPrecise},
-                                      {"sparse_mode", param.sparseMode},
-                                      {"pse_type", param.pseType}});
-    rst = rst && reverseCtx.SetTilingMaxDataSize(2560);
-    rst = rst && reverseCtx.SetKernelRunCbf(RunFlashAttentionGrad);
-    rst = rst && reverseCtx.SetKernelMainFunc((void *)fagKernelFunc);
-    rst = rst && reverse.SetContext(&reverseCtx);
+    bool rst = mForwardCtx.SetOpName(mForward.mName.c_str());
+    rst = rst && mForwardCtx.SetDeterministic(mForward.mCtr.mDeterministic);
+    rst = rst && mForwardCtx.SetInputs({&mParam.query, &mParam.key, &mParam.value, &mParam.pse, &mParam.dropMask,
+                                        &mParam.paddingMask, &mParam.attenMask, &mParam.prefix, &mParam.actualSeqQLen,
+                                        &mParam.actualSeqKvLen, &mParam.qStartIdx, &mParam.kvStartIdx});
+    rst = rst && mForwardCtx.SetOutputs({&mParam.softmaxMax, &mParam.softmaxSum, &mParam.softmaxRes, &mParam.attenRes});
+    rst = rst && mForwardCtx.SetAttrs({{"scale_value", mParam.scale},
+                                       {"keep_prob", mParam.keepProb},
+                                       {"pre_tockens", mParam.preTokens},
+                                       {"next_tockens", mParam.nxtTokens},
+                                       {"head_num", mParam.n1},
+                                       {"input_layout", mParam.layout},
+                                       {"inner_precise", mParam.innerPrecise},
+                                       {"sparse_mode", mParam.sparseMode},
+                                       {"pse_type", mParam.pseType}});
+    rst = rst && mForwardCtx.SetTilingDataMaxSize(2456);    /* 2456 FlashAttentionScore 最大 TilingData 大小 */
+    rst = rst && mForwardCtx.SetKernelRunCbf(RunFlashAttention);
+    rst = rst && mForwardCtx.SetKernelMainFunc((void *)fasKernelFunc);
+    rst = rst && mForward.SetContext(&mForwardCtx);
+    rst = rst && mReverseCtx.SetOpName(mReverse.mName.c_str());
+    rst = rst && mReverseCtx.SetDeterministic(mReverse.mCtr.mDeterministic);
+    rst = rst &&
+          mReverseCtx.SetInputs({&mParam.query, &mParam.key, &mParam.value, &mParam.dy, &mParam.pse, &mParam.dropMask,
+                                 &mParam.paddingMask, &mParam.attenMask, &mParam.softmaxMax, &mParam.softmaxSum,
+                                 &mParam.softmaxRes, &mParam.attenRes, &mParam.prefix, &mParam.actualSeqQLen,
+                                 &mParam.actualSeqKvLen, &mParam.qStartIdx, &mParam.kvStartIdx});
+    rst = rst && mReverseCtx.SetOutputs({&mParam.dq, &mParam.dk, &mParam.dv, &mParam.dPse});
+    rst = rst && mReverseCtx.SetAttrs({{"scale_value", mParam.scale},
+                                       {"keep_prob", mParam.keepProb},
+                                       {"pre_tockens", mParam.preTokens},
+                                       {"next_tockens", mParam.nxtTokens},
+                                       {"head_num", mParam.n1},
+                                       {"input_layout", mParam.layout},
+                                       {"inner_precise", mParam.innerPrecise},
+                                       {"sparse_mode", mParam.sparseMode},
+                                       {"pse_type", mParam.pseType}});
+    rst = rst && mReverseCtx.SetTilingDataMaxSize(2560);    /* 2560 FlashAttentionScoreGrad 最大 TilingData 大小 */
+    rst = rst && mReverseCtx.SetKernelRunCbf(RunFlashAttentionGrad);
+    rst = rst && mReverseCtx.SetKernelMainFunc((void *)fagKernelFunc);
+    rst = rst && mReverse.SetContext(&mReverseCtx);
     if (!rst) {
         return rst;
     }
@@ -294,12 +296,12 @@ bool FaCase::InitOriginTilingFunc()
 
     /* FlashAttentionScore FlashAttentionScoreGrad 需提供修改 TilingContext 功能 */
     /* FlashAttentionScoreGrad 需提供按指定优先级调用 Tiling 模板功能 */
-    fasOriginTilingFunc =
+    mFasOriginTilingFunc =
         (gert::OpImplKernelRegistry::TilingKernelFunc)platform->LoadOpTilingSoSym("TilingFlashAttentionScore");
-    fagOriginTilingFunc =
+    mFagOriginTilingFunc =
         (gert::OpImplKernelRegistry::TilingKernelFunc)platform->LoadOpTilingSoSym("TilingFlashAttentionGradScore");
-    if (fasOriginTilingFunc == nullptr || fagOriginTilingFunc == nullptr) {
-        LOG_ERR("Can't get origin tiling func, Fas(%p), Fag(%p)", fasOriginTilingFunc, fagOriginTilingFunc);
+    if (mFasOriginTilingFunc == nullptr || mFagOriginTilingFunc == nullptr) {
+        LOG_ERR("Can't get origin tiling func, Fas(%p), Fag(%p)", mFasOriginTilingFunc, mFagOriginTilingFunc);
         return false;
     }
     return true;
@@ -307,7 +309,7 @@ bool FaCase::InitOriginTilingFunc()
 
 bool FaCase::InitCurrentCasePtr()
 {
-    Case::currentCasePtr = this;
+    Case::mCurrentCasePtr = this;
     return true;
 }
 
@@ -316,27 +318,27 @@ bool FaCase::DoOpTiling(DoTilingParam &tilingParam)
     if (tilingParam.ctx == nullptr) {
         return false;
     }
-    if (preTilingRunCbf != nullptr) {
-        preTilingRunCbf(tilingParam);
+    if (mPreTilingRunCbf != nullptr) {
+        mPreTilingRunCbf(tilingParam);
     }
     /* 外部无法构造 Tensor 的数据, 此处进行处理 */
     if (tilingParam.prefixTensor != nullptr) {
-        tilingParam.prefixTensor->SetData(gert::TensorData{param.prefixTensorData.data()});
+        tilingParam.prefixTensor->SetData(gert::TensorData{mParam.prefixTensorData.data()});
     }
     if (tilingParam.actSeqQLenTensor != nullptr) {
-        tilingParam.actSeqQLenTensor->SetData(gert::TensorData{param.actualSeqQLenTensorData.data()});
+        tilingParam.actSeqQLenTensor->SetData(gert::TensorData{mParam.actualSeqQLenTensorData.data()});
     }
     if (tilingParam.actSeqKVLenTensor != nullptr) {
-        tilingParam.actSeqKVLenTensor->SetData(gert::TensorData{param.actualSeqKVLenTensorData.data()});
+        tilingParam.actSeqKVLenTensor->SetData(gert::TensorData{mParam.actualSeqKVLenTensorData.data()});
     }
     if (tilingParam.qStartIdxTensor != nullptr) {
-        tilingParam.qStartIdxTensor->SetData(gert::TensorData{param.qStartIdxTensorData.data()});
+        tilingParam.qStartIdxTensor->SetData(gert::TensorData{mParam.qStartIdxTensorData.data()});
     }
     if (tilingParam.kvStartIdxTensor != nullptr) {
-        tilingParam.kvStartIdxTensor->SetData(gert::TensorData{param.kvStartIdxTensorData.data()});
+        tilingParam.kvStartIdxTensor->SetData(gert::TensorData{mParam.kvStartIdxTensorData.data()});
     }
     /* 按优先级 Tiling */
-    auto priority = tilingTemplatePriority;
+    auto priority = mTilingTemplatePriority;
     if (priority == Case::kTilingTemplatePriority_Invalid) {
         return false;
     }

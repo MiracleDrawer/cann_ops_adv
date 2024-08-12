@@ -37,9 +37,9 @@ TEST_F(Ts_Fag_Ascend910B2, Tc_Us1s2Bbn2_IllegalAttenMaskShape_001)
     );
 
     ASSERT_TRUE(cs.Init());
-    cs.param.attenMask = Tensor("atten_mask", {10000, 10000, cs.param.s1, cs.param.s2}, "X_X_S1_S2",
-                                cs.param.attenMaskDtype, ge::FORMAT_ND);
-    ASSERT_EQ(cs.Run(), cs.reverse.exp.success);
+    cs.mParam.attenMask = Tensor("atten_mask", {10000, 10000, cs.mParam.s1, cs.mParam.s2}, "X_X_S1_S2",
+                                 cs.mParam.attenMaskDtype, ge::FORMAT_ND);
+    ASSERT_EQ(cs.Run(), cs.mReverse.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fag_Ascend910B2, Tc_Us1s2Bbn2_IllegalAttenMaskShape_002)
@@ -64,8 +64,8 @@ TEST_F(Ts_Fag_Ascend910B2, Tc_Us1s2Bbn2_IllegalAttenMaskShape_002)
     );
 
     ASSERT_TRUE(cs.Init());
-    cs.param.attenMask = Tensor("atten_mask", {cs.param.b}, "B", cs.param.attenMaskDtype, ge::FORMAT_ND);
-    ASSERT_EQ(cs.Run(), cs.reverse.exp.success);
+    cs.mParam.attenMask = Tensor("atten_mask", {cs.mParam.b}, "B", cs.mParam.attenMaskDtype, ge::FORMAT_ND);
+    ASSERT_EQ(cs.Run(), cs.mReverse.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fag_Ascend910B2, Tc_Us1s2Bbn2_IllegalPseShape_001)
@@ -90,8 +90,9 @@ TEST_F(Ts_Fag_Ascend910B2, Tc_Us1s2Bbn2_IllegalPseShape_001)
     );
 
     ASSERT_TRUE(cs.Init());
-    cs.param.pse = Tensor("pse", {10000, 10000, cs.param.s1, cs.param.s2}, "X_X_S1_S2", cs.param.dtype, ge::FORMAT_ND);
-    ASSERT_EQ(cs.Run(), cs.reverse.exp.success);
+    cs.mParam.pse =
+        Tensor("pse", {10000, 10000, cs.mParam.s1, cs.mParam.s2}, "X_X_S1_S2", cs.mParam.dtype, ge::FORMAT_ND);
+    ASSERT_EQ(cs.Run(), cs.mReverse.mExp.mSuccess);
 }
 
 TEST_F(Ts_Fag_Ascend910B2, Tc_Us1s2Bbn2_IllegalPseShape_002)
@@ -116,8 +117,8 @@ TEST_F(Ts_Fag_Ascend910B2, Tc_Us1s2Bbn2_IllegalPseShape_002)
     );
 
     ASSERT_TRUE(cs.Init());
-    cs.param.pse = Tensor("pse", {cs.param.b}, "B", cs.param.dtype, ge::FORMAT_ND);
-    ASSERT_EQ(cs.Run(), cs.reverse.exp.success);
+    cs.mParam.pse = Tensor("pse", {cs.mParam.b}, "B", cs.mParam.dtype, ge::FORMAT_ND);
+    ASSERT_EQ(cs.Run(), cs.mReverse.mExp.mSuccess);
 }
 
 class Ts_Fag_Ascend910B2_Us1s2Bbn2 : public Ts_Fag_WithParam_Ascend910B2 {};
@@ -125,7 +126,7 @@ class Ts_Fag_Ascend910B2_Us1s2Bbn2 : public Ts_Fag_WithParam_Ascend910B2 {};
 TEST_P(Ts_Fag_Ascend910B2_Us1s2Bbn2, Tc_BatchCase)
 {
     ASSERT_TRUE(case_->Init());
-    ASSERT_EQ(case_->Run(), case_->reverse.exp.success);
+    ASSERT_EQ(case_->Run(), case_->mReverse.mExp.mSuccess);
 }
 
 const auto Tc_Fag_Us1s2Bbn2_BatchCase = ::testing::Values(
@@ -662,7 +663,7 @@ const auto Tc_Fag_Us1s2Bbn2_BatchCase = ::testing::Values(
                               10000000011100021134UL,               /* ExpectTilingKey */
                               ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
             FaParam(2, 30, 2, 1024, 1024, 64,                       /* B, N2, G, S1, S2, D */
-                    ge::DataType::DT_FLOAT, LayoutType::BNSD,     /* Dtype, Layout */
+                    ge::DataType::DT_FLOAT, LayoutType::BNSD,       /* Dtype, Layout */
                     0.08838f, 0.8f, 512, -256,                      /* Scale, KeepProb, PreTokens, NxtTokens */
                     1, 0,                                           /* InnerPrecise, SparseMode */
                     PseShapeType::B_N1_1_S2,                        /* PseShapeType */
@@ -680,7 +681,7 @@ const auto Tc_Fag_Us1s2Bbn2_BatchCase = ::testing::Values(
                               10000000011100021134UL,               /* ExpectTilingKey */
                               ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
             FaParam(2, 30, 2, 9216, 77, 64,                         /* B, N2, G, S1, S2, D */
-                    ge::DataType::DT_FLOAT, LayoutType::BNSD,     /* Dtype, Layout */
+                    ge::DataType::DT_FLOAT, LayoutType::BNSD,       /* Dtype, Layout */
                     0.08838f, 0.8f, 65504, 65504,                   /* Scale, KeepProb, PreTokens, NxtTokens */
                     1, 0,                                           /* InnerPrecise, SparseMode */
                     PseShapeType::B_N1_1_S2,                        /* PseShapeType */
@@ -691,19 +692,19 @@ const auto Tc_Fag_Us1s2Bbn2_BatchCase = ::testing::Values(
                     PrefixShapeType::NONE),                         /* PrefixShapeType */
             FagCase::kTemplatePriority_Us1s2_Bbn2                   /* TilingTemplatePriority */
             ),
-     FagCase("Fag_Us1s2Bbn2_Case_031", true,                         /* CaseName, Enable */
+    FagCase("Fag_Us1s2Bbn2_Case_031", true,                         /* CaseName, Enable */
             "",                                                     /* DebugInfo */
             OpInfo(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                    ExpectInfo(true,                                 /* ExpectSuccess */
                               10000000001100011134UL,               /* ExpectTilingKey */
                               ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
             FaParam(128, 18, 1, 34, 34, 16,                         /* B, N2, G, S1, S2, D */
-                    ge::DataType::DT_FLOAT, LayoutType::SBH,     /* Dtype, Layout */
-                    0.08838f, 1, 65536, 65536,                   /* Scale, KeepProb, PreTokens, NxtTokens */
+                    ge::DataType::DT_FLOAT, LayoutType::SBH,        /* Dtype, Layout */
+                    0.08838f, 1, 65536, 65536,                      /* Scale, KeepProb, PreTokens, NxtTokens */
                     1, 0,                                           /* InnerPrecise, SparseMode */
-                    PseShapeType::B_N1_S1_S2,                        /* PseShapeType */
-                    DropMaskShapeType::NONE,                       /* DropMaskShapeType */
-                    PaddingMaskShapeType::NONE,                    /* PaddingMaskShapeType */
+                    PseShapeType::B_N1_S1_S2,                       /* PseShapeType */
+                    DropMaskShapeType::NONE,                        /* DropMaskShapeType */
+                    PaddingMaskShapeType::NONE,                     /* PaddingMaskShapeType */
                     AttenMaskShapeType::S1_S2,                      /* AttentionMaskShapeType */
                     ge::DataType::DT_BOOL,                          /* AttentionMaskDtype */
                     PrefixShapeType::NONE),                         /* PrefixShapeType */
@@ -712,14 +713,32 @@ const auto Tc_Fag_Us1s2Bbn2_BatchCase = ::testing::Values(
     FagCase("Fag_Us1s2Bbn2_Case_032", true,                         /* CaseName, Enable */
             "",                                                     /* DebugInfo */
             OpInfo(ControlInfo(true, false),                        /* RunTiling, RunKernel */
-                   ExpectInfo(false,                                 /* ExpectSuccess */
-                                ExpectInfo::kInvalidTilingKey,        /* ExpectTilingKey */
-                                ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
-            FaParam(1, 40, 1, 256, 128, 128,                      /* B, N2, G, S1, S2, D */
+                   ExpectInfo(false,                                /* ExpectSuccess */
+                              ExpectInfo::kInvalidTilingKey,        /* ExpectTilingKey */
+                              ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
+            FaParam(1, 40, 1, 256, 128, 128,                        /* B, N2, G, S1, S2, D */
                     ge::DataType::DT_BF16, LayoutType::BSND,        /* Dtype, Layout */
                     0.08838f, 0.8f, 2048, 2048,                     /* Scale, KeepProb, PreTokens, NxtTokens */
                     1, 8,                                           /* InnerPrecise, SparseMode */
                     PseShapeType::B_N1_1_S2,                        /* PseShapeType */
+                    DropMaskShapeType::B_N1_S1_S2DIV8,              /* DropMaskShapeType */
+                    PaddingMaskShapeType::S1_S2,                    /* PaddingMaskShapeType */
+                    AttenMaskShapeType::S1_S2,                      /* AttentionMaskShapeType */
+                    ge::DataType::DT_BOOL,                          /* AttentionMaskDtype */
+                    PrefixShapeType::NONE),                         /* PrefixShapeType */
+            FagCase::kTemplatePriority_Us1s2_Bbn2                   /* TilingTemplatePriority */
+            ),
+    FagCase("Fag_Us1s2Bbn2_Case_033", true,                         /* CaseName, Enable */
+            "",                                                     /* DebugInfo */
+            OpInfo(ControlInfo(true, true),                         /* RunTiling, RunKernel */
+                   ExpectInfo(true,                                 /* ExpectSuccess */
+                              ExpectInfo::kInvalidTilingKey,        /* ExpectTilingKey */
+                              ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
+            FaParam(2, 25, 1, 15, 15, 72,                           /* B, N2, G, S1, S2, D */
+                    ge::DataType::DT_FLOAT16, LayoutType::BNSD,     /* Dtype, Layout */
+                    0.08838f, 0.8f, 2048, 2048,                     /* Scale, KeepProb, PreTokens, NxtTokens */
+                    1, 0,                                           /* InnerPrecise, SparseMode */
+                    PseShapeType::NONE,                             /* PseShapeType */
                     DropMaskShapeType::B_N1_S1_S2DIV8,              /* DropMaskShapeType */
                     PaddingMaskShapeType::S1_S2,                    /* PaddingMaskShapeType */
                     AttenMaskShapeType::S1_S2,                      /* AttentionMaskShapeType */
@@ -736,25 +755,25 @@ class Ts_Fag_Ascend910B2_Us1s2Bbn2_InvalidShape : public Ts_Fag_Ascend910B2_Us1s
 TEST_P(Ts_Fag_Ascend910B2_Us1s2Bbn2_InvalidShape, Tc_AttenmaskErr)
 {
     ASSERT_TRUE(case_->Init());
-    case_->param.attenMask =
-        Tensor("attenMask", {case_->param.s1, 1}, "S1_1(Invalid)", case_->param.dtype, ge::FORMAT_ND);
-    ASSERT_EQ(case_->Run(), case_->reverse.exp.success);
+    case_->mParam.attenMask =
+        Tensor("attenMask", {case_->mParam.s1, 1}, "S1_1(Invalid)", case_->mParam.dtype, ge::FORMAT_ND);
+    ASSERT_EQ(case_->Run(), case_->mReverse.mExp.mSuccess);
 }
 
 TEST_P(Ts_Fag_Ascend910B2_Us1s2Bbn2_InvalidShape, Tc_AttenmaskErrDim)
 {
     ASSERT_TRUE(case_->Init());
-    case_->param.attenMask = Tensor("attenMask", {1, case_->param.s1, 1, case_->param.s2}, "1_S1_1_S2(Invalid)",
-                                    case_->param.dtype, ge::FORMAT_ND);
-    ASSERT_EQ(case_->Run(), case_->reverse.exp.success);
+    case_->mParam.attenMask = Tensor("attenMask", {1, case_->mParam.s1, 1, case_->mParam.s2}, "1_S1_1_S2(Invalid)",
+                                     case_->mParam.dtype, ge::FORMAT_ND);
+    ASSERT_EQ(case_->Run(), case_->mReverse.mExp.mSuccess);
 }
 
 TEST_P(Ts_Fag_Ascend910B2_Us1s2Bbn2_InvalidShape, Tc_AttenmaskErrDimNum)
 {
     ASSERT_TRUE(case_->Init());
-    case_->param.attenMask =
-        Tensor("attenMask", {1, case_->param.s1, 1}, "1_S1_1(Invalid)", case_->param.dtype, ge::FORMAT_ND);
-    ASSERT_EQ(case_->Run(), case_->reverse.exp.success);
+    case_->mParam.attenMask =
+        Tensor("attenMask", {1, case_->mParam.s1, 1}, "1_S1_1(Invalid)", case_->mParam.dtype, ge::FORMAT_ND);
+    ASSERT_EQ(case_->Run(), case_->mReverse.mExp.mSuccess);
 }
 
 const auto Tc_Fag_Us1s2Bbn2_InvalidShape_BatchCase = ::testing::Values(
@@ -785,18 +804,18 @@ class Ts_Fag_Ascend910B2_Us1s2Bbn2_InvalidPrefixCompressShape : public Ts_Fag_As
 
 TEST_P(Ts_Fag_Ascend910B2_Us1s2Bbn2_InvalidPrefixCompressShape, Tc_AttenmaskErrShapeForPrefixCompress)
 {
-       ASSERT_TRUE(case_->Init());
-       case_->param.attenMask =
-           Tensor("attenMask", {2048, 2048}, "not_3072_2048(Invalid)", case_->param.dtype, ge::FORMAT_ND);
-       ASSERT_EQ(case_->Run(), case_->reverse.exp.success);
+    ASSERT_TRUE(case_->Init());
+    case_->mParam.attenMask =
+        Tensor("attenMask", {2048, 2048}, "not_3072_2048(Invalid)", case_->mParam.dtype, ge::FORMAT_ND);
+    ASSERT_EQ(case_->Run(), case_->mReverse.mExp.mSuccess);
 }
 
 TEST_P(Ts_Fag_Ascend910B2_Us1s2Bbn2_InvalidPrefixCompressShape, Tc_PrefixErrShapeForPrefixCompress)
 {
-       ASSERT_TRUE(case_->Init());
-       case_->param.prefix = Tensor("prefix", {110, 110, 110, 110, 110, 110, 110}, "prefixN_gt_B(Invalid)",
-                                    case_->param.dtype, ge::FORMAT_ND);
-       ASSERT_EQ(case_->Run(), case_->reverse.exp.success);
+    ASSERT_TRUE(case_->Init());
+    case_->mParam.prefix = Tensor("prefix", {110, 110, 110, 110, 110, 110, 110}, "prefixN_gt_B(Invalid)",
+                                  case_->mParam.dtype, ge::FORMAT_ND);
+    ASSERT_EQ(case_->Run(), case_->mReverse.mExp.mSuccess);
 }
 
 const auto Tc_Fag_Us1s2Bbn2_InvalidPrefixCompressShape_BatchCase = ::testing::Values(

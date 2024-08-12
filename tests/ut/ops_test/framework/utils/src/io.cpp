@@ -23,14 +23,12 @@
 
 [[maybe_unused]] bool ops::adv::tests::utils::FileExist(const std::string &filePath)
 {
-    struct stat s {
-        0
-    };
+    struct stat s {};
     return stat(filePath.c_str(), &s) == 0;
 }
 
 [[maybe_unused]] bool ops::adv::tests::utils::ReadFile(const std::string &filePath, size_t &fileSize, void *buffer,
-                                                         size_t bufferSize)
+                                                       size_t bufferSize)
 {
     struct stat sBuf {};
     int fileStatus = stat(filePath.data(), &sBuf);

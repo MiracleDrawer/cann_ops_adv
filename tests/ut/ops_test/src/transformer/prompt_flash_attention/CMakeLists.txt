@@ -31,11 +31,12 @@ set(_PFA_CompileDefintions
         PFA_UT
 )
 OpsTest_Level2_AddOp(
-        BRIEF                                         Pfa
-        SNAKE                                         prompt_flash_attention
-        KERNEL_TILING_DATA_DEF_H                      ${_PFA_KernelTilingDataDefH}
-        KERNEL_SOURCES_EXT                            ${_PFA_KernelSourcesExt}
-        KERNEL_PRIVATE_COMPILE_DEFINITIONS_EXT        ${_PFA_CompileDefintions}
-        TILING_SOURCES_EXT                            ${_PFA_TilingSourcesExt}
-        UTEST_COMMON_PRIVATE_LINK_LIBRARIES_EXT       ${_PFA_TargetPrivateIncludesExt}
+        SUB_SYSTEM                              transformer
+        BRIEF                                   Pfa
+        SNAKE                                   prompt_flash_attention
+        KERNEL_TILING_DATA_DEF_H                ${_PFA_KernelTilingDataDefH}
+        KERNEL_SOURCES_EXT                      ${_PFA_KernelSourcesExt}
+        KERNEL_PRIVATE_COMPILE_DEFINITIONS_EXT  ${_PFA_CompileDefintions}
+        TILING_SOURCES_EXT                      ${_PFA_TilingSourcesExt}
+        UTEST_COMMON_PRIVATE_LINK_LIBRARIES_EXT ${_PFA_TargetPrivateIncludesExt}
 )

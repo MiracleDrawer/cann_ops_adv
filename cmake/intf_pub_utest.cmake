@@ -7,12 +7,8 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # ======================================================================================================================
 
-# UTest 场景, 严格检查源码实现的编译选项
-add_library(intf_utest_strict_compile_options INTERFACE)
-target_compile_options(intf_utest_strict_compile_options
-        INTERFACE
-            -Wall -Werror -fno-common -fno-strict-aliasing
-)
+# UTest 场景, 编译 Target 名称公共前缀
+set(UTest_NamePrefix UTest)
 
 # UTest 场景, 公共配置
 add_library(intf_pub_utest INTERFACE)
@@ -26,12 +22,40 @@ target_compile_definitions(intf_pub_utest
 )
 target_compile_options(intf_pub_utest
         INTERFACE
-            -Werror
             -fPIC
             $<IF:$<VERSION_GREATER:${CMAKE_C_COMPILER_VERSION},4.8.5>,-fstack-protector-strong,-fstack-protector-all>
             -g
             $<$<BOOL:${ENABLE_GCOV}>:--coverage -fprofile-arcs -ftest-coverage>
-            $<$<BOOL:${ENABLE_ASAN}>:-fsanitize=address -fsanitize-recover=address,all -fno-omit-frame-pointer>
+            $<$<BOOL:${ENABLE_ASAN}>:-fsanitize=address -fsanitize-address-use-after-scope -fsanitize=leak>
+            # 在 Clang 编译器场景下 使能 -fsanitize=undefined 会默认开启基本所有的 UBSAN 检查项, 只有以下检查项不会开启
+            #   float-divide-by-zero, unsigned-integer-overflow, implicit-conversion, local-bounds 及 nullability-* 类检查.
+            # 故在 Clang 编译器使能 UBSAN 场景下, 需开启 -fsanitize=undefined 使能时仍未开启的对应检查项
+            # 在 GNU 编译器场景下, 官方文档并未对使能 -fsanitize=undefined 时开启的默认检查项范围进行说明, 故手工开启常用基本检查项, 避免能力遗漏
+            $<$<BOOL:${ENABLE_UBSAN}>:-fsanitize=undefined -fsanitize=float-divide-by-zero -fno-sanitize=alignment>
+            $<$<BOOL:${ENABLE_UBSAN}>:$<$<CXX_COMPILER_ID:Clang>:-fsanitize=unsigned-integer-overflow -fsanitize=implicit-conversion>>    # GNU 不支持这些检查项
+            $<$<BOOL:${ENABLE_UBSAN}>:$<$<CXX_COMPILER_ID:GNU>:-fsanitize=shift -fsanitize=integer-divide-by-zero -fsanitize=signed-integer-overflow -fsanitize=float-divide-by-zero -fsanitize=float-cast-overflow -fsanitize=bool -fsanitize=enum -fsanitize=vptr>>
+            $<$<BOOL:${ENABLE_ASAN} OR ${ENABLE_UBSAN}>:-fno-omit-frame-pointer -fsanitize-recover=all>
+            -Wall -fno-common -fno-strict-aliasing
+            -Wundef -Wcast-qual -Wpointer-arith -Wdate-time
+            -Wfloat-equal -Wformat=2 -Wshadow
+            -Wsign-compare -Wunused-macros -Wvla -Wdisabled-optimization -Wempty-body -Wignored-qualifiers
+            $<$<CXX_COMPILER_ID:GNU>:-Wimplicit-fallthrough=3> -Wtype-limits -Wshift-negative-value -Wswitch-default
+            -Wframe-larger-than=33554432    # 33554432=32768 * 1024, 兼容 ASAN场景对栈的额外消耗
+            -Woverloaded-virtual
+            -Wnon-virtual-dtor $<$<CXX_COMPILER_ID:GNU>:-Wshift-overflow=2> -Wshift-count-overflow
+            -Wwrite-strings -Wmissing-format-attribute -Wformat-nonliteral
+            -Wdelete-non-virtual-dtor $<$<CXX_COMPILER_ID:GNU>:-Wduplicated-cond>
+            $<$<CXX_COMPILER_ID:GNU>:-Wtrampolines>
+            $<$<CXX_COMPILER_ID:GNU>:-Wsized-deallocation>
+            $<$<CXX_COMPILER_ID:GNU>:-Wlogical-op>
+            $<$<CXX_COMPILER_ID:GNU>:-Wsuggest-attribute=format>
+            $<$<COMPILE_LANGUAGE:C>:-Wnested-externs>
+            $<$<CXX_COMPILER_ID:GNU>:-Wduplicated-branches>
+            -Wmissing-include-dirs
+            $<$<CXX_COMPILER_ID:GNU>:-Wformat-signedness>
+            $<$<CXX_COMPILER_ID:GNU>:-Wreturn-local-addr> -Wextra
+            -Wredundant-decls -Wfloat-conversion
+            $<$<CXX_COMPILER_ID:Clang>:-Wno-tautological-unsigned-enum-zero-compare>
 )
 target_include_directories(intf_pub_utest
         INTERFACE
@@ -58,7 +82,5 @@ target_link_options(intf_pub_utest
         INTERFACE
             $<$<BOOL:${ENABLE_GCOV}>:-fprofile-arcs -ftest-coverage>
             $<$<BOOL:${ENABLE_ASAN}>:-fsanitize=address>
+            $<$<BOOL:${ENABLE_UBSAN}>:-fsanitize=undefined>
 )
-
-# UTest 场景, 编译 Target 名称公共前缀
-set(UTest_NamePrefix UTest)

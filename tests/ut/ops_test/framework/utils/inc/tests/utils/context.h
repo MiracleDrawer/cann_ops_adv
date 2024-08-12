@@ -24,9 +24,9 @@ class Context : public ops::adv::tests::utils::ContextIntf {
 public:
     /**
      * Ascend C 框架推荐的 TilingData 最大长度, 超过此值可能会导致算子性能下降.
-     * 注意: 此值不可修改.
+     * 注意: 若算子实际 TilingData 长度超过此值, 不可直接修改此值, 而应调用 SetTilingDataMaxSize 接口修改.
      */
-    static constexpr uint32_t kMaxTilingDataSize = 2048;
+    static constexpr uint32_t kDefaultTilingDataMaxSize = 2048;
 
     /**
      * Kernel 运行回调函数
@@ -45,32 +45,86 @@ public:
     Context() = default;
     ~Context() override;
 
-    /* 属性设置 */
+    /**
+     * 属性设置
+     * 设置确定性计算标识
+     */
     [[maybe_unused]] [[nodiscard]] bool SetDeterministic(bool enable);
-    [[maybe_unused]] [[nodiscard]] bool SetAttrs(std::vector<std::pair<std::string, std::any>> attrs);
-    [[maybe_unused]] [[nodiscard]] bool AddAttrs(std::vector<std::pair<std::string, std::any>> attrs);
-    [[maybe_unused]] [[nodiscard]] bool MdfAttrs(const std::pair<std::string, std::any> &attr);
-    [[maybe_unused]] [[nodiscard]] bool SetTilingMaxDataSize(uint32_t size = kMaxTilingDataSize);
-    [[maybe_unused]] [[nodiscard]] bool SetKernelRunCbf(KernelRunCbf cbf);
-    [[maybe_unused]] [[nodiscard]] bool SetKernelMainFunc(void* func);
 
-    /* 属性获取 */
+    /**
+     * 属性设置
+     * 设置算子输入属性
+     */
+    [[maybe_unused]] [[nodiscard]] bool SetAttrs(std::vector<std::pair<std::string, std::any>> attrs);
+
+    /**
+     * 属性设置
+     * 添加算子输入属性
+     */
+    [[maybe_unused]] [[nodiscard]] bool AddAttrs(std::vector<std::pair<std::string, std::any>> attrs);
+
+    /**
+     * 属性设置
+     * 修改算子输入属性
+     */
+    [[maybe_unused]] [[nodiscard]] bool MdfAttrs(const std::pair<std::string, std::any> &attr);
+
+    /**
+     * 属性设置
+     * 设置算子 TilingData 最大大小
+     */
+    [[maybe_unused]] [[nodiscard]] bool SetTilingDataMaxSize(uint32_t size = kDefaultTilingDataMaxSize);
+
+    /**
+     * 属性设置
+     * 设置算子 Kernel 处理回调函数
+     */
+    [[maybe_unused]] [[nodiscard]] bool SetKernelRunCbf(KernelRunCbf cbf);
+
+    /**
+     * 属性设置
+     * 设置算子 Kernel 总入口回调函数
+     */
+    [[maybe_unused]] [[nodiscard]] bool SetKernelMainFunc(void *func);
+
+    /**
+     * 属性获取
+     * 获取 TilingData 数量
+     */
     [[maybe_unused]] [[nodiscard]] int32_t GetTilingDataNum() const;
-    [[maybe_unused]] [[nodiscard]] void *GetTilingData() const;
+
+    /**
+     * 属性获取
+     * 获取 TilingData 值(无法获取具体结构, 需要调用者进行数据类型转换)
+     */
+    [[maybe_unused]] [[nodiscard]] const void *GetTilingData() const;
+
+    /**
+     * 属性获取
+     * 获取 TilingData 的 string 表示(0x格式)
+     */
     [[maybe_unused]] [[nodiscard]] const std::string &GetTilingDataStr() const;
+
+    /**
+     * 属性获取
+     * 获取 json 表示的 Tiling 结果
+     */
     [[maybe_unused]] [[nodiscard]] const std::string &GetTilingResult() const;
 
-    /* Tiling */
-    [[maybe_unused]] [[nodiscard]] bool RunTiling() override;
+    /**
+     * 运行 Tiling
+     * \param caseName 当前运行的用例名
+     */
+    [[maybe_unused]] [[nodiscard]] bool RunTiling(std::string &caseName) override;
 
 protected:
     static constexpr size_t kDefaultTilingResultSize_ = 10 * 1024 * 1024;
 
     /* 属性 */
     std::vector<std::pair<std::string, std::any>> attrs_;
-    uint32_t tilingDataMaxLen_ = kMaxTilingDataSize;
+    uint32_t tilingDataMaxLen_ = kDefaultTilingDataMaxSize;
     KernelRunCbf kernelRunCbf_ = nullptr;
-    void* kernelMainFunc_ = nullptr;
+    void *kernelMainFunc_ = nullptr;
     int64_t deterministic_ = 0; /**< 默认不开启确定性计算 */
 
     /* Tiling */
@@ -85,12 +139,14 @@ protected:
     std::string tilingDataStr_;
 
 protected:
-    bool RunKernelProcess() override;
+    bool RunKernelProcess(std::string &caseName) override;
     uint8_t *AllocWorkspaceImpl(uint64_t size) override;
     void FreeWorkspaceImpl(uint8_t *ptr) override;
 
     bool InitTilingJsonStr();
     bool ParseTilingResult();
+
+    static bool CheckKernelResultStr(std::string &kernelLog);
 
     template <class T> bool DetectField(T &field, const char *fPrefix, const char *fSuffix)
     {

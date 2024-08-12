@@ -80,7 +80,7 @@ public:
 
     template <class T> [[maybe_unused]] bool CopyDevDataToHost(std::vector<T> &hostData)
     {
-        int64_t hostEleNum = std::ceil(devDataSize_ / sizeof(T));
+        auto hostEleNum = static_cast<int64_t>(std::ceil(devDataSize_ / sizeof(T)));
         int64_t hostDataSize = hostEleNum * sizeof(T);
         hostData.resize(hostEleNum, 0);
         return this->CopyDevDataToHost((uint8_t *)hostData.data(), hostDataSize);

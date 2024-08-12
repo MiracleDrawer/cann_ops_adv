@@ -131,7 +131,7 @@ public:
 
 private:
     std::map<std::string, std::shared_ptr<TilingCases>> registry_map_;
-    const std::map<int32_t, TilingClassCase> empty_tiling_case_;
+    const std::map<int32_t, TilingClassCase> empty_tiling_case_ {};
 };
 
 class Register {

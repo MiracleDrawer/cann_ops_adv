@@ -38,19 +38,38 @@ get_target_property(GTEST_GTEST_INC GTest::gtest INTERFACE_INCLUDE_DIRECTORIES)
 list(APPEND CMAKE_PREFIX_PATH ${ASCEND_CANN_PACKAGE_PATH}/toolkit/tools/tikicpulib/lib/cmake)
 find_package(tikicpulib REQUIRED)
 
-# ASAN 场景随编译执行用例场景下, 将相关检查在编译前执行, 避免出现编译完成后又无法执行的情况, 影响使用体验.
-if (ENABLE_ASAN)
-    # libasan.so
-    execute_process(COMMAND ${CMAKE_C_COMPILER} --print-file-name=libasan.so
-                    RESULT_VARIABLE _RST
-                    OUTPUT_VARIABLE ASAN_SHARED_PATH)
-    if (_RST)
-        message(FATAL_ERROR "Can't get libasan.so path with ${CMAKE_C_COMPILER}")
+# ASAN / UBSAN 场景随编译执行用例场景下, 将相关检查在编译前执行, 避免出现编译完成后又无法执行的情况, 影响使用体验.
+if (ENABLE_ASAN OR ENABLE_UBSAN)
+    set(SAN_LD_PRELOAD "LD_PRELOAD=")
+    if (ENABLE_ASAN)
+        # libasan.so
+        execute_process(COMMAND ${CMAKE_C_COMPILER} --print-file-name=libasan.so
+                        RESULT_VARIABLE _RST
+                        OUTPUT_VARIABLE ASAN_SHARED_PATH)
+        if (_RST)
+            message(FATAL_ERROR "Can't get libasan.so path with ${CMAKE_C_COMPILER}")
+        endif ()
+        get_filename_component(ASAN_SHARED_PATH "${ASAN_SHARED_PATH}" DIRECTORY)
+        get_filename_component(ASAN_SHARED_PATH "${ASAN_SHARED_PATH}/libasan.so" REALPATH)
+        if (NOT EXISTS ${ASAN_SHARED_PATH})
+            message(FATAL_ERROR "ASAN_SHARED_PATH=${ASAN_SHARED_PATH} not exist.")
+        endif ()
+        set(SAN_LD_PRELOAD "${SAN_LD_PRELOAD}:${ASAN_SHARED_PATH}")
     endif ()
-    get_filename_component(ASAN_SHARED_PATH "${ASAN_SHARED_PATH}" DIRECTORY)
-    get_filename_component(ASAN_SHARED_PATH "${ASAN_SHARED_PATH}/libasan.so" REALPATH)
-    if (NOT EXISTS ${ASAN_SHARED_PATH})
-        message(FATAL_ERROR "ASAN_SHARED_PATH=${ASAN_SHARED_PATH} not exist.")
+    if (ENABLE_UBSAN)
+        # libubsan.so
+        execute_process(COMMAND ${CMAKE_C_COMPILER} --print-file-name=libubsan.so
+                        RESULT_VARIABLE _RST
+                        OUTPUT_VARIABLE UBSAN_SHARED_PATH)
+        if (_RST)
+            message(FATAL_ERROR "Can't get libubsan.so path with ${CMAKE_C_COMPILER}")
+        endif ()
+        get_filename_component(UBSAN_SHARED_PATH "${UBSAN_SHARED_PATH}" DIRECTORY)
+        get_filename_component(UBSAN_SHARED_PATH "${UBSAN_SHARED_PATH}/libubsan.so" REALPATH)
+        if (NOT EXISTS ${UBSAN_SHARED_PATH})
+            message(FATAL_ERROR "UBSAN_SHARED_PATH=${UBSAN_SHARED_PATH} not exist.")
+        endif ()
+        set(SAN_LD_PRELOAD "${SAN_LD_PRELOAD}:${UBSAN_SHARED_PATH}")
     endif ()
     # libstdc++.so
     execute_process(COMMAND ${CMAKE_C_COMPILER} --print-file-name=libstdc++.so
@@ -64,6 +83,7 @@ if (ENABLE_ASAN)
     if (NOT EXISTS ${STDC_SHARED_PATH})
         message(FATAL_ERROR "STDC_SHARED_PATH=${STDC_SHARED_PATH} not exist.")
     endif ()
+    set(SAN_LD_PRELOAD "${SAN_LD_PRELOAD}:${STDC_SHARED_PATH}")
 endif ()
 
 

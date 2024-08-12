@@ -29,13 +29,13 @@ FasCase::FasCase(const char *name, bool enable, const char *dbgInfo, OpInfo forw
 
 bool FasCase::Run()
 {
-    if (!enable) {
+    if (!mEnable) {
         return true;
     }
-    if (!forward.ProcessTiling(name)) {
+    if (!mForward.ProcessTiling(mName)) {
         return false;
     }
-    if (!forward.ProcessKernel(name)) {
+    if (!mForward.ProcessKernel(mName)) {
         return false;
     }
     return true;

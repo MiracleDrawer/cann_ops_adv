@@ -42,14 +42,11 @@ const size_t ATTEN_OUT_INDEX = 3UL;
 const size_t ATTENTION_MASK_DIM_NUM_4 = 4UL;
 const size_t ATTENTION_MASK_DIM_NUM_2 = 2UL;
 const int64_t BMM_SOFTMAX_RATIO = 4L;
-const size_t DATA_COPY_TRANPOSE_DIM_NUM = 4L;
 const int64_t MAX_AIV_NUM = 48L;
 const int64_t DROP_MASK_ALIGN_UNIT = 256L; // input bits, and align to 32B in UB
 const int64_t HIGH_PERF_BUFFER_NUM = 6L;
-const int64_t HIGH_PERF_SUPPORT_D_LIMIT = 128L;
 const int64_t HIGH_PERF_SUPPORT_S2_BASIC = 128L;
 const int64_t HIGH_PERF_API_BUFFER_MULTIPLE = 2L;
-const int64_t HIGH_PERF_WORKSPACE_MULTIPLE = 3L;
 const int64_t HIGH_PERF_BLOCK_SIZE = 128L;
 const uint32_t PSE_ALIBI_S_SIZE = 1024;
 
@@ -58,11 +55,9 @@ const int64_t ATTEN_MASK_S1_REV_INDEX = 2L;
 const int64_t ATTEN_MASK_COMPRESS_LIMIT = 2048L;
 const int64_t ATTEN_MASK_COMPRESS_PREFIX_LIMIT = 3072L;
 const int64_t MAX_VAR_LEN_SEQ_LEN = 4096L;
-const int64_t ALIGN_NUM_16 = 16L;
 const int64_t S2_REUSE_SIZE_512 = 512L;
 const int64_t S2_REUSE_SIZE_1024 = 1024L;
 const int64_t S1_REUSE_SIZE_3840 = 3840L;
-const int64_t S1_REUSE_SIZE_2048 = 2048L;
 const int64_t D_SPECIFIC_SIZE = 64L;
 const int64_t BALANCE_LOAD_LIST_SIZE = 8L;
 constexpr int64_t cof[BALANCE_LOAD_LIST_SIZE] = {256, 384, 512, 640, 768, 896, 960, 1024};
@@ -78,8 +73,6 @@ const int64_t BMM2_BASICBLOCK_N_64 = 64L;
 const int64_t BMM2_BASICBLOCK_K_256 = 256L;
 const int64_t S2_SPECIFIC_SIZE_928 = 928L;
 const int64_t S2_NZTOND_SIZE_128 = 128L;
-const int64_t MAX_PAD_S_DIM_SIZE = 512 * 1024;
-const int64_t MAX_UNPAD_S_DIM_SIZE = 64 * 1024;
 const int64_t UB_BASIC_LIMIT_SIZE = 8 * 1024;
 const int64_t SLOPE_BN_DIM_NUM = 2L;
 const int64_t SLOPE_N_DIM_NUM = 1L;
@@ -1710,9 +1703,9 @@ ge::graphStatus FlashAttentionScoreTilingBase::PostTiling()
                                 tilingData.multiCoreParams.get_coreNum();
         workspaces[0] += pseAlibiBytes;
     }
-    OPS_LOG_D(context_, "[%s] final workspace size: %zu, pseAlibiBaseS1:%ld, pseAlibiBaseS2:%ld.",
+    OPS_LOG_D(context_, "[%s] final workspace size:%zu, pseAlibiBaseS1:%ld, pseAlibiBaseS2:%ld.",
               templateName, workspaces[0], pseAlibiBaseS1, pseAlibiBaseS2);
-    OPS_LOG_D_FULL(opName, "[%s] tiling data: %s", templateName, GetTilingDataDebugStr().c_str());
+    OPS_LOG_D_FULL(opName, "[%s] tiling data:%s", templateName, GetTilingDataDebugStr().c_str());
     OPS_LOG_D(context_, "[%s] tiling data size: %zu", templateName, tilingData.GetDataSize());
 
     return ge::GRAPH_SUCCESS;
@@ -2828,10 +2821,11 @@ protected:
     bool SetBmm2TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock, int64_t tmpDBasicBlock, int64_t batch,
                             matmul_tiling::MatmulApiTiling &bmm2) override
     {
+        int64_t singleM = std::min(tmpS1BasicBlock, s1Size);
         bmm2.SetAType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
         bmm2.SetBType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmmDtype, false);
         bmm2.SetCType(matmul_tiling::TPosition::GM, matmul_tiling::CubeFormat::ND, bmm2OutDtype);
-        bmm2.SetShape(std::min(tmpS1BasicBlock, s1Size), dSize,
+        bmm2.SetShape(singleM, dSize,
                       std::min(tmpS2BasicBlock * tilingData.coreParams.get_nRatio(), s2Size));
         bmm2.SetOrgShape(s1Size, s2StrideSize, std::min(tmpS2BasicBlock * tilingData.coreParams.get_nRatio(), s2Size),
                          s2StrideSize);
@@ -2840,7 +2834,8 @@ protected:
             return false;
         }
         if (dSize == D_SPECIFIC_SIZE && tilingData.inputParams.get_layoutType() == LAYOUT_BNSD &&
-            tilingData.inputParams.get_sparseType() == static_cast<uint8_t>(SparseEnum::ALL)) {
+            tilingData.inputParams.get_sparseType() == static_cast<uint8_t>(SparseEnum::ALL) &&
+            singleM >= BMM2_BASICBLOCK_M_64) {
             if (bmm2.SetFixSplit(BMM2_BASICBLOCK_M_64, BMM2_BASICBLOCK_M_64, BMM2_BASICBLOCK_K_256) != 0) {
                 return false;
             }
@@ -3162,15 +3157,15 @@ protected:
 
         // dSize小于64的场景，无需切D， workspace占用较小
         if (dSize <= 64) {
-            // stage1占用2倍或4倍的空间，stage2占用2倍空间
+            // 默认使能NZND, stage1占用3倍的空间，stage2占用2倍空间
             workspaces[0] = static_cast<size_t>(
-                                (bmm1Byetes * SPACE_NUM_2 + stage1Bytes * SPACE_NUM_2 +
+                                (bmm1Byetes * SPACE_NUM_3 + stage1Bytes * SPACE_NUM_2 +
                                  SPACE_NUM_2 * coreParams.get_s1BaseSize() * dSize * calcTypeSize) * aivNum) +
                                  WORK_SPACE_RESERVE_SIZE;
         } else {
-            // 切D场景，stage1占用2倍或4倍的空间，stage2占用4倍空间
+            // 切D场景，默认使能NZND，stage1占用3倍的空间，stage2占用4倍空间
             workspaces[0] = static_cast<size_t>(
-                                (bmm1Byetes * SPACE_NUM_2 + stage1Bytes * SPACE_NUM_2 +
+                                (bmm1Byetes * SPACE_NUM_3 + stage1Bytes * SPACE_NUM_2 +
                                  SPACE_NUM_4 * coreParams.get_s1BaseSize() * dSize * calcTypeSize) * aivNum) +
                                  WORK_SPACE_RESERVE_SIZE;
         }
@@ -3666,7 +3661,6 @@ protected:
         baseUbCalSize = std::min(baseUbCalSize, shapeSingleCoreSize * ubCalFactor);
         // ub 的外层循环次数
         int64_t multiCoreFactorSize = CeilDivision(shapeSingleCoreSize * ubCalFactor, baseUbCalSize);
-        shapeTotalSize = AlignUp(shapeTotalSize, GM_ALIGN);
 
         dropmaskParams.set_shapeTotalSize(shapeTotalSize);
         dropmaskParams.set_multiCoreFactorSize(static_cast<int32_t>(multiCoreFactorSize));
