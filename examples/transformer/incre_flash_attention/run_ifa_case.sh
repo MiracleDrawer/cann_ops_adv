@@ -12,7 +12,7 @@ set -e
 
 CURRENT_DIR=$(dirname $(readlink -f ${BASH_SOURCE[0]}))
 
-# 根据cmake传进来的算子名参数 区分是fa的还是fag的
+# Distinguish whether it is fa or fag based on the operator name parameters passed in by cmake.
 case_name=$1
 test_program=$2
 
