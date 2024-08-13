@@ -115,27 +115,9 @@ extern "C" __global__ __aicore__ void ffn(__gm__ uint8_t *x, __gm__ uint8_t *wei
         FFNHighPerformence<half, mt> op(mm, mm);
         op.Init(x, weight1, weight2, expertTokens, bias1, bias2, y, user1, ffn_tiling_data, &tPipe);
         op.Process();
-    } else if (TILING_KEY_IS(6000)) { // One matmul, float16, weights are NZ format
-        KERNEL_TASK_TYPE(6000, KERNEL_TYPE_MIX_AIC_1_1);
-        using mt = mmType<half, CubeFormat::ND, CubeFormat::NZ>;
-        mt::MT mm;
-        const TCubeTiling *__restrict mmTiling = mm1Tiling->isBias ? mm1Tiling : mm2Tiling;
-        REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), mm, mmTiling);
-        FFNHighPerformence<half, mt> op(mm, mm);
-        op.Init(x, weight1, weight2, expertTokens, bias1, bias2, y, user1, ffn_tiling_data, &tPipe);
-        op.Process();
     } else if (TILING_KEY_IS(0)) { // Two matmul, float16
         KERNEL_TASK_TYPE(0, KERNEL_TYPE_MIX_AIC_1_1);
         using mt = mmType<half, CubeFormat::ND>;
-        mt::MT mm1;
-        mt::MT mm2;
-        REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), mm1, mm1Tiling, mm2, mm2Tiling);
-        FFNHighPerformence<half, mt> op(mm1, mm2);
-        op.Init(x, weight1, weight2, expertTokens, bias1, bias2, y, user1, ffn_tiling_data, &tPipe);
-        op.Process();
-    } else if (TILING_KEY_IS(4000)) { // Two matmul, float16, weights are NZ format
-        KERNEL_TASK_TYPE(4000, KERNEL_TYPE_MIX_AIC_1_1);
-        using mt = mmType<half, CubeFormat::ND, CubeFormat::NZ>;
         mt::MT mm1;
         mt::MT mm2;
         REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), mm1, mm1Tiling, mm2, mm2Tiling);

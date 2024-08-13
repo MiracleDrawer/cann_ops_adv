@@ -191,11 +191,7 @@ inline aclTensor* ConvertType(const gert::Tensor* ge_tensor) {
 
   void* device_addr = nullptr;
   auto tensor_place = ge_tensor->GetPlacement();
-  if (tensor_place == gert::kOnDeviceHbm) {
-    device_addr = (void*)ge_tensor->GetAddr();
-  } else {
-    device_addr = (void*)ge_tensor->GetAddr();
-  }
+  device_addr = const_cast<void*>(ge_tensor->GetAddr());
 
   auto dataType = GetConvertType(ge_tensor);
 
@@ -270,7 +266,7 @@ inline aclTensor* ConvertMmType(const gert::Tensor* ge_tensor, bool transpose, b
   static const auto aclCreateTensor = GET_OP_API_FUNC(aclCreateTensor);
   OPS_ERR_IF(aclCreateTensor == nullptr, OPS_LOG_E("aclnnfallback", "aclCreateTensor nullptr"), return nullptr);
 
-  void* device_addr = (void*)ge_tensor->GetAddr();;
+  void* device_addr = const_cast<void*>(ge_tensor->GetAddr());
   // convert data type
   auto dataType_ge = ge_tensor->GetDataType();
   auto dataType = ToAclDataType(dataType_ge);

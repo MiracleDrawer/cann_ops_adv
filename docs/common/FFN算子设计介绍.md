@@ -66,7 +66,7 @@ FFN算子核心计算过程如上图所示，计算主要由matmul1 -> 激活函
 
 为直观体现tiling计算的核心思路，以具体平台参数和典型输入shape为例：
 
-* 某910B平台20个AICore，L0A/L0B buffer大小为64kb，L0C buffer大小为128kb；
+* 以如下硬件信息为例：20个AICore，L0A/L0B buffer大小为64kb，L0C buffer大小为128kb；
 * x/weight数据类型为float16，x[128, 5120]，weight1[8, 5120, 2560]，weight2[8, 2560, 5120]，取expert_token=[16, 16, 16, 16, 16, 16, 16, 16]。此时需要循环8个专家，每个循环需要计算matmul1：A[16, 5120] \* B[5120, 2560]，激活函数：[16, 2560]，matmul2：A[16, 2560] \* B[2560, 5120]。
 
 FFN算子的计算过程主要为matmul1 + 激活函数 + matmul2，因此tiling参数也分为这3个部分，其中matmul计算是调用高阶api完成，对应的tiling参数主体也由对应的接口完成，FFN会根据实际算子优化效果对部分参数进行调整。
@@ -90,15 +90,15 @@ matmul tiling分为两个部分，分核和单核内的切分，这两部分相�
 
 * 分核
 
-  单核切分主要时考虑计算和搬运效率，分核是考虑将AiCore算力尽可能并行用起来。matmul的分核主要有m/k/n三个轴可以切分，但在分k周需要再额外做一次累加，或者利用DDR的atomic累加能力（支持float，如果输出是float16需要在搬运到vector做一次类型转换），在FFN算子的早期实现中尝试过该方案，性能无法达到预期，该方面没有再继续探索。当前FFN的实现都是在m/n两个轴上进行分核，或者在专家维度上进行分核。在确定单核baseM/baseK/baseN组合为：128/64/256的条件下
+  单核切分主要时考虑计算和搬运效率，分核是考虑将AiCore算力尽可能并行用起来。matmul的分核主要有m/k/n三个轴可以切分，但在k轴分核需要再额外做一次累加，或者利用DDR的atomic累加能力（支持float，如果输出是float16需要在搬运到vector做一次类型转换），在FFN算子的早期实现中尝试过该方案，性能无法达到预期，该方面没有再继续探索（该方式或许可进一步优化）。当前FFN的实现都是在m/n两个轴上进行分核，或者在专家维度上进行分核。在确定单核baseM/baseK/baseN组合为128/64/256的条件下：
 
   1. 按matmul1：A[16, 5120] \* B[5120, 2560]的shape，n=2560，分10核计算，单核singleN=256；
   2. 按matmul2：A[16, 2560] \* B[2560, 5120]的shape，n=5120，分20核计算，单核singleN=256；
 
   matmul1按最优的单核策略，只够分10核，浪费了一半的AiCore能力，matmul2与matmul1之间有数据依赖，无法将其用来算matmul2，此时有两种解决方案：
 
-  1. 取后一个专家的matmul1来并行计算，本文档中成为专家并行分核方案；
-  2. 重新调整matmul1的singleN=128或者更小，以是能多核并行计算。
+  1. 取后一个专家的matmul1来并行计算，本文档中称为专家并行分核方案；
+  2. 重新调整matmul1的singleN=128或者更小，以使能多核并行计算。
 
   当前代码为这两种方案的组合，根据实际的shape信息进行选择。
 
@@ -113,11 +113,11 @@ matmul tiling分为两个部分，分核和单核内的切分，这两部分相�
 
 * 混合并行
 
-  专家并行存在的一个问题是，当并行的两个matmul的m轴相差较大时（n/k轴总是相等的），有一半的核会算的比较快，在Sync All只能空闲等待，从而导致算力浪费，直观的解决方案是选取m相近的专家进行分核。结合单核切分信息baseM：
+  专家并行存在的一个问题是，当并行的两个matmul的m轴相差较大时（n/k轴总是相等的），有一半的核会算的比较快，在SyncAll只能空闲等待，从而导致算力浪费，直观的解决方案是选取m相近的专家进行分核。结合shape信息和单核切分信息baseM：
 
   1. 初始化空数组tokenCache，数组最大长度为允许并行的最大专家数量，此处以2为例；
   2. 遍历token，得到当前专家matmul计算的m轴大小；
-  3. 当m>baseM时，意味着m轴可以进行分核，配合n轴分核，可以分满AiCore核，此时不需要专家并行，直接完成该专家的计算；
+  3. 当m > baseM时，意味着m轴可以进行分核，配合n轴分核，可以分满AiCore核，此时不需要专家并行，直接完成该专家的计算；
   4. 当m <= baseM时，将当前专家信息存放在数组tokenCache中；
   5. 当tokenCache中已缓存2个专家时，启动专家并行计算，并清空tokenCache；否则回到第2步；
   6. 当遍历完所有token，tokenCache不为空时，遍历tokenCache，不进行专家并行，调整singeN=128进行分核计算；
@@ -128,7 +128,7 @@ matmul tiling分为两个部分，分核和单核内的切分，这两部分相�
 
 FFN的计算里没有归约计算，因此tiling可以更灵活，一般是在matmul的tiling基础之上进行，主要考虑的因素：
 
-1. 高效的计算过程，vector计算过程总体比较简单、确定，没有太多优化空间；
+1. 高效的计算过程，但FFN的vector计算过程总体比较简单、确定，该因素上没有太多优化空间；
 2. UB buffer的大小，主要考虑内存复用和每次计算的数据量。
 
 以vector的tiling参数baseM、baseN（与matmul的baseM、baseN不是同一个变量，以cubeTiling.baseM、cubeTiling.baseN区分）决定每次的vector计算量，vector的计算方式一般为两重循环。
@@ -143,22 +143,22 @@ for (int offsetM = 0; offsetM < cubeTiling.baseM; offsetM += baseM) {
 }
 ```
 
-上述计算过程需要确定vector计算的baseM、baseN，同时确定UB buffer的分配复用情况。非量化、伪量化的计算过程简单，没有UB buffer的复用。量化场景多、计算复杂，UB buffer需要复用，以提高单次计算的数据量，其复用情况如下（量化模板vector计算过程见上文）：
+上述计算过程需要确定vector计算的baseM、baseN，同时确定UB buffer的分配复用情况。非量化、伪量化的计算过程简单，没有UB buffer的复用，而量化场景多、计算复杂，UB buffer需要复用，以提高单次计算的数据量，其复用情况如下（量化模板vector计算过程见上文）：
 
 ![FFN量化场景UB buffer分配](../fig/FFN量化场景UB_buffer分配.png)
 
-定义每份buffer比上处理的数据个数（baseM*baseN，记为ubCalcSize）为该buffer的份数，总结不同场景的UB buffer分配情况如下：
+定义每份buffer分配的字节大小比上处理的数据个数（baseM*baseN，记为ubCalcSize）为该buffer的份数，总结不同场景的UB buffer分配情况如下：
 
 | 场景                       | 输入 | 输出 | double buffer | temp buffer | 高阶api temp | baseM*baseN示例 | 总份数* ubCalcSize |
 | -------------------------- | ---- | ---- | ------------- | ----------- | ------------ | --------------- | ------------------ |
 | 高精度                     | 4    | 2    | 1             | 4           | 8            | 32*256=8kb      | 18*8kb=144kb       |
-| 高性能                     | 2    | 2    | 1             | 0           | 4            | 64*256=16kb     | 8*16kb=160kb       |
+| 高性能                     | 2    | 2    | 1             | 0           | 4            | 64*256=16kb     | 8*16kb=128kb       |
 | 量化输出float16            | 2    | 1    | 1             | 2           | 4            | 64*256=16kb     | 9*16kb=144kb       |
-| 量化输出bfloat16           | 4    | 2    | 1             | 6           | 8            | 64*256=16kb     | 20*16kb=144kb      |
+| 量化输出bfloat16           | 4    | 2    | 1             | 6           | 8            | 64*256=16kb     | 20*8kb=160kb      |
 | 伪量化float16激活函数      | 2    | 2    | 2             | 0           | 4            | 32*256=8kb      | 13*8kb=104kb       |
-| 伪量化float16 cast weight  | 1    | 2    | 2             | 0           | 0            | 同上            | 同上               |
+| 伪量化float16 cast weight  | 1    | 2    | 2             | 0           | 0            | 同上            | scale按一份计入上一行总份数 |
 | 伪量化bfloat16激活函数     | 4    | 2    | 2             | 4           | 6            | 32*256=8kb      | 23*8kb=184kb       |
-| 伪量化bfloat16 cast weight | 1    | 2    | 2             | 0           | 6            | 同上            | 同上               |
+| 伪量化bfloat16 cast weight | 1    | 2    | 2             | 0           | 6            | 同上            | scale按一份计入上一行总份数 |
 
 说明：
 
@@ -166,11 +166,12 @@ for (int offsetM = 0; offsetM < cubeTiling.baseM; offsetM += baseM) {
 2. temp buffer为FFN算子处理过程中要用到的UB临时空间，如激活函数(float32)->Cast(bfloat16)，激活函数的输出是在UB临时空间上；
 3. 高级api temp指给高级api预留的临时空间，高阶api除了输入输出，其计算过程中也需要占用除此之外的UB buffer，一般预留2倍输入大小；
 4. 为简化不同场景的计算逻辑和性能的稳定，ubCalcSize按8kb对齐；
-5. 以某910B平台UB大小为192kb为例，给出ubCalcSize的最大取值和最终UB buffer的总占用大小。
+5. 以UB大小192kb为例，最后两列给出ubCalcSize的最大取值和最终UB buffer的总占用大小；
+6. 伪量化场景内存分配额外考虑scale占用一份。
 
 # 4 流水并行
 
-AiCore上存在多个并行单元，对应的指令或接口有异步指令和同步指令，以充分利用硬件的并行能力。
+AiCore上存在多个并行单元，对应的接口有异步接口和同步接口，以充分利用硬件的并行能力。
 
 FFN实际应用场景中计算流程上主要是Cube上的MTE2（DDR到CubeCore的数据搬运）为瓶颈点，该过程由tiling参数进行优化（如上文所述），此外vector上的激活函数的时间总体占比小于5%，因此在非量化和量化场景中，没有专门针对该场景进行CV（CubeCore和VectorCore）并行的优化，复杂的流水并行设计主要在伪量化场景上，该场景在matmul计算前需要对权重进行反量化，该过程在VectorCore且极为耗时。
 
@@ -181,4 +182,5 @@ FFN实际应用场景中计算流程上主要是Cube上的MTE2（DDR到CubeCore�
 <img src="../fig/FFN伪量化场景流水并发.png" alt="FFN伪量化场景流水并发" style="zoom:67%;" />
 
 1. 上述示例流程中CastWeight1与matmul2并行（除首次），CastWeight2与matmul1并行（除最后一次）；
-2. 3个SyncAll，其中matmul1前面的SyncAll是等待所有VectorCore完成CastWeight1（weight的反量化过程）；matmul2前面的SyncAll为等待所有VectorCore完成激活函数和CastWeight2过程。
+2. 3个SyncAll，其中matmul1前面的SyncAll是等待所有VectorCore完成CastWeight1（weight的反量化过程）；matmul2前面的SyncAll为等待所有VectorCore完成激活函数和CastWeight2过程；
+3. 上述示例流程中matmul1为两专家并行，matmul2串行；示例中两个CastWeight2均与matmul1并行，而不是第二个CastWeight2与第一个matmul2并行，是因为matmul1单核计算量为matmul2的两倍（以上文中shape为例，baseN相同，matmul1的k轴为matmul2的k轴两倍），计算时间足够长，且实际测试都与matmul1并行效果更好。

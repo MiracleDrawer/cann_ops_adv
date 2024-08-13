@@ -39,11 +39,9 @@ enum class ActiveType {
 
 constexpr size_t FFN_ATTR_INDEX_ACTIVATION = 0;
 constexpr size_t FFN_ATTR_INDEX_INNER_PRECISE = 1;
-constexpr size_t FFN_ATTR_INDEX_OUTPUT_DTYPE = 2;
 constexpr size_t FFN_ATTR_INDEX_TOKENS_INDEX_FLAG = 3;
 
 constexpr uint64_t ONE_MATMUL = 2 * 1000;
-constexpr uint64_t WEIGHT_NZ_FORMAT = 4 * 1000;
 constexpr uint64_t HIGH_PERFORMANCE_KEY = 0;
 constexpr uint64_t QUANT_KEY = 1;
 constexpr uint64_t HIGH_PRECISION_KEY = 3;
@@ -71,8 +69,6 @@ constexpr class ActiveMap ACTIVE_MAP[] = {
 
 constexpr int64_t DIMS_2 = 2;
 constexpr int64_t DIMS_3 = 3;
-constexpr int64_t X_MAX_DIMS = 8;
-constexpr int64_t REUSE_FACTOR = 2;
 
 constexpr uint32_t X_INDEX = 0;
 constexpr uint32_t WEIGHT1_INDEX = 1;
@@ -85,8 +81,6 @@ constexpr uint32_t SCALE_INDEX = 6;
 constexpr uint32_t ANTIQUANT_SCALE1_INDEX = 10;
 constexpr uint32_t ANTIQUANT_SCALE2_INDEX = 11;
 constexpr uint32_t TYPICAL1_N1 = 2560;
-constexpr uint32_t TYPICAL2_N1 = 5120;
-constexpr uint32_t TYPICAL_K1 = 5120;
 
 constexpr uint32_t MAX_EXPERT_NUM = 256;
 constexpr uint32_t FP32_DATATYPE_SIZE = 4;
@@ -108,7 +102,6 @@ constexpr uint32_t UB_DIVIDE_NUM_HIGH_PRECISION = 9;
 constexpr uint32_t UB_DIVIDE_NUM_QUANT = 7;
 constexpr uint32_t UB_DIVIDE_NUM_QUANT_DEQ_FLOAT32 = 26;
 constexpr uint32_t UB_DIVIDE_NUM_QUANT_BF16 = 20;
-constexpr uint32_t UB_DIVIDE_NUM_ANTIQUANT = 32;
 constexpr uint32_t GLU_UB_DIVIDE_NUM_FP16 = 7; // 2 input, 1 output, 4 tempbuffer
 constexpr uint32_t CONSTANT_TWO = 2;
 constexpr uint32_t MAX_UINT32 = 4294967295;
@@ -1922,9 +1915,6 @@ ge::graphStatus FFNTiling::FFNSetTilingKey(gert::TilingContext *context, uint64_
                 tilingData.mm2TilingData.get_stepN() == CONSTANT_TWO) {
                 featurekey += 1; // enable stepN=2
             }
-        }
-        if (key == HIGH_PERFORMANCE_KEY && wFormat == matmul_tiling::CubeFormat::NZ) {
-            featurekey += WEIGHT_NZ_FORMAT; // weight1 and weight2 is in NZ format
         }
         key = featurekey + key;
     }

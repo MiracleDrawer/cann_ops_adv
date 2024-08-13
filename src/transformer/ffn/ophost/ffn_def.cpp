@@ -12,7 +12,6 @@
  * \file ffn.cpp
  * \brief
  */
-#include <cstdint>
 #include "register/op_def_registry.h"
 
 namespace ops {
@@ -164,8 +163,8 @@ public:
             .AttrType(OPTIONAL)
             .Bool(false); // false: values in expert tokens are counts, default; true: values therein are indices
 
-        OpAICoreConfig aicore_config;
-        aicore_config.DynamicCompileStaticFlag(true)
+        OpAICoreConfig aicoreConfig;
+        aicoreConfig.DynamicCompileStaticFlag(true)
             .DynamicFormatFlag(true)
             .DynamicRankSupportFlag(true)
             .DynamicShapeSupportFlag(true)
@@ -176,83 +175,83 @@ public:
             .ExtendCfgInfo("aclnnSupport.value", "support_aclnn")
             .ExtendCfgInfo("jitCompile.flag", "static_false,dynamic_false");
 
-        this->AICore().AddConfig("ascend910b", aicore_config);
-        aicore_config.Input("x")
+        this->AICore().AddConfig("ascend910b", aicoreConfig);
+        aicoreConfig.Input("x")
             .ParamType(REQUIRED)
             .DataType({ge::DT_FLOAT16})
             .Format({ge::FORMAT_FRACTAL_NZ})
             .UnknownShapeFormat({ge::FORMAT_FRACTAL_NZ});
-        aicore_config.Input("weight1")
+        aicoreConfig.Input("weight1")
             .ParamType(REQUIRED)
             .DataType({ge::DT_FLOAT16})
             .Format({ge::FORMAT_FRACTAL_NZ})
             .UnknownShapeFormat({ge::FORMAT_FRACTAL_NZ});
-        aicore_config.Input("weight2")
+        aicoreConfig.Input("weight2")
             .ParamType(REQUIRED)
             .DataType({ge::DT_FLOAT16})
             .Format({ge::FORMAT_FRACTAL_NZ})
             .UnknownShapeFormat({ge::FORMAT_FRACTAL_NZ});
-        aicore_config.Input("expert_tokens")
+        aicoreConfig.Input("expert_tokens")
             .ParamType(OPTIONAL)
             .DataType({ge::DT_INT64})
             .Format({ge::FORMAT_ND})
             .UnknownShapeFormat({ge::FORMAT_ND});
-        aicore_config.Input("bias1")
+        aicoreConfig.Input("bias1")
             .ParamType(OPTIONAL)
             .DataType({ge::DT_FLOAT16})
             .Format({ge::FORMAT_ND})
             .UnknownShapeFormat({ge::FORMAT_ND});
-        aicore_config.Input("bias2")
+        aicoreConfig.Input("bias2")
             .ParamType(OPTIONAL)
             .DataType({ge::DT_FLOAT16})
             .Format({ge::FORMAT_ND})
             .UnknownShapeFormat({ge::FORMAT_ND});
-        aicore_config.Input("scale")
+        aicoreConfig.Input("scale")
             .ParamType(OPTIONAL)
             .DataType({ge::DT_FLOAT})
             .Format({ge::FORMAT_ND})
             .UnknownShapeFormat({ge::FORMAT_ND});
-        aicore_config.Input("offset")
+        aicoreConfig.Input("offset")
             .ParamType(OPTIONAL)
             .DataType({ge::DT_FLOAT})
             .Format({ge::FORMAT_ND})
             .UnknownShapeFormat({ge::FORMAT_ND});
-        aicore_config.Input("deq_scale1")
+        aicoreConfig.Input("deq_scale1")
             .ParamType(OPTIONAL)
             .DataType({ge::DT_UINT64})
             .Format({ge::FORMAT_ND})
             .UnknownShapeFormat({ge::FORMAT_ND});
-        aicore_config.Input("deq_scale2")
+        aicoreConfig.Input("deq_scale2")
             .ParamType(OPTIONAL)
             .DataType({ge::DT_UINT64})
             .Format({ge::FORMAT_ND})
             .UnknownShapeFormat({ge::FORMAT_ND});
-        aicore_config.Input("antiquant_scale1")
+        aicoreConfig.Input("antiquant_scale1")
             .ParamType(OPTIONAL)
             .DataType({ge::DT_FLOAT16})
             .Format({ge::FORMAT_ND})
             .UnknownShapeFormat({ge::FORMAT_ND});
-        aicore_config.Input("antiquant_scale2")
+        aicoreConfig.Input("antiquant_scale2")
             .ParamType(OPTIONAL)
             .DataType({ge::DT_FLOAT16})
             .Format({ge::FORMAT_ND})
             .UnknownShapeFormat({ge::FORMAT_ND});
-        aicore_config.Input("antiquant_offset1")
+        aicoreConfig.Input("antiquant_offset1")
             .ParamType(OPTIONAL)
             .DataType({ge::DT_FLOAT16})
             .Format({ge::FORMAT_ND})
             .UnknownShapeFormat({ge::FORMAT_ND});
-        aicore_config.Input("antiquant_offset2")
+        aicoreConfig.Input("antiquant_offset2")
             .ParamType(OPTIONAL)
             .DataType({ge::DT_FLOAT16})
             .Format({ge::FORMAT_ND})
             .UnknownShapeFormat({ge::FORMAT_ND});
-        aicore_config.Output("y")
+        aicoreConfig.Output("y")
             .ParamType(REQUIRED)
             .DataType({ge::DT_FLOAT16})
             .Format({ge::FORMAT_FRACTAL_NZ})
             .UnknownShapeFormat({ge::FORMAT_FRACTAL_NZ});
-        this->AICore().AddConfig("ascend310p", aicore_config);
+        this->AICore().AddConfig("ascend310p", aicoreConfig);
     }
 };
 

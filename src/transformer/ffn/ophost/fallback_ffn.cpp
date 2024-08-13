@@ -50,10 +50,10 @@ inline aclTensor *GeTensor2AclTensor(const gert::Tensor *geTensor, bool enableTr
     }
 
     static const auto aclCreateTensor = GET_OP_API_FUNC(aclCreateTensor);
-    OPS_ERR_IF(aclCreateTensor == nullptr, OPS_LOG_E("aclnnfallback", "aclCreateTensor nullptr"), return nullptr);
+    OPS_ERR_IF((aclCreateTensor == nullptr), OPS_LOG_E("aclnnfallback", "aclCreateTensor nullptr"), return nullptr);
 
-    void *deviceAddr = (void *)geTensor->GetAddr();
-    ;
+    void *deviceAddr = const_cast<void *>(geTensor->GetAddr());
+
     // convert data type
     auto dataType_ge = geTensor->GetDataType();
     auto dataType = ToAclDataType(dataType_ge);
@@ -92,7 +92,7 @@ inline aclTensor *GeTensor2AclTensor(const gert::Tensor *geTensor, bool enableTr
     }
     aclTensor *out = aclCreateTensor(viewShape.data(), viewShape.size(), dataType, strides.data(), 0, aclFormat,
                                      shape.data(), shape.size(), deviceAddr);
-    OPS_ERR_IF(out == nullptr, OPS_LOG_E("aclnnfallback", "out nullptr"), return nullptr);
+    OPS_ERR_IF((out == nullptr), OPS_LOG_E("aclnnfallback", "out nullptr"), return nullptr);
 
     return out;
 }
@@ -102,15 +102,15 @@ graphStatus FFNExecuteFunc(OpExecuteContext *host_api_ctx)
     OPS_ERR_IF(host_api_ctx == nullptr, OPS_LOG_E("aclnnfallback", "host_api_ctx is null"), return GRAPH_FAILED);
 
     auto x_ge = host_api_ctx->GetInputTensor(kffnInputX);
-    OPS_ERR_IF(x_ge == nullptr, OPS_LOG_E("aclnnfallback", "x_ge is null"), return GRAPH_FAILED);
+    OPS_ERR_IF((x_ge == nullptr), OPS_LOG_E("aclnnfallback", "x_ge is null"), return GRAPH_FAILED);
     auto x_acl = GeTensor2AclTensor(x_ge, false, true);
 
     auto weight1_ge = host_api_ctx->GetInputTensor(kffnInputWeight1);
-    OPS_ERR_IF(weight1_ge == nullptr, OPS_LOG_E("aclnnfallback", "weight1_ge is null"), return GRAPH_FAILED);
+    OPS_ERR_IF((weight1_ge == nullptr), OPS_LOG_E("aclnnfallback", "weight1_ge is null"), return GRAPH_FAILED);
     auto weight1_acl = GeTensor2AclTensor(weight1_ge, false, true);
 
     auto weight2_ge = host_api_ctx->GetInputTensor(kffnInputWeight2);
-    OPS_ERR_IF(weight2_ge == nullptr, OPS_LOG_E("aclnnfallback", "weight2_ge is null"), return GRAPH_FAILED);
+    OPS_ERR_IF((weight2_ge == nullptr), OPS_LOG_E("aclnnfallback", "weight2_ge is null"), return GRAPH_FAILED);
     auto weight2_acl = GeTensor2AclTensor(weight2_ge, false, true);
 
     auto expert_tokens_ge = host_api_ctx->GetOptionalInputTensor(kffnInputExpertTokens);
@@ -138,9 +138,9 @@ graphStatus FFNExecuteFunc(OpExecuteContext *host_api_ctx)
     auto output_ge = host_api_ctx->GetOutputTensor(kffnOutput);
     auto output_acl = GeTensor2AclTensor(output_ge, false, true);
 
-    OPS_ERR_IF(output_ge == nullptr, OPS_LOG_E("aclnnfallback", "output_ge is null"), return GRAPH_FAILED);
+    OPS_ERR_IF((output_ge == nullptr), OPS_LOG_E("aclnnfallback", "output_ge is null"), return GRAPH_FAILED);
     auto attrs = host_api_ctx->GetAttrs();
-    OPS_ERR_IF(attrs == nullptr, OPS_LOG_E("aclnnfallback", "attrs is null"), return GRAPH_FAILED);
+    OPS_ERR_IF((attrs == nullptr), OPS_LOG_E("aclnnfallback", "attrs is null"), return GRAPH_FAILED);
     const char *activation_type_ge = attrs->GetAttrPointer<char>(0);
     const int64_t *inner_pricise_ge = attrs->GetAttrPointer<int64_t>(1);
     const bool *tokens_index_flag_ge = attrs->GetAttrPointer<bool>(3);
@@ -149,7 +149,7 @@ graphStatus FFNExecuteFunc(OpExecuteContext *host_api_ctx)
                                   scale_ge, offset_ge, deq_scale1_ge, deq_scale2_ge, antiquant_scale1_ge,
                                   antiquant_scale2_ge, antiquant_offset1_ge, antiquant_offset2_ge, activation_type_ge,
                                   *inner_pricise_ge, *tokens_index_flag_ge, output_acl);
-    OPS_ERR_IF(api_ret != GRAPH_SUCCESS, OPS_LOG_E("aclnnfallback", "api_ret faild:%d", api_ret), return GRAPH_FAILED);
+    OPS_ERR_IF((api_ret != GRAPH_SUCCESS), OPS_LOG_E("aclnnfallback", "api_ret faild:%u", api_ret), return GRAPH_FAILED);
 
     return GRAPH_SUCCESS;
 }

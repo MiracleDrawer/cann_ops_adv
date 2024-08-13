@@ -393,11 +393,14 @@ protected:
      */
     __aicore__ inline void SyncBeforeMM1(bool whetherFirstMM1)
     {
-        if (whetherWaitMM2) {
-            mm2.WaitIterateAll();
-            mm2.End();
-            whetherWaitMM2 = false;
+        if constexpr (IsSameType<c1T, half>::value) {
+            if (whetherWaitMM2) {
+                mm2.WaitIterateAll();
+                mm2.End();
+                whetherWaitMM2 = false;
+            }
         }
+
         if (whetherSyncBeforeMM1 && !whetherFirstMM1) {
             SyncAll<true>();
         }
@@ -469,9 +472,7 @@ protected:
         // make sure which expert each core/cube needs to compute
         uint32_t expertIMM = mm1ExpertParallInfo.expertIdxBuf[expertOrderInBuf];
         tokens = ubTokens.GetValue(expertIMM);
-        if constexpr (IsSameType<c1T, half>::value) {
-            SyncBeforeMM1(whetherFirstMM1);
-        }
+        SyncBeforeMM1(whetherFirstMM1);
 
         if (coreIdx < mm1ExpertParallInfo.expertParallelism * coreNumEachExpert && subBlockIdx == 0) {
             // assert mm1ExpertParallInfo.size == mm1ExpertParallInfo.start + mm1ParallelExpertsNum
