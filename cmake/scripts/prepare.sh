@@ -53,6 +53,10 @@ while [[ $# -gt 0 ]]; do
         TILING_KEY="$2"
         shift 2
         ;;
+    --ops-compile-options)
+        OPS_COMPILE_OPTIONS="$2"
+        shift 2
+        ;;
     --check-compatible)
         CHECK_COMPATIBLE="$2"
         shift 2
@@ -86,9 +90,8 @@ function convert_string() {
 
 function set_env() {
     CONVERT_TILING_KEY="$(convert_string ${TILING_KEY})"
-    if [ -z "${CONVERT_TILING_KEY}" ];then
-        CONVERT_TILING_KEY="FALSE"
-    fi
+
+    CONVERT_OPS_COMPILE_OPTIONS="$(convert_string ${OPS_COMPILE_OPTIONS})"
 
     CONVERT_ASCEND_COMPUTE_UNIT="$(convert_string ${ASCEND_COMPUTE_UNIT})"
 }
@@ -106,6 +109,7 @@ function build() {
         -DASCEND_CMAKE_DIR=${ASCEND_CMAKE_DIR} \
         -DCHECK_COMPATIBLE=${CHECK_COMPATIBLE} \
         -DTILING_KEY="${CONVERT_TILING_KEY}" \
+        -DOPS_COMPILE_OPTIONS="${CONVERT_OPS_COMPILE_OPTIONS}" \
         -DASCEND_COMPUTE_UNIT=${CONVERT_ASCEND_COMPUTE_UNIT} \
         -DOP_DEBUG_CONFIG=${OP_DEBUG_CONFIG}
 

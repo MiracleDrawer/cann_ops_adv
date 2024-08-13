@@ -243,6 +243,10 @@ while [[ $# -gt 0 ]]; do
         OP_DEBUG_CONFIG="$2"
         shift 2
         ;;
+    --ops-compile-options)
+        OPS_COMPILE_OPTIONS="$2"
+        shift 2
+        ;;
     *)
         help_info
         exit 1
@@ -295,6 +299,10 @@ fi
 
 if [ -n "${OP_DEBUG_CONFIG}" ];then
     CUSTOM_OPTION="${CUSTOM_OPTION} -DOP_DEBUG_CONFIG=${OP_DEBUG_CONFIG}"
+fi
+
+if [ -n "${OPS_COMPILE_OPTIONS}" ];then
+    CUSTOM_OPTION="${CUSTOM_OPTION} -DOPS_COMPILE_OPTIONS=${OPS_COMPILE_OPTIONS}"
 fi
 
 if [ -n "${ascend_package_path}" ];then

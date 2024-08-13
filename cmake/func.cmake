@@ -107,8 +107,13 @@ endfunction()
 function(add_compile_cmd_target)
     cmake_parse_arguments(CMD "" "COMPUTE_UNIT" "" ${ARGN})
 
-    if(OP_DEBUG_CONFIG)
-        set(OP_DEBUG_CONFIG_OPTION --op-debug-config ${OP_DEBUG_CONFIG})
+    if(ADD_OPS_COMPILE_OPTION_V2)
+            set(OP_DEBUG_CONFIG_OPTION --opc-config-file ${ASCEND_CUSTOM_OPC_OPTIONS})
+    else()
+        if(OP_DEBUG_CONFIG)
+            set(OP_DEBUG_CONFIG_OPTION --op-debug-config ${OP_DEBUG_CONFIG})
+        endif()
+        set(OP_TILING_KEY_OPTION --tiling-keys ${ASCEND_CUSTOM_TILING_KEYS})
     endif()
 
     set(_OUT_DIR           ${ASCEND_BINARY_OUT_DIR}/${CMD_COMPUTE_UNIT})
@@ -120,19 +125,19 @@ function(add_compile_cmd_target)
             ${base_aclnn_binary_dir}/aic-${CMD_COMPUTE_UNIT}-ops-info.ini
             ${GEN_OUT_DIR}
             ${CMD_COMPUTE_UNIT}
-            --tiling-keys ${ASCEND_CUSTOM_TILING_KEYS}
+            ${OP_TILING_KEY_OPTION}
             ${OP_DEBUG_CONFIG_OPTION}
             COMMAND ${HI_PYTHON} ${ASCENDC_CMAKE_UTIL_DIR}/ascendc_bin_param_build.py
             ${base_aclnn_binary_dir}/inner/aic-${CMD_COMPUTE_UNIT}-ops-info.ini
             ${GEN_OUT_DIR}
             ${CMD_COMPUTE_UNIT}
-            --tiling-keys ${ASCEND_CUSTOM_TILING_KEYS}
+            ${OP_TILING_KEY_OPTION}
             ${OP_DEBUG_CONFIG_OPTION}
             COMMAND ${HI_PYTHON} ${ASCENDC_CMAKE_UTIL_DIR}/ascendc_bin_param_build.py
             ${base_aclnn_binary_dir}/exc/aic-${CMD_COMPUTE_UNIT}-ops-info.ini
             ${GEN_OUT_DIR}
             ${CMD_COMPUTE_UNIT}
-            --tiling-keys ${ASCEND_CUSTOM_TILING_KEYS}
+            ${OP_TILING_KEY_OPTION}
             ${OP_DEBUG_CONFIG_OPTION}
     )
 
@@ -176,17 +181,82 @@ endfunction()
 function(add_ops_compile_options)
     cmake_parse_arguments(OP_COMPILE "" "OP_NAME" "COMPUTE_UNIT;OPTIONS" ${ARGN})
 
-    file(APPEND ${ASCEND_CUSTOM_OPTIONS}
-            "${OP_COMPILE_OP_NAME},${OP_COMPILE_COMPUTE_UNIT},${OP_COMPILE_OPTIONS}\n"
-    )
+    if(NOT OP_COMPILE_OPTIONS)
+        return()
+    endif()
+
+    if(ADD_OPS_COMPILE_OPTION_V2)
+        execute_process(COMMAND ${HI_PYTHON} ${ASCENDC_CMAKE_UTIL_DIR}/ascendc_gen_options.py
+                ${ASCEND_CUSTOM_OPTIONS} ${OP_COMPILE_OP_NAME}
+                ${OP_COMPILE_COMPUTE_UNIT} ${OP_COMPILE_OPTIONS}
+                RESULT_VARIABLE EXEC_RESULT
+                OUTPUT_VARIABLE EXEC_INFO
+                ERROR_VARIABLE EXEC_ERROR)
+        if (EXEC_RESULT)
+            message("add ops compile options info: ${EXEC_INFO}")
+            message("add ops compile options error: ${EXEC_ERROR}")
+            message(FATAL_ERROR "Error: add ops compile options failed!")
+        endif ()
+    else()
+        file(APPEND ${ASCEND_CUSTOM_OPTIONS}
+                "${OP_COMPILE_OP_NAME},${OP_COMPILE_COMPUTE_UNIT},${OP_COMPILE_OPTIONS}\n"
+        )
+    endif()
 endfunction()
 
 function(add_ops_tiling_keys)
     cmake_parse_arguments(OP_COMPILE "" "OP_NAME" "COMPUTE_UNIT;TILING_KEYS" ${ARGN})
 
-    file(APPEND ${ASCEND_CUSTOM_TILING_KEYS}
-            "${OP_COMPILE_OP_NAME},${OP_COMPILE_COMPUTE_UNIT},${OP_COMPILE_TILING_KEYS}\n"
-    )
+    if(NOT OP_COMPILE_TILING_KEYS)
+        return()
+    endif()
+
+    if(ADD_OPS_COMPILE_OPTION_V2)
+        list(JOIN OP_COMPILE_TILING_KEYS "," STRING_TILING_KEYS)
+        add_ops_compile_options(
+                OP_NAME ${OP_COMPILE_OP_NAME}
+                OPTIONS --tiling_key=${STRING_TILING_KEYS}
+        )
+    else()
+        file(APPEND ${ASCEND_CUSTOM_TILING_KEYS}
+                "${OP_COMPILE_OP_NAME},${OP_COMPILE_COMPUTE_UNIT},${OP_COMPILE_TILING_KEYS}\n"
+        )
+    endif()
+endfunction()
+
+function(add_opc_config)
+    cmake_parse_arguments(OP_COMPILE "" "OP_NAME" "COMPUTE_UNIT;CONFIG" ${ARGN})
+
+    if(NOT ADD_OPS_COMPILE_OPTION_V2)
+        return()
+    endif()
+
+    if(NOT OP_COMPILE_CONFIG)
+        return()
+    endif()
+
+    string(REPLACE "," ";" OP_COMPILE_CONFIG_LIST "${OP_COMPILE_CONFIG}")
+    
+    set(_OPC_CONFIG)
+
+    foreach(_option ${OP_COMPILE_CONFIG_LIST})
+        if("${_option}" STREQUAL "ccec_g")
+            list(APPEND _OPC_CONFIG "-g")
+        elseif("${_option}" STREQUAL "ccec_O0")
+            list(APPEND _OPC_CONFIG "-O0")
+        elseif("${_option}" STREQUAL "oom")
+            list(APPEND _OPC_CONFIG "--oom")
+        elseif("${_option}" STREQUAL "dump_cce")
+            list(APPEND _OPC_CONFIG "--save-temp-files")
+        endif()
+    endforeach()
+
+    if(_OPC_CONFIG)
+        add_ops_compile_options(
+                OP_NAME ${OP_COMPILE_OP_NAME}
+                OPTIONS ${_OPC_CONFIG}
+        )
+    endif()
 endfunction()
 
 function(add_ops_src_copy)

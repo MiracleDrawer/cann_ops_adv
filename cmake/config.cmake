@@ -81,20 +81,27 @@ set(ASCEND_BINARY_OUT_DIR         ${CMAKE_CURRENT_BINARY_DIR}/binary            
 set(ASCEND_AUTOGEN_DIR            ${CMAKE_CURRENT_BINARY_DIR}/autogen                  CACHE   STRING "Auto generate file directories")
 set(ASCEND_CUSTOM_OPTIONS         ${ASCEND_AUTOGEN_DIR}/custom_compile_options.ini)
 set(ASCEND_CUSTOM_TILING_KEYS     ${ASCEND_AUTOGEN_DIR}/custom_tiling_keys.ini)
+set(ASCEND_CUSTOM_OPC_OPTIONS     ${ASCEND_AUTOGEN_DIR}/custom_opc_options.ini)
 set(OP_BUILD_TOOL                 ${ASCEND_CANN_PACKAGE_PATH}/tools/opbuild/op_build   CACHE   STRING   "op_build tool")
 file(MAKE_DIRECTORY ${ASCEND_AUTOGEN_DIR})
 file(REMOVE ${ASCEND_CUSTOM_OPTIONS})
 file(TOUCH ${ASCEND_CUSTOM_OPTIONS})
 file(REMOVE ${ASCEND_CUSTOM_TILING_KEYS})
 file(TOUCH ${ASCEND_CUSTOM_TILING_KEYS})
+file(REMOVE ${ASCEND_CUSTOM_OPC_OPTIONS})
+file(TOUCH ${ASCEND_CUSTOM_OPC_OPTIONS})
 if (BUILD_OPEN_PROJECT)
-    set(ASCEND_PROJECT_DIR       ${ASCEND_CANN_PACKAGE_PATH}/tools/ascend_project)
+    if(EXISTS ${ASCEND_CANN_PACKAGE_PATH}/tools/ascend_project/cmake)
+        set(ASCEND_PROJECT_DIR       ${ASCEND_CANN_PACKAGE_PATH}/tools/ascend_project)
+    else()
+        set(ASCEND_PROJECT_DIR       ${ASCEND_CANN_PACKAGE_PATH}/tools/op_project_templates/ascendc/customize)
+    endif()
     set(ASCEND_CMAKE_DIR         ${ASCEND_PROJECT_DIR}/cmake   CACHE   STRING   "ascend project cmake")
     set(IMPL_INSTALL_DIR         packages/vendors/${VENDOR_NAME}/op_impl/ai_core/tbe/${VENDOR_NAME}_impl)
     set(IMPL_DYNAMIC_INSTALL_DIR packages/vendors/${VENDOR_NAME}/op_impl/ai_core/tbe/${VENDOR_NAME}_impl/dynamic)
     set(ACLNN_INC_INSTALL_DIR    packages/vendors/${VENDOR_NAME}/op_api/include)
 else()
-    set(ASCEND_CMAKE_DIR         ${TOP_DIR}/asl/ops/cann/ops/built-in/ascendc/samples/cmake   CACHE   STRING   "ascend project cmake")
+    set(ASCEND_CMAKE_DIR         ${TOP_DIR}/asl/ops/cann/ops/built-in/ascendc/samples/customize/cmake   CACHE   STRING   "ascend project cmake")
     set(IMPL_INSTALL_DIR         lib/ascendc/impl)
     set(IMPL_DYNAMIC_INSTALL_DIR lib/ascendc/impl/dynamic)
     set(ACLNN_INC_INSTALL_DIR    lib/include)
@@ -105,6 +112,13 @@ set(ASCENDC_CMAKE_UTIL_DIR       ${ASCEND_CMAKE_DIR}/util)
 set(CUSTOM_DIR         ${CMAKE_BINARY_DIR}/custom)
 set(TILING_CUSTOM_DIR  ${CUSTOM_DIR}/op_impl/ai_core/tbe/op_tiling)
 set(TILING_CUSTOM_FILE ${TILING_CUSTOM_DIR}/liboptiling.so)
+
+# 兼容ascendc变更临时适配，待切换新版本ascendc新版本后删除
+if(EXISTS ${ASCENDC_CMAKE_UTIL_DIR}/ascendc_gen_options.py)
+    set(ADD_OPS_COMPILE_OPTION_V2 ON)
+else()
+    set(ADD_OPS_COMPILE_OPTION_V2 OFF)
+endif()
 
 ########################################################################################################################
 # CMake 选项, 缺省参数设置
@@ -196,6 +210,12 @@ if (BUILD_OPEN_PROJECT)
             set(EP_TILING_KEY FALSE)
         endif ()
 
+        if (OPS_COMPILE_OPTIONS)
+            string(REPLACE ";" "::" EP_OPS_COMPILE_OPTIONS "${OPS_COMPILE_OPTIONS}")
+        else()
+            set(EP_OPS_COMPILE_OPTIONS FALSE)
+        endif ()
+
         string(REPLACE ";" "::" EP_ASCEND_COMPUTE_UNIT "${ASCEND_COMPUTE_UNIT}")
 
         execute_process(COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/cmake/scripts/prepare.sh
@@ -209,6 +229,7 @@ if (BUILD_OPEN_PROJECT)
                 --op-build-tool ${OP_BUILD_TOOL}
                 --ascend-cmake-dir ${ASCEND_CMAKE_DIR}
                 --tiling-key ${EP_TILING_KEY}
+                --ops-compile-options ${EP_OPS_COMPILE_OPTIONS}
                 --check-compatible ${CHECK_COMPATIBLE}
                 --ascend-compute_unit ${EP_ASCEND_COMPUTE_UNIT}
                 --op_debug_config ${OP_DEBUG_CONFIG}
@@ -218,6 +239,13 @@ if (BUILD_OPEN_PROJECT)
         if (result)
             message(FATAL_ERROR "Error: ops prepare build failed.")
         endif ()
+
+        file(REMOVE ${ASCEND_CUSTOM_OPTIONS})
+        file(TOUCH ${ASCEND_CUSTOM_OPTIONS})
+        file(REMOVE ${ASCEND_CUSTOM_TILING_KEYS})
+        file(TOUCH ${ASCEND_CUSTOM_TILING_KEYS})
+        file(REMOVE ${ASCEND_CUSTOM_OPC_OPTIONS})
+        file(TOUCH ${ASCEND_CUSTOM_OPC_OPTIONS})
     endif ()
 endif ()
 

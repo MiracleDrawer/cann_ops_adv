@@ -116,7 +116,7 @@ ge::graphStatus InferDataType4FlashAttentionScoreGrad(gert::InferDataTypeContext
     // dv, outidx:2
     context->SetOutputDataType(2, dtype);
     // dpse, outidx:3
-    // ºóÐøÕë¶ÔpseÄÚ²¿Éú³ÉµÄ³¡¾°£¬Dtype¾Í²»ÄÜ¸úËæqkvÁË
+    // åŽç»­é’ˆå¯¹pseå†…éƒ¨ç”Ÿæˆçš„åœºæ™¯ï¼ŒDtypeå°±ä¸èƒ½è·Ÿéšqkväº†
     context->SetOutputDataType(3, dtype);
     return GRAPH_SUCCESS;
 }

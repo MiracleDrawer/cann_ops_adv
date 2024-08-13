@@ -186,12 +186,22 @@ if (BUILD_OPEN_PROJECT)
             DESTINATION packages/vendors/${VENDOR_NAME}/op_impl/ai_core/tbe/op_tiling
     )
 
-    if (TILING_KEY)
-        add_ops_tiling_keys(
+    add_ops_tiling_keys(
+            OP_NAME "ALL"
+            TILING_KEYS ${TILING_KEY}
+    )
+
+    add_opc_config(
+            OP_NAME "ALL"
+            CONFIG ${OP_DEBUG_CONFIG}
+    )
+
+    if(ADD_OPS_COMPILE_OPTION_V2)
+        add_ops_compile_options(
                 OP_NAME "ALL"
-                TILING_KEYS ${TILING_KEY}
+                OPTIONS ${OPS_COMPILE_OPTIONS}
         )
-    endif ()
+    endif()
 endif ()
 
 add_subdirectory(src/utils)
