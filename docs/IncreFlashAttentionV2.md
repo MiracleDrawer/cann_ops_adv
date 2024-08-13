@@ -64,6 +64,7 @@
   - value（aclTensorList\*，计算输入）：Device侧的aclTensorList，公式中的输入V，数据类型支持FLOAT16、INT8、BFLOAT16 ，[数据格式](common/数据格式.md)支持ND，**Atlas 推理系列产品（Ascend 310P处理器）中的加速卡仅支持FLOAT16**。
 
   - pseShift（aclTensor\*，计算输入）：Device侧的aclTensor，位置编码参数，**预留参数，暂未使用**。
+  
   - attenMask（aclTensor\*，计算输入）：Device侧的aclTensor，可选参数，表示attention掩码矩阵，数据类型支持BOOL、INT8、UINT8，[数据格式](common/数据格式.md)支持ND。
 
   - actualSeqLengths（aclIntArray\*，计算输入）：Host侧的aclIntArray，可选参数，表示key和value的S轴实际长度，数据类型支持INT64。

@@ -66,7 +66,7 @@
     
     - antiquantOffsetOptional（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：FLOAT16、BFLOAT16、FLOAT32。[数据格式](common/数据格式.md)支持ND（参考），表示反量化偏移，支持per-tensor，per-channel，per-token。Q_S大于等于2时只支持FLOAT16，如不使用该功能时可传入nullptr。综合约束请见[约束与限制](#1)。
     
-    - blockTableOptional（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：INT32。[数据格式](common/数据格式.md)支持ND（参考）。表示PageAttention中KV存储使用的block映射表，如不使用该功能可传入nullptr；Q_S大于等于2时该参数无效。
+    - blockTableOptional（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：INT32。[数据格式](common/数据格式.md)支持ND（参考）。表示PageAttention中KV存储使用的block映射表，如不使用该功能可传入nullptr。
     
     - queryPaddingSizeOptional（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：INT64。[数据格式](common/数据格式.md)支持ND（参考）。表示Query中每个batch的数据是否右对齐，且右对齐的个数是多少。仅支持Q_S大于1，其余场景该参数无效。用户不特意指定时可传入默认值nullptr。
 
@@ -79,6 +79,12 @@
     - valueAntiquantScaleOptional（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：FLOAT16、BFLOAT16、FLOAT32。[数据格式](common/数据格式.md)支持ND（参考），kv伪量化参数分离时表示value的反量化因子，支持per-tensor，per-channel，per-token。Q_S大于等于2时该参数无效，如不使用该功能时可传入nullptr。综合约束请见[约束与限制](#1)。
     
     - valueAntiquantOffsetOptional（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：FLOAT16、BFLOAT16、FLOAT32。[数据格式](common/数据格式.md)支持ND（参考），kv伪量化参数分离时表示value的反量化偏移，支持per-tensor，per-channel，per-token。Q_S大于等于2时该参数无效，如不使用该功能时可传入nullptr。综合约束请见[约束与限制](#1)。
+    
+    - keySharedPrefixOptional（aclTensor\*，计算输入）：Device侧的aclTensor，attention结构中Key的系统前缀部分的参数，数据类型支持FLOAT16、BFLOAT16、INT8，不支持[非连续的Tensor](common/非连续的Tensor.md)，[数据格式](common/数据格式.md)支持ND。如不使用该功能时可传入nullptr。综合约束请见[约束与限制](#1)。
+    
+    - valueSharedPrefixOptional（aclTensor\*，计算输入）：Device侧的aclTensor，attention结构中Value的系统前缀部分的输入，数据类型支持FLOAT16、BFLOAT16、INT8，不支持[非连续的Tensor](common/非连续的Tensor.md)，[数据格式](common/数据格式.md)支持ND。如不使用该功能时可传入nullptr。综合约束请见[约束与限制](#1)。
+    
+    - actualSharedPrefixLenOptional（aclIntArray\*，计算输入）：Host侧的aclIntArray，可传入nullptr，代表keySharedPrefix/valueSharedPrefix的有效Sequence Length。数据类型支持：INT64。如果不指定seqlen可以传入nullptr，表示和keySharedPrefix/valueSharedPrefix的s长度相同。限制：该入参中的有效Sequence Length应该不大于keySharedPrefix/valueSharedPrefix中的Sequence Length。
     
     - numHeads（int64\_t，计算输入）：Host侧的int，代表query的head个数，数据类型支持INT64，在BNSD场景下，需要与shape中的query的N轴shape值相同，否则执行异常。
     
@@ -93,7 +99,7 @@
        **说明**：
        query、key、value数据排布格式支持从多种维度解读，其中B（Batch）表示输入样本批量大小、S（Seq-Length）表示输入样本序列长度、H（Head-Size）表示隐藏层的大小、N（Head-Num）表示多头数、D（Head-Dim）表示隐藏层最小的单元尺寸，且满足D=H/N
     
-    - numKeyValueHeads（int64\_t，计算输入）：Host侧的int，代表key、value中head个数，用于支持GQA（Grouped-Query Attention，分组查询注意力）场景，数据类型支持INT64。用户不特意指定时可传入默认值0，表示和key/value的head个数相等，需要满足numHeads整除numKeyValueHeads，numHeads与numKeyValueHeads的比值不能大于64。在BNSD场景下，还需要与shape中的key/value的N轴shape值相同，否则执行异常。
+    - numKeyValueHeads（int64\_t，计算输入）：Host侧的int，代表key、value中head个数，用于支持GQA（Grouped-Query Attention，分组查询注意力）场景，数据类型支持INT64。用户不特意指定时可传入默认值0，表示key/value和query的head个数相等，需要满足numHeads整除numKeyValueHeads，numHeads与numKeyValueHeads的比值不能大于64。在BNSD场景下，还需要与shape中的key/value的N轴shape值相同，否则执行异常。
     
     - sparseMode（int64\_t，计算输入）：Host侧的int，表示sparse的模式。数据类型支持：INT64。Q_S为1时该参数无效。
       -   sparseMode为0时，代表defaultMask模式，如果attenmask未传入则不做mask操作，忽略preTokens和nextTokens（内部赋值为INT\_MAX）；如果传入，则需要传入完整的attenmask矩阵（S1 \* S2），表示preTokens和nextTokens之间的部分需要计算。
@@ -117,7 +123,7 @@
         当前0、1为保留配置值，当计算过程中“参与计算的mask部分”存在某整行全为1的情况时，精度可能会有损失。此时可以尝试将该参数配置为2或3来使能行无效功能以提升精度，但是该配置会导致性能下降。
         如果算子可判断出存在无效行场景，会自动使能无效行计算，例如sparse_mode为3，Sq > Skv场景。
     
-    - blockSize（int64\_t，计算输入）：Host侧的int64\_t，PageAttention中KV存储每个block中最大的token个数，默认为0，数据类型支持INT64，Q_S大于等于2时该参数无效。
+    - blockSize（int64\_t，计算输入）：Host侧的int64\_t，PageAttention中KV存储每个block中最大的token个数，默认为0，数据类型支持INT64。
     
     - antiquantMode（int64，计算输入）：伪量化的方式，传入0时表示为per-channel（per-channel包含per-tensor），传入1时表示per-token。Q_S大于等于2时该参数无效，用户不特意指定时可传入默认值0，传入0和1之外的其他值会执行异常。
     
@@ -191,6 +197,16 @@
         -   sparseMode = 2、3、4时，attenMask的shape需要为S,S或1,S,S或1,1,S,S,其中S的值需要固定为2048，且需要用户保证传入的attenMask为下三角，不传入attenMask或者传入的shape不正确报错。
         -   sparseMode = 1、2、3的场景忽略入参preTokens、nextTokens并按照相关规则赋值。
    -   kvCache反量化仅支持query为FLOAT16时，将INT8类型的key和value反量化到FLOAT16。入参key/value的datarange与入参antiquantScale的datarange乘积范围在（-1，1）范围内，高性能模式可以保证精度，否则需要开启高精度模式来保证精度。
+   -   page attention场景:
+        -   page attention的使能必要条件是blockTable存在且有效，同时key、value是按照blockTable中的索引在一片连续内存中排布，支持key、value dtype为FLOAT16/BFLOAT16/INT8，在该场景下key、value的inputLayout参数无效。blockTable中填充的是blockid，当前不会对blockid的合法性进行校验，需用户自行保证。
+        -   blockSize是用户自定义的参数，该参数的取值会影响page attention的性能，在使能page attention场景下，blockSize最小为128, 最大为512，且要求是128的倍数。通常情况下，page attention可以提高吞吐量，但会带来性能上的下降。
+        -   page attention场景下，当输入kv cache排布格式为（blocknum, blocksize, H），且 KV_N * D 超过64k时，受硬件指令约束，会被拦截报错。可通过使能GQA（减小 KV_N）或调整kv cache排布格式为（blocknum, KV_N, blocksize, D）解决。当query的inputLayout为BNSD时，kv cache排布支持（blocknum, blocksize, H）和（blocknum, KV_N, blocksize, D）两种格式，当query的inputLayout为BSH、BSND时，kv cache排布只支持（blocknum, blocksize, H）一种格式。blocknum不能小于根据actualSeqLengthsKv和blockSize计算的每个batch的block数量之和。且key和value的shape需保证一致。
+        -   page attention不支持伪量化场景，不支持tensorlist场景，不支持左padding场景。
+        -   page attention场景下，必须传入actualSeqLengthsKv。
+        -   page attention场景下，blockTable必须为二维，第一维长度需等于B，第二维长度不能小于maxBlockNumPerSeq（maxBlockNumPerSeq为不同batch中最大actualSeqLengthsKv对应的block数量）。
+   -   page attention的使能场景下，以下场景输入KV_S需要大于等于maxBlockNumPerSeq * blockSize
+      - 传入attenMask时，如 mask shape为(B, 1, Q_S, KV_S)
+      - 传入pseShift时，如 pseShift shape为(B, N, Q_S, KV_S)
    -   query左padding场景:
         -   query左padding场景query的搬运起点计算公式为：Q_S - queryPaddingSize - actualSeqLengths。query的搬运终点计算公式为：Q_S - queryPaddingSize。其中query的搬运起点不能小于0，终点不能大于Q_S，否则结果将不符合预期。
         -   query左padding场景kvPaddingSize小于0时将被置为0。
@@ -207,27 +223,37 @@
    -   pseShift功能使用限制如下：
         - 支持query数据类型为FLOAT16或BFLOAT16或INT8场景下使用该功能。
         - query数据类型为FLOAT16且pseShift存在时，强制走高精度模式，对应的限制继承自高精度模式的限制。
-        - Q_S需大于等于query的S长度，KV_S需大于等于key的S长度。
+        - Q_S需大于等于query的S长度，KV_S需大于等于key的S长度。prefix场景KV_S需大于等于actualSharedPrefixLen与key的S长度之和。
    -   输出为INT8，入参quantOffset2传入非空指针和非空tensor值，并且sparseMode、preTokens和nextTokens满足以下条件，矩阵会存在某几行不参与计算的情况，导致计算结果误差，该场景会拦截(解决方案：如果希望该场景不被拦截，需要在FIA接口外部做后量化操作，不在FIA接口内部使能)：
-        -   sparseMode = 0，attenMask如果非空指针，每个batch actualSeqLengths — actualSeqLengthsKV - preTokens > 0 或 nextTokens < 0 时，满足拦截条件
+        -   sparseMode = 0，attenMask如果非空指针，每个batch actualSeqLengths — actualSeqLengthsKV - actualSharedPrefixLen - preTokens > 0 或 nextTokens < 0 时，满足拦截条件
         -   sparseMode = 1 或 2，不会出现满足拦截条件的情况
-        -   sparseMode = 3，每个batch actualSeqLengthsKV - actualSeqLengths < 0，满足拦截条件
-        -   sparseMode = 4，preTokens < 0 或 每个batch nextTokens + actualSeqLengthsKV - actualSeqLengths < 0 时，满足拦截条件
+        -   sparseMode = 3，每个batch actualSeqLengthsKV + actualSharedPrefixLen - actualSeqLengths < 0，满足拦截条件
+        -   sparseMode = 4，preTokens < 0 或 每个batch nextTokens + actualSeqLengthsKV + actualSharedPrefixLen - actualSeqLengths < 0 时，满足拦截条件
    -   kv伪量化参数分离当前暂不支持
+   -   prefix相关参数约束：
+        -   keySharedPrefix和valueSharedPrefix要么都为空，要么都不为空
+        -   keySharedPrefix和valueSharedPrefix都不为空时，keySharedPrefix、valueSharedPrefix、key、value的维度相同、dtype保持一致。
+        -   keySharedPrefix和valueSharedPrefix都不为空时，keySharedPrefix的shape第一维batch必须为1，layout为BNSD和BSND情况下N、D轴要与key一致、BSH情况下H要与key一致，valueSharedPrefix同理。keySharedPrefix和valueSharedPrefix的S应相等
+        -   当actualSharedPrefixLen存在时，actualSharedPrefixLen的shape需要为[1]，值不能大于keySharedPrefix和valueSharedPrefix的S
+        -   公共前缀的S加上key或value的S的结果，要满足原先key或value的S的限制
+        -   prefix不支持PageAttention场景、不支持左padding场景、不支持tensorlist场景
+        -   prefix场景，sparse为0或1时，如果传入attenmask，则S2需大于等于actualSharedPrefixLen与key的S长度之和
 
 - **当Q_S等于1时**：
   -   query，key，value输入，功能使用限制如下：
       -   支持B轴小于等于65536，支持N轴小于等于256，支持D轴小于等于512。
       -   query、key、value输入类型均为INT8的场景暂不支持。
   -   page attention场景:
-      -   page attention的使能必要条件是blocktable存在且有效，同时key、value是按照blocktable中的索引在一片连续内存中排布，支持key、value dtype为FLOAT16/BFLOAT16/INT8，在该场景下inputLayout对key、value无效。
+      -   page attention的使能必要条件是blocktable存在且有效，同时key、value是按照blocktable中的索引在一片连续内存中排布，支持key、value dtype为FLOAT16/BFLOAT16/INT8，在该场景下key、value的inputLayout参数无效。
       -   blockSize是用户自定义的参数，该参数的取值会影响page attention的性能，在使能page attention场景下，blockSize需要传入非0值, 且blocksize最大不超过512。key、value输入类型为FLOAT16/BFLOAT16时需要16对齐，key、value 输入类型为INT8时需要32对齐，推荐使用128。通常情况下，page attention可以提高吞吐量，但会带来性能上的下降。
-      -   page attention使能场景下，当输入kv cache排布格式为（blocknum, blocksize, H），当 H 超过64k时，受硬件指令约束，会被拦截报错。（H=numKvHeads * headDims）
-      -   page attention使能场景下，支持kv cache排布格式为（blocknum, numKvHeads, blocksize, headDims），此时query layout仅支持BNSD。
-  -   page attention的使能场景下，以下场景输入S需要大于等于maxBlockNumPerSeq * blockSize
-      - 使能 Attention mask，如 mask shape为 \(B, 1, 1, S\)
-      - 使能 pseShift，如 pseShift shape为\(B, N, 1, S\)
-      - 使能伪量化 per-token模式：输入参数 antiquantScale和antiquantOffset 的shape均为\(2, B, S\)
+      -   page attention使能场景下，当输入kv cache排布格式为（blocknum, blocksize, H），且 numKvHeads * headDim 超过64k时，受硬件指令约束，会被拦截报错。可通过使能GQA（减小 numKvHeads）或调整kv cache排布格式为（blocknum, numKvHeads, blocksize, D）解决。
+      -   page attention不支持左padding场景。
+      -   page attention场景下，必须传入actualSeqLengthsKv。
+      -   page attention场景下，blockTable必须为二维，第一维长度需等于B，第二维长度不能小于maxBlockNumPerSeq（maxBlockNumPerSeq为每个batch中最大actualSeqLengthsKv对应的block数量）。
+      -   page attention的使能场景下，以下场景输入S需要大于等于maxBlockNumPerSeq * blockSize
+        - 使能 Attention mask，如 mask shape为 \(B, 1, 1, S\)
+        - 使能 pseShift，如 pseShift shape为\(B, N, 1, S\)
+        - 使能伪量化 per-token模式：输入参数 antiquantScale和antiquantOffset 的shape均为\(2, B, S\)
   -   kv左padding场景:
       -   kv左padding场景kvCache的搬运起点计算公式为：KV_S - kvPaddingSize - actualSeqLengths。kvCache的搬运终点计算公式为：KV_S - kvPaddingSize。其中kvCache的搬运起点或终点小于0时，返回数据结果为全0。
       -   kv左padding场景kvPaddingSize小于0时将被置为0。
@@ -248,7 +274,7 @@
   -   prefix相关参数约束：
       - keySharedPrefix和valueSharedPrefix要么都为空，要么都不为空
       - keySharedPrefix和valueSharedPrefix都不为空时，keySharedPrefix、valueSharedPrefix、key、value的维度相同、dtype保持一致。
-      - keySharedPrefix和valueSharedPrefix都不为空时，keySharedPrefix的shape第一维batch必须为1，layout为BNSD和BSND情况下N、D轴要与key一致、BSH情况下H要与key一致，valueSharedPrefix同理。
+      - keySharedPrefix和valueSharedPrefix都不为空时，keySharedPrefix的shape第一维batch必须为1，layout为BNSD和BSND情况下N、D轴要与key一致、BSH情况下H要与key一致，valueSharedPrefix同理。keySharedPrefix和valueSharedPrefix的S应相等
       - 当actualSharedPrefixLen存在时，actualSharedPrefixLen的shape需要为[1]，值不能大于keySharedPrefix和valueSharedPrefix的S
       - 公共前缀的S加上key或value的S的结果，要满足原先key或value的S的限制
 ## 算子原型

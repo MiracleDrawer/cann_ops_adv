@@ -124,14 +124,16 @@
 -   pseShift功能使用限制如下：
     - pseShift数据类型需与query数据类型保持一致。
     - 仅支持D轴对齐，即D轴可以被16整除。
--   page attention的使能必要条件是blocktable存在且有效，同时key、value是按照blocktable中的索引在一片连续内存中排布，支持key、value dtype为FLOAT16、BFLOAT16、INT8，在该场景下inputLayout对key、value无效。
--   blockSize是用户自定义的参数，该参数的取值会影响page attention的性能，在使能page attention场景下，blockSize需要传入非0值, 且blocksize最大不超过512。key、value输入类型为FLOAT16/BFLOAT16时需要16对齐，key、value 输入类型为INT8时需要32对齐，推荐使用128。通常情况下，page attention可以提高吞吐量，但会带来性能上的下降。
--   page attention使能场景下，当输入kv cache排布格式为（blocknum, blocksize, H），当 H 超过64k时，受硬件指令约束，会被拦截报错。（H=numKvHeads * headDims）
--   page attention使能场景下，支持kv cache排布格式为（blocknum, numKvHeads, blocksize, headDims），此时query layout仅支持BNSD。
--   page attention使能场景下，以下场景输入S需要大于等于maxBlockNumPerSeq * blockSize
-    - 使能 Attention mask，如 mask shape为 \(B, 1, 1, S\)
-    - 使能 pseShift，如 pseShift shape为\(B, N, 1, S\)
-    - 使能伪量化 per-token模式：输入参数 antiquantScale和antiquantOffset 的shape均为\(2, B, S\)
+-   page attention场景:
+    - page attention的使能必要条件是blockTable存在且有效，同时key、value是按照blockTable中的索引在一片连续内存中排布，支持key、value dtype为FLOAT16/BFLOAT16/INT8，在该场景下key、value的inputLayout参数无效。
+    - blockSize是用户自定义的参数，该参数的取值会影响page attention的性能，在使能page attention场景下，blockSize需要传入非0值, 且blocksize最大不超过512。key、value输入类型为FLOAT16/BFLOAT16时需要16对齐，key、value 输入类型为INT8时需要32对齐，推荐使用128。通常情况下，page attention可以提高吞吐量，但会带来性能上的下降。
+    -   page attention使能场景下，当输入kv cache排布格式为（blocknum, blocksize, H），且 numKvHeads * headDim 超过64k时，受硬件指令约束，会被拦截报错。可通过使能GQA（减小 numKvHeads）或调整kv cache排布格式为（blocknum, numKvHeads, blocksize, D）解决。
+    -   page attention场景下，必须传入输入actualSeqLengths。
+    -   page attention场景下，blockTable必须为二维，第一维长度需等于B，第二维长度不能小于maxBlockNumPerSeq（maxBlockNumPerSeq为每个batch中最大actualSeqLengthsKv对应的block数量）。
+    -   page attention使能场景下，以下场景输入S需要大于等于maxBlockNumPerSeq * blockSize
+      - 使能 Attention mask，如 mask shape为 \(B, 1, 1, S\)
+      - 使能 pseShift，如 pseShift shape为\(B, N, 1, S\)
+      - 使能伪量化 per-token模式：输入参数 antiquantScale和antiquantOffset 的shape均为\(2, B, S\)
 -   antiquantScale和antiquantOffset参数约束：
     - 支持per-channel、per-tensor两种模式：
       - per-channel模式：两个参数BNSD场景下shape为\(2, N, 1, D\)，BSND场景下shape为\(2, N, D\)，BSH场景下shape为\(2, H\)，N为numKeyValueHeads。参数数据类型和query数据类型相同。
