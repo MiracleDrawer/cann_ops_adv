@@ -194,17 +194,17 @@ graphStatus FusedInferHostExecuteFunc(OpExecuteContext* host_api_ctx)
                                 deqScale2, quantScale2, quantOffset2, antiquantScaleGe, antiquantOffsetGe,
                                 blocktableGe, queryPaddingGe, kvPaddingGe,
                                 keyAntiquantScaleGe, keyAntiquantOffsetGe, valueAntiquantScaleGe, valueAntiquantOffsetGe,
-                                keySharedPrefixGe, valueSharedPrefixGe, actualSharedPrefixLenGe,
+                                keySharedPrefixGe, valueSharedPrefixGe, actSeqSharedPrefix,
                                 num_heads, dScaleValue, pre_tokens, next_tokens, layout, kvHeadNum, sparseMode,
                                 innerPrecise, blockSize, antiquantMode, softmaxLseFlag, keyAntiquantMode, valueAntiquantMode, output, softmaxLse);
 
   OPS_ERR_IF(api_ret != GRAPH_SUCCESS,
-    OPS_LOG_E("aclnnfallback", "api_ret faild:%d", api_ret), return GRAPH_FAILED);
+    OPS_LOG_E("aclnnfallback", "api_ret faild:%u", api_ret), return GRAPH_FAILED);
 
   return GRAPH_SUCCESS;
 }
 
-IMPL_OP(FusedInferAttentionScore).OpExecuteFunc(FusedInferHostExecuteFunc).HostInputs({5, 6});
+IMPL_OP(FusedInferAttentionScore).OpExecuteFunc(FusedInferHostExecuteFunc).HostInputs({5, 6, 23});
 }  // namespace fallback
 
 #ifdef __cplusplus

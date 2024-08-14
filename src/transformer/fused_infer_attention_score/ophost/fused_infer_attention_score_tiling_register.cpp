@@ -21,7 +21,7 @@ ge::graphStatus TilingPrepareForFusedInferAttentionScore(gert::TilingParseContex
     return ge::GRAPH_SUCCESS;
 }
 IMPL_OP_OPTILING(FusedInferAttentionScore)
-    .TilingInputsDataDependency({ACTUAL_SEQ_Q_INDEX, ACTUAL_SEQ_KV_INDEX, BLOCK_TABLE_INDEX, QUERY_PADDING_SIZE_INDEX,
+    .TilingInputsDataDependency({ACTUAL_SEQ_Q_INDEX, ACTUAL_SEQ_KV_INDEX, QUERY_PADDING_SIZE_INDEX,
                                  KV_PADDING_SIZE_INDEX, ACTUAL_SHARED_PREFIX_LEN_INDEX},
                                 {gert::TilingPlacement::TILING_ON_HOST, gert::TilingPlacement::TILING_ON_AICPU})
     .Tiling(DoOpTilingFusedInferAttentionScore)

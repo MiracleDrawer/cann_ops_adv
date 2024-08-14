@@ -65,10 +65,11 @@ public:
     __aicore__ inline PromptFlashAttentionS1s2Bns1X310Base() {};
     __aicore__ inline void Init(__gm__ uint8_t* query, __gm__ uint8_t* key, __gm__ uint8_t* value,
                                 __gm__ uint8_t* pseShift, __gm__ uint8_t* attenMask,
-                                __gm__ uint8_t* actualSeqLengths, __gm__ uint8_t* actualSeqLengthsKV,
+                                __gm__ uint8_t* actualSeqLengths, __gm__ uint8_t* actualSeqLengthsKV, __gm__ uint8_t* blocktable,
                                 __gm__ uint8_t* queryPaddingSize, __gm__ uint8_t* kvPaddingSize,
+                                __gm__ uint8_t* keySharedPrefix, __gm__ uint8_t* valueSharedPrefix, __gm__ uint8_t* actualSharedPrefixLen,
                                 __gm__ uint8_t* attentionOut, __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace,
-                                const PromptFlashAttentionTilingData* __restrict tiling, TPipe* tPipe);
+                                const PromptFlashAttentionTilingData* __restrict tiling, __gm__ uint8_t* gmTiling, TPipe* tPipe);
     using T = typename PFAT::inputType;
     using U = typename PFAT::maskType;
     using O = typename PFAT::outputType;
@@ -303,10 +304,11 @@ template<typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::Init(__gm__ uint8_t* query, __gm__ uint8_t* key,
                                         __gm__ uint8_t* value, __gm__ uint8_t* pseShift,
                                         __gm__ uint8_t* attenMask, __gm__ uint8_t* actualSeqLengths,
-                                        __gm__ uint8_t* actualSeqLengthsKV,
+                                        __gm__ uint8_t* actualSeqLengthsKV, __gm__ uint8_t* blocktable,
                                         __gm__ uint8_t* queryPaddingSize, __gm__ uint8_t* kvPaddingSize,
+                                        __gm__ uint8_t* keySharedPrefix, __gm__ uint8_t* valueSharedPrefix, __gm__ uint8_t* actualSharedPrefixLen,
                                         __gm__ uint8_t* attentionOut, __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace,
-                                        const PromptFlashAttentionTilingData* __restrict tiling,
+                                        const PromptFlashAttentionTilingData* __restrict tiling, __gm__ uint8_t* gmTiling,
                                         TPipe* tPipe) {
     tmp_block_idx = GetBlockIdx();
     // init global buffer

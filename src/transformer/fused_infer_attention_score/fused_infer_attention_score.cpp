@@ -35,7 +35,7 @@ extern "C" __global__ __aicore__ void fused_infer_attention_score(__gm__ uint8_t
   // judge ifa or pfa by range of tilingKey
   if(TILING_KEY_VAR >= 1000000000000000000) {
     prompt_flash_attention_FIAS(query, key, value, pse_shift, attenMask, actualSeqLengths, actualSeqLengthsKV, deq_scale1, quant_scale1,
-      deq_scale2, quant_scale2, quant_offset2, antiquantScale, antiquantOffset, queryPaddingSize, kvPaddingSize, attentionOut, softmaxLse, workspace, tiling);
+      deq_scale2, quant_scale2, quant_offset2, antiquantScale, antiquantOffset, blocktable, queryPaddingSize, kvPaddingSize, keySharedPrefix, valueSharedPrefix, actualSharedPrefixLen, attentionOut, softmaxLse, workspace, tiling);
   } else {
     incre_flash_attention_FIAS(query, key, value, pse_shift, attenMask, actualSeqLengthsKV, deq_scale1, quant_scale1, deq_scale2,
                           quant_scale2, quant_offset2, antiquantScale, antiquantOffset, blocktable, kvPaddingSize,

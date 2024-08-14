@@ -43,6 +43,8 @@ static const uint64_t CHAR_0 = 0;
 static const uint64_t CHAR_1 = 1;
 static const uint64_t CHAR_2 = 2;
 static const uint64_t CHAR_3 = 3;
+static const uint64_t CHAR_4 = 4;
+static const uint64_t CHAR_9 = 9;
 
 
 struct AxesInfo {
@@ -56,7 +58,7 @@ struct AxesInfo {
 
 enum class InputLayout { SH, BSH, NSD, BNSD, BSND, BNSD_BSND, NONE, };
 
-std::unordered_map<DataType, string> StrDataTypePfa = {
+static std::unordered_map<DataType, string> StrDataTypePfa = {
     {DataType::DT_FLOAT, "DT_FLOAT"},
     {DataType::DT_FLOAT16, "DT_FLOAT16"},
     {DataType::DT_INT8, "DT_INT8"},
@@ -115,27 +117,27 @@ static aclnnStatus CheckDimsAndLayout(const aclTensor *query, const aclTensor *k
         OP_LOGE(ACLNN_ERR_PARAM_INVALID,
                 "the layout of q and k v must be same, but got q dim:%lu k dim:%lu v dim:%lu", qDimNum, kDimNum, vDimNum);
         return ACLNN_ERR_PARAM_INVALID;
-    } else if ((qDimNum != DIM_NUM_4) && (inputLayout[CHAR_0] == 'B' && inputLayout[CHAR_1] == 'N' &&
+    } else if ((qDimNum != DIM_NUM_4) && strnlen(inputLayout, CHAR_4) >= CHAR_4 && (inputLayout[CHAR_0] == 'B' && inputLayout[CHAR_1] == 'N' &&
         inputLayout[CHAR_2] == 'S' && inputLayout[CHAR_3] == 'D')) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID,
                 "layout is BNSD, input shape dim should be 4, but got %lu", qDimNum);
         return ACLNN_ERR_PARAM_INVALID;
-    } else if ((qDimNum != DIM_NUM_4) && (inputLayout[CHAR_0] == 'B' && inputLayout[CHAR_1] == 'S' &&
+    } else if ((qDimNum != DIM_NUM_4) && strnlen(inputLayout, CHAR_4) >= CHAR_4 && (inputLayout[CHAR_0] == 'B' && inputLayout[CHAR_1] == 'S' &&
         inputLayout[CHAR_2] == 'N' && inputLayout[CHAR_3] == 'D')) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID,
                 "layout is BSND, input shape dim should be 4, but got %lu", qDimNum);
         return ACLNN_ERR_PARAM_INVALID;
-    } else if ((qDimNum != DIM_NUM_3) && (inputLayout[CHAR_0] == 'B' && inputLayout[CHAR_1] == 'S' &&
+    } else if ((qDimNum != DIM_NUM_3) && strnlen(inputLayout, CHAR_4) >= CHAR_3 && (inputLayout[CHAR_0] == 'B' && inputLayout[CHAR_1] == 'S' &&
                inputLayout[CHAR_2] == 'H')) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID,
                 "layout is BSH, input shape dim should be 3, but got %lu", qDimNum);
         return ACLNN_ERR_PARAM_INVALID;
-    } else if ((qDimNum != DIM_NUM_3) && (inputLayout[CHAR_0] == 'N' && inputLayout[CHAR_1] == 'S' &&
+    } else if ((qDimNum != DIM_NUM_3) && strnlen(inputLayout, CHAR_4) >= CHAR_3 && (inputLayout[CHAR_0] == 'N' && inputLayout[CHAR_1] == 'S' &&
                inputLayout[CHAR_2] == 'D')) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID,
                 "layout is NSD, input shape dim should be 3, but got %lu", qDimNum);
         return ACLNN_ERR_PARAM_INVALID;
-    } else if ((qDimNum != DIM_NUM_2) && (inputLayout[CHAR_0] == 'S' && inputLayout[CHAR_1] == 'H')) {
+    } else if ((qDimNum != DIM_NUM_2) && strnlen(inputLayout, CHAR_4) >= CHAR_2 && (inputLayout[CHAR_0] == 'S' && inputLayout[CHAR_1] == 'H')) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID,
                 "layout is SH, input shape dim should be 2, but got %lu", qDimNum);
         return ACLNN_ERR_PARAM_INVALID;
@@ -161,7 +163,7 @@ static aclnnStatus analysisAxis(const aclTensor *query, const aclTensor *key, co
 
     // query: (B*S1, N1*D)
     // key/value: (B*S2, N2*D)
-    if (shapeInfo.dimNum == DIM_NUM_2 && inputLayout[0] == 'S' && inputLayout[1] == 'H') {
+    if (shapeInfo.dimNum == DIM_NUM_2 && strnlen(inputLayout, CHAR_4) >= CHAR_2 && inputLayout[0] == 'S' && inputLayout[1] == 'H') {
         uint64_t dSize = qShape[1] / headNum;
         if (dSize == 0) {
             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Input query shape is (S[%ld], H[%ld]), input num_head N is %ld, "
@@ -180,7 +182,7 @@ static aclnnStatus analysisAxis(const aclTensor *query, const aclTensor *key, co
 
     // query: (B,S1,N1*D)
     // key/value: (B,S2,N2*D)
-    if (shapeInfo.dimNum == DIM_NUM_3 && inputLayout[0] == 'B' && inputLayout[1] == 'S' && inputLayout[2] == 'H') {
+    if (shapeInfo.dimNum == DIM_NUM_3 && strnlen(inputLayout, CHAR_4) >= CHAR_3 && inputLayout[0] == 'B' && inputLayout[1] == 'S' && inputLayout[2] == 'H') {
         uint64_t dSize = qShape[2] / headNum;
         if (dSize == 0) {
             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Input query shape is (B[%ld], S[%ld], H[%ld]), input num_head N is %ld, "
@@ -199,7 +201,7 @@ static aclnnStatus analysisAxis(const aclTensor *query, const aclTensor *key, co
 
     // query: (B,S1,N1,D)
     // key/value: (B,S2,N2,D)
-    if (shapeInfo.dimNum == DIM_NUM_4 && inputLayout[0] == 'B' && inputLayout[1] == 'S' && inputLayout[2] == 'N' &&
+    if (shapeInfo.dimNum == DIM_NUM_4 && strnlen(inputLayout, CHAR_4) >= CHAR_4 && inputLayout[0] == 'B' && inputLayout[1] == 'S' && inputLayout[2] == 'N' &&
         inputLayout[3] == 'D') {
         shapeInfo.axes.b = qShape[0];
         shapeInfo.axes.n2 = kShape[INDEX_2];
@@ -212,7 +214,7 @@ static aclnnStatus analysisAxis(const aclTensor *query, const aclTensor *key, co
 
     // query: (B*N1,S1,D)
     // key/value: (B*N2,S2,D)
-    if (shapeInfo.dimNum == DIM_NUM_3 && inputLayout[0] == 'N' && inputLayout[1] == 'S' && inputLayout[2] == 'D') {
+    if (shapeInfo.dimNum == DIM_NUM_3 && strnlen(inputLayout, CHAR_4) >= CHAR_3 && inputLayout[0] == 'N' && inputLayout[1] == 'S' && inputLayout[2] == 'D') {
         shapeInfo.axes.b = 1;
         shapeInfo.axes.n2 = kShape[0];
         shapeInfo.axes.s1 = qShape[1];
@@ -224,14 +226,14 @@ static aclnnStatus analysisAxis(const aclTensor *query, const aclTensor *key, co
 
     // query: (B,N1,S1,D)
     // key/value: (B,N2,S2,D)
-    if (shapeInfo.dimNum == DIM_NUM_4 && inputLayout[0] == 'B' && inputLayout[1] == 'N' && inputLayout[2] == 'S' &&
+    if (shapeInfo.dimNum == DIM_NUM_4 && strnlen(inputLayout, CHAR_4) >= CHAR_4 && inputLayout[0] == 'B' && inputLayout[1] == 'N' && inputLayout[2] == 'S' &&
         inputLayout[3] == 'D') {
         shapeInfo.axes.b = qShape[0];
         shapeInfo.axes.n2 = kShape[1];
         shapeInfo.axes.s1 = qShape[2];
         shapeInfo.axes.s2 = kShape[2];
         shapeInfo.axes.d = qShape[3];
-        if (strlen(inputLayout) == 9 && inputLayout[4] == '_' && inputLayout[5] == 'B' && inputLayout[6] == 'S' && inputLayout[7] == 'N' &&
+        if (strnlen(inputLayout, CHAR_9) == CHAR_9 && inputLayout[4] == '_' && inputLayout[5] == 'B' && inputLayout[6] == 'S' && inputLayout[7] == 'N' &&
             inputLayout[8] == 'D') {
             shapeInfo.inputLayout = InputLayout::BNSD_BSND;
             shapeInfo.l0InputLayoutStr = "BNSD_BSND";
@@ -414,9 +416,9 @@ static aclnnStatus preprocessQKVInput(const aclTensor *&query, const aclTensor *
     if (shapeInfo.inputLayout == InputLayout::BSH && shapeInfo.needPad) {
         // (B,S,N,D) -> (B,S,N*D)
         FVector<int64_t, DIM_NUM_3> queryShape{shapeInfo.axes.b, shapeInfo.axes.s1,
-                                               shapeInfo.axes.n1 * (shapeInfo.axes.d + shapeInfo.padNum)};
+                                               shapeInfo.axes.n1 * (shapeInfo.axes.d + static_cast<int64_t>(shapeInfo.padNum))};
         FVector<int64_t, DIM_NUM_3> keyValueShape{shapeInfo.axes.b, shapeInfo.axes.s2,
-                                                  shapeInfo.axes.n2 * (shapeInfo.axes.d + shapeInfo.padNum)};
+                                                  shapeInfo.axes.n2 * (shapeInfo.axes.d + static_cast<int64_t>(shapeInfo.padNum))};
 
         CHECK_RET(reShapeMiddle(query, key, value, queryShape.data(), queryShape.size(),
                                 keyValueShape.data(), keyValueShape.size(), executor) == ACLNN_SUCCESS,
@@ -426,9 +428,9 @@ static aclnnStatus preprocessQKVInput(const aclTensor *&query, const aclTensor *
     if (shapeInfo.inputLayout == InputLayout::SH && shapeInfo.needPad) {
         // (B,S,N,D) -> (B*S,N*D)
         FVector<int64_t, DIM_NUM_2> queryShape{shapeInfo.axes.b * shapeInfo.axes.s1,
-                                               shapeInfo.axes.n1 * (shapeInfo.axes.d + shapeInfo.padNum)};
+                                               shapeInfo.axes.n1 * (shapeInfo.axes.d + static_cast<int64_t>(shapeInfo.padNum))};
         FVector<int64_t, DIM_NUM_2> keyValueShape{shapeInfo.axes.b * shapeInfo.axes.s2,
-                                                  shapeInfo.axes.n2 * (shapeInfo.axes.d + shapeInfo.padNum)};
+                                                  shapeInfo.axes.n2 * (shapeInfo.axes.d + static_cast<int64_t>(shapeInfo.padNum))};
 
         CHECK_RET(reShapeMiddle(query, key, value, queryShape.data(), queryShape.size(),
                                 keyValueShape.data(), keyValueShape.size(), executor) == ACLNN_SUCCESS,
@@ -438,9 +440,9 @@ static aclnnStatus preprocessQKVInput(const aclTensor *&query, const aclTensor *
     if (shapeInfo.inputLayout == InputLayout::NSD && shapeInfo.needPad) {
         // (B,N,S,Dp) -> (B*N,S,Dp)
         FVector<int64_t, DIM_NUM_3> queryShape{shapeInfo.axes.b * shapeInfo.axes.n1, shapeInfo.axes.s1,
-                                               (shapeInfo.axes.d + shapeInfo.padNum)};
+                                               (shapeInfo.axes.d + static_cast<int64_t>(shapeInfo.padNum))};
         FVector<int64_t, DIM_NUM_3> keyValueShape{shapeInfo.axes.b * shapeInfo.axes.n2, shapeInfo.axes.s2, 
-                                                  (shapeInfo.axes.d + shapeInfo.padNum)};
+                                                  (shapeInfo.axes.d + static_cast<int64_t>(shapeInfo.padNum))};
 
         CHECK_RET(reShapeMiddle(query, key, value, queryShape.data(), queryShape.size(),
                                 keyValueShape.data(), keyValueShape.size(), executor) == ACLNN_SUCCESS,
@@ -458,7 +460,7 @@ static aclnnStatus postProcessOutput(const aclTensor *&l0AttentionOutOut, const 
             (shapeInfo.inputLayout == InputLayout::SH)) {
             // (B,S,Hp) -> (B,S,N,Dp)
             FVector<int64_t, DIM_NUM_4> paddedSBNDShape{shapeInfo.axes.b, shapeInfo.axes.s1, shapeInfo.axes.n1,
-                                                shapeInfo.axes.d + shapeInfo.padNum};
+                                                shapeInfo.axes.d + static_cast<int64_t>(shapeInfo.padNum)};
             l0AttentionOutOut =
                 l0op::Reshape(l0AttentionOutOut,
                             executor->AllocIntArray(paddedSBNDShape.data(), paddedSBNDShape.size()), executor);
@@ -466,7 +468,7 @@ static aclnnStatus postProcessOutput(const aclTensor *&l0AttentionOutOut, const 
         } else if (shapeInfo.inputLayout == InputLayout::NSD) {
             // (N,S,Dp) -> (B,N,S,Dp)
             FVector<int64_t, DIM_NUM_4> paddedSBNDShape{shapeInfo.axes.b, shapeInfo.axes.n1, shapeInfo.axes.s1,
-                                                shapeInfo.axes.d + shapeInfo.padNum};
+                                                shapeInfo.axes.d + static_cast<int64_t>(shapeInfo.padNum)};
             l0AttentionOutOut =
                 l0op::Reshape(l0AttentionOutOut,
                             executor->AllocIntArray(paddedSBNDShape.data(), paddedSBNDShape.size()), executor);
@@ -553,6 +555,19 @@ static bool CheckTensorDataType(const aclTensor* query, const aclTensor* key, co
     return true;
 }
 
+static inline bool CheckResultOutShapePfa(const aclTensor *inferOut, const aclTensor *out) {
+    auto const &xShape = inferOut->GetViewShape();
+    auto const &yShape = out->GetViewShape();
+    if(xShape != yShape) {
+        if(!(xShape.GetShapeSize() == 1 && yShape.GetShapeSize() == 1)) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Out tensor's shape[%s] is not equal with inferOut shape[%s].",
+                op::ToString(out->GetViewShape()).GetString(), op::ToString(inferOut->GetViewShape()).GetString());
+            return false;
+        }
+    }
+    return true;
+}
+
 aclnnStatus aclnnInnerPromptFlashAttentionGetWorkspaceSize(
     const aclTensor *query, const aclTensor *key, const aclTensor *value, const aclTensor *pseShift,
     const aclTensor *attenMask, const aclIntArray *actualSeqLengths, const aclIntArray *actualSeqLengthsKv,
@@ -604,6 +619,7 @@ aclnnStatus aclnnInnerPromptFlashAttentionGetWorkspaceSize(
     CHECK_RET(l0AttentionOutOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(postProcessOutput(l0AttentionOutOut, attentionOut, shapeInfo, l0Executor) == ACLNN_SUCCESS,
               ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(CheckResultOutShapePfa(l0AttentionOutOut, attentionOut), ACLNN_ERR_PARAM_INVALID);
     auto viewCopyResult = l0op::ViewCopy(l0AttentionOutOut, attentionOut, l0Executor);
     CHECK_RET(viewCopyResult != nullptr, ACLNN_ERR_INNER_NULLPTR);
 

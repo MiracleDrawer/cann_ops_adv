@@ -48,7 +48,7 @@ protected:
 
     __aicore__ inline void ComputeEachCoreSInnerLoop();
 
-    __aicore__ inline void SInnerLoopFunc(int64_t sInnerFirstToken, int64_t sInnerEndToken, int curBatch, int32_t preTokens, int32_t nextTokens);
+    __aicore__ inline void SInnerLoopFunc(int64_t sInnerFirstToken, int64_t sInnerEndToken, int curBatch, int64_t preTokens, int64_t nextTokens);
 
     __aicore__ inline void ComputeEachCore(uint32_t coreIdx);
 
@@ -105,12 +105,20 @@ protected:
             LocalTensor<T> dstLocal = this->kvAntiquantDstQueue.template AllocTensor<T>();
 
             kvCopyParam.blockCount = kvComputeSInnerSize;
-            if (this->isKvContinuous == 0) {
-                ListTensorDesc valueListDesc((__gm__ void*)this->value_ptr);
-                __gm__ uint8_t* tempValueGm = (__gm__ uint8_t*)valueListDesc.GetDataPtr<__gm__ uint8_t>(params->taskBatch);
-                this->valueGm.SetGlobalBuffer((__gm__ KV_T*)tempValueGm);
+            if constexpr (PFAT::enablePrefix) {
+                if (params->isPrefixInnerIter) {
+                    DataCopy(srcLocal, this->valueSharedPrefixGm[vOffset], kvCopyParam);
+                } else {
+                    DataCopy(srcLocal, this->valueGm[vOffset], kvCopyParam);
+                }
+            } else {
+                if (this->isKvContinuous == 0) {
+                    ListTensorDesc valueListDesc((__gm__ void*)this->value_ptr);
+                    __gm__ uint8_t* tempValueGm = (__gm__ uint8_t*)valueListDesc.GetDataPtr<__gm__ uint8_t>(params->taskBatch);
+                    this->valueGm.SetGlobalBuffer((__gm__ KV_T*)tempValueGm);
+                }
+                DataCopy(srcLocal, this->valueGm[vOffset], kvCopyParam);
             }
-            DataCopy(srcLocal, this->valueGm[vOffset], kvCopyParam);
             this->kvAntiquantSrcQueue.EnQue(srcLocal);
             srcLocal = this->kvAntiquantSrcQueue.template DeQue<int8_t>();
 
@@ -178,12 +186,20 @@ protected:
             LocalTensor<T> dstLocal = this->kvAntiquantDstQueue.template AllocTensor<T>();
 
             kvCopyParam.blockCount = kvComputeSInnerSize;
-            if (this->isKvContinuous == 0) {
-                ListTensorDesc keyListDesc((__gm__ void*)this->key_ptr);
-                __gm__ uint8_t* tempKeyGm = (__gm__ uint8_t*)keyListDesc.GetDataPtr<__gm__ uint8_t>(params->taskBatch);
-                this->keyGm.SetGlobalBuffer((__gm__ KV_T*)tempKeyGm);
+            if constexpr (PFAT::enablePrefix) {
+                if (params->isPrefixInnerIter) {
+                    DataCopy(srcLocal, this->keySharedPrefixGm[kOffset], kvCopyParam);
+                } else {
+                    DataCopy(srcLocal, this->keyGm[kOffset], kvCopyParam);
+                }
+            } else {
+                if (this->isKvContinuous == 0) {
+                    ListTensorDesc keyListDesc((__gm__ void*)this->key_ptr);
+                    __gm__ uint8_t* tempKeyGm = (__gm__ uint8_t*)keyListDesc.GetDataPtr<__gm__ uint8_t>(params->taskBatch);
+                    this->keyGm.SetGlobalBuffer((__gm__ KV_T*)tempKeyGm);
+                }
+                DataCopy(srcLocal, this->keyGm[kOffset], kvCopyParam);
             }
-            DataCopy(srcLocal, this->keyGm[kOffset], kvCopyParam);
             this->kvAntiquantSrcQueue.EnQue(srcLocal);
             srcLocal = this->kvAntiquantSrcQueue.template DeQue<int8_t>();
 
@@ -209,7 +225,8 @@ protected:
         SetFlag<HardEvent::MTE3_MTE2>(bmmWaitAntiEvt);
         WaitFlag<HardEvent::MTE3_MTE2>(bmmWaitAntiEvt);
     }
-    __aicore__ inline void Bmm1ComputeIterate(int64_t qOffset, int64_t kOffset, int32_t singleCoreM, int32_t singleCoreN, int32_t unalignSingleCoreN, int pingpong, int taskBatch) {
+    __aicore__ inline void Bmm1ComputeIterate(int64_t qOffset, int64_t kOffset, const uint32_t BIdx, const uint32_t NIdx,
+        const uint32_t sInnerOffsetDataSize, int32_t singleCoreM, int32_t singleCoreN, int32_t unalignSingleCoreN, int pingpong, int taskBatch, bool isPrefixInnerIter) {
        if (this->mm1SingleCoreNPrev != singleCoreN) {
             // 减少SetOrgShape调用次数，可以减少cv通信次数
             this->mm.SetOrgShape(this->tilingData->bmm1TilingDataRect.M, this->tilingData->bmm1TilingDataRect.N,
@@ -217,6 +234,28 @@ protected:
                                  singleCoreN);
             this->mm1SingleCoreNPrev = singleCoreN;
         }
+        if constexpr (PFAT::MM_TYPE == MatMulType::MM_PA) {
+            this->bmm1LocalInfo = this->PABmm1UB.template Get<uint32_t>();
+            this->bmm1LocalInfo.SetValue(0, BIdx);
+            this->bmm1LocalInfo.SetValue(1, NIdx / this->tilingData->promptAttentionBaseParams.headNumRatio);
+            this->bmm1LocalInfo.SetValue(2, sInnerOffsetDataSize);  // 2: Sinner的偏移
+            this->bmm1LocalInfo.SetValue(3, (uint32_t)((reinterpret_cast<uint64_t>(this->currentKey)>>32) & 0x00000000ffffffff));  // 3: key指针的高位  32: 移动的位数
+            this->bmm1LocalInfo.SetValue(4, (uint32_t)(reinterpret_cast<uint64_t>(this->currentKey)));  // 4: key指针的低位
+            this->bmm1LocalInfo.SetValue(5, (uint32_t)((reinterpret_cast<uint64_t>(this->blocktable_ptr)>>32) & 0x00000000ffffffff));  // 5: blocktable指针的高位  32: 移动的位数
+            this->bmm1LocalInfo.SetValue(6, (uint32_t)(reinterpret_cast<uint64_t>(this->blocktable_ptr)));  // 6: blocktable指针的低位
+
+            event_t eventIDSToMTE3 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::S_MTE3));
+            SetFlag<HardEvent::S_MTE3>(eventIDSToMTE3);
+            WaitFlag<HardEvent::S_MTE3>(eventIDSToMTE3);
+
+            DataCopy(this->bmm1CBDataGm[pingpong], this->bmm1LocalInfo, 8);  // 8: 对齐
+
+            event_t eventIDMTE3ToS = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE3_S));
+            SetFlag<HardEvent::MTE3_S>(eventIDMTE3ToS);
+            WaitFlag<HardEvent::MTE3_S>(eventIDMTE3ToS);
+
+            this->mm.SetSelfDefineData(reinterpret_cast<uint64_t>(this->bmm1CBDataPtr[pingpong]));
+       }
         this->mm.SetTail(singleCoreM, unalignSingleCoreN);
         this->mm.SetTensorA(this->queryGm[qOffset]);
 
@@ -228,6 +267,14 @@ protected:
 
         if constexpr (!IsSameType<T, KV_T>::value && IsSameType<KV_T, int8_t>::value) {
             this->mm.SetTensorB(this->keyGmAntiquant, true);
+        } else if constexpr (PFAT::MM_TYPE == MatMulType::MM_PA) {
+            this->mm.SetTensorB(this->keyGm, true);
+        } else if constexpr (PFAT::enablePrefix) {
+            if (isPrefixInnerIter) {
+                this->mm.SetTensorB(this->keySharedPrefixGm[kOffset], true);
+            } else {
+                this->mm.SetTensorB(this->keyGm[kOffset], true);
+            }
         } else {
             this->mm.SetTensorB(this->keyGm[kOffset], true);
         }
@@ -305,6 +352,7 @@ protected:
         int ubPingpong = 0;
         int64_t nextSouterOffset;
         uint32_t computeSize;
+        uint32_t padSize = 0;
         for (int64_t souterOffset = 0; souterOffset < params->singleProcessSOuterSize; souterOffset = nextSouterOffset) {     // 待整改
             int64_t leftSouterSize = params->singleProcessSOuterSize - souterOffset;
             int64_t souterSize = (leftSouterSize >= this->softmaxSouterStepLen) ? this->softmaxSouterStepLen : leftSouterSize;
@@ -339,8 +387,13 @@ protected:
                 pipe_barrier(PIPE_V);
                 this->tempBmm2Queue.FreeTensor(this->pseShiftUb);
                 if (params->useMask && params->sparseBandSelect0) {  // mask 预取，非band模式sparseBandSelect0为true，只需要关注前面的useMask
+                    if constexpr (PFAT::enablePrefix) {
+                        padSize = params->isPrefixInnerIter ? params->padPrefixSize : params->padSize;
+                    } else {
+                        padSize = params->padSize;
+                    }
                     this->PseOrMaskCopyIn(attenMaskOffset, souterSize, params->isInnerTail,
-                        params->maskCopyInCol, params->singleProcessSInnerBmmTail, params->padSize, true);
+                        params->maskCopyInCol, params->singleProcessSInnerBmmTail, padSize, true);
                 }
             }
 
@@ -397,12 +450,22 @@ protected:
                     attenMaskOffsetPre += souterSize * this->attentionMaskStride;
                 }
                 if (params->usePseShift) {  // pse 预取
+                    if constexpr (PFAT::enablePrefix) {
+                        padSize = params->isPrefixInnerIter ? params->pseShiftPadPrefixSize : params->pseShiftPadSize;
+                    } else {
+                        padSize = params->pseShiftPadSize;
+                    }
                     pseShiftOffset += souterSize * this->pseShiftStride;
                     this->PseOrMaskCopyIn(pseShiftOffset, nextSouterSize, params->isInnerTail,
-                        params->pseShiftCopyInCol, params->singleProcessSInnerBmmTail, params->pseShiftPadSize, false);
+                        params->pseShiftCopyInCol, params->singleProcessSInnerBmmTail, padSize, false);
                 } else if (params->useMask && params->sparseBandSelect0) {  // mask 预取，非band模式sparseBandSelect0为true，只需要关注前面的useMask
+                    if constexpr (PFAT::enablePrefix) {
+                        padSize = params->isPrefixInnerIter ? params->padPrefixSize : params->padSize;
+                    } else {
+                        padSize = params->padSize;
+                    }
                     this->PseOrMaskCopyIn(attenMaskOffset, nextSouterSize, params->isInnerTail, params->maskCopyInCol,
-                        params->singleProcessSInnerBmmTail, params->padSize, true);
+                        params->singleProcessSInnerBmmTail, padSize, true);
                 }
 
                 // mm1 result copyIn 预取
@@ -438,7 +501,7 @@ protected:
         }
     }
 
-    __aicore__ inline void Bmm2ComputeIterate() {
+    __aicore__ inline void Bmm2ComputeIterate(const uint32_t BIdx, const uint32_t NIdx, const uint32_t sInnerOffsetDataSize) {
         PFAComputeParam *params = this->headParams;
         if ((this->mm2MStridePrev != params->singleProcessSOuterSize)
             || (this->mm2KaStridePrev != params->mm1SingleCoreN)) {
@@ -451,6 +514,28 @@ protected:
              this->mm2MStridePrev = params->singleProcessSOuterSize;
              this->mm2KaStridePrev = params->mm1SingleCoreN;
         }
+        if constexpr (PFAT::MM_TYPE == MatMulType::MM_PA) {
+            this->bmm2LocalInfo = this->PABmm2UB.template Get<uint32_t>();
+            this->bmm2LocalInfo.SetValue(0, BIdx);
+            this->bmm2LocalInfo.SetValue(1, NIdx / this->tilingData->promptAttentionBaseParams.headNumRatio);
+            this->bmm2LocalInfo.SetValue(2, sInnerOffsetDataSize);  // 2: sinner的偏移
+            this->bmm2LocalInfo.SetValue(3, (uint32_t)((reinterpret_cast<uint64_t>(this->currentValue)>>32) & 0x00000000ffffffff));  // 3: value指针的高位  32: 移动的位数
+            this->bmm2LocalInfo.SetValue(4, (uint32_t)(reinterpret_cast<uint64_t>(this->currentValue)));  // 4: value指针的低位
+            this->bmm2LocalInfo.SetValue(5, (uint32_t)((reinterpret_cast<uint64_t>(this->blocktable_ptr)>>32) & 0x00000000ffffffff));  // 5: blocktable指针的高位  32: 移动的位数
+            this->bmm2LocalInfo.SetValue(6, (uint32_t)(reinterpret_cast<uint64_t>(this->blocktable_ptr)));  // 6: blocktable指针的低位
+
+            event_t eventIDSToMTE3 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::S_MTE3));
+            SetFlag<HardEvent::S_MTE3>(eventIDSToMTE3);
+            WaitFlag<HardEvent::S_MTE3>(eventIDSToMTE3);
+
+            DataCopy(this->bmm2CBDataGm[params->gmPingpong], this->bmm2LocalInfo, 8);  // 8: 对齐
+
+            event_t eventIDMTE3ToS = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE3_S));
+            SetFlag<HardEvent::MTE3_S>(eventIDMTE3ToS);
+            WaitFlag<HardEvent::MTE3_S>(eventIDMTE3ToS);
+
+            this->bmm2.SetSelfDefineData(reinterpret_cast<uint64_t>(this->bmm2CBDataPtr[params->gmPingpong]));
+       }
         this->bmm2.SetTail(params->singleProcessSOuterSize,
             this->tilingData->promptAttentionBaseParams.headSize, params->singleProcessSInnerBmmTail);
         if constexpr (IsSameType<T, int8_t>::value) {
@@ -474,6 +559,14 @@ protected:
 
         if constexpr (!IsSameType<T, KV_T>::value && IsSameType<KV_T, int8_t>::value) {
             this->bmm2.SetTensorB(this->valueGmAntiquant);
+        } else if constexpr (PFAT::MM_TYPE == MatMulType::MM_PA) {
+            this->bmm2.SetTensorB(this->valueGm);
+        } else if constexpr (PFAT::enablePrefix) {
+            if (params->isPrefixInnerIter) {
+                this->bmm2.SetTensorB(this->valueSharedPrefixGm[params->valueOffset]);
+            } else {
+                this->bmm2.SetTensorB(this->valueGm[params->valueOffset]);
+            }
         } else {
             this->bmm2.SetTensorB(this->valueGm[params->valueOffset]);
         }
@@ -522,14 +615,25 @@ protected:
         dst->attentionOutOffset = src->attentionOutOffset;
         dst->batchNOffset = src->batchNOffset;
         dst->sOuterOffset = src->sOuterOffset;
+        dst->sInnerLoopOffset = src->sInnerLoopOffset;
         dst->multiSeqOffset = src->multiSeqOffset;
         dst->multiSeqOffsetBSNDOut = src->multiSeqOffsetBSNDOut;
         dst->SoftMaxOffset = src->SoftMaxOffset;
+        dst->sInnerOffsetDataSize = src->sInnerOffsetDataSize;
         dst->taskBatch = src->taskBatch;
         dst->preTokensPerBatch = src->preTokensPerBatch;
         dst->nextTokensPerBatch = src->nextTokensPerBatch;
         dst->actualSeqLengthPerBatch = src->actualSeqLengthPerBatch;
         dst->actualSeqLengthKVPerBatch = src->actualSeqLengthKVPerBatch;
+        if constexpr (PFAT::enablePrefix) {
+            dst->singleProcessSInnerPrefixSizeTail = src->singleProcessSInnerPrefixSizeTail;
+            dst->maskInnerPrefixTailAlign = src->maskInnerPrefixTailAlign;
+            dst->padPrefixSize = src->padPrefixSize;
+            dst->pseShiftInnerPrefixTailAlign = src->pseShiftInnerPrefixTailAlign;
+            dst->pseShiftPadPrefixSize = src->pseShiftPadPrefixSize;
+            dst->unalignSInnerPrefix = src->unalignSInnerPrefix;
+            dst->isPrefixInnerIter = src->isPrefixInnerIter;
+        }
     }
 };
 
@@ -672,19 +776,35 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1VecInputCopyI
     this->softmaxSouterStepLen = this->softmaxFlashTilingData.srcM;
     // 优化尾块，softmax循环次数
     if (this->softmaxFlashTilingData.srcK != params->singleProcessSInnerSizeNow) {
-        this->softmaxSouterStepLen = this->softmaxFlashTilingData.srcSize / params->singleProcessSInnerSizeNow / 8 * 8; // 8对齐
+        uint32_t minSoftmaxSouterStepLen = this->softmaxFlashTilingData.srcSize / params->singleProcessSInnerSizeNow / 8 * 8; // 8对齐
+        if (params->useMask) {  // 在D<=64的情况下，maskubsize可能大于bmm2ubsize，只会按maskubsize分到16k，在mask padding size大于sinner padding size时，会导致访问越界
+            uint32_t maskSouter = this->maskBmm2ShareSize / params->maskCopyInCol / 8 * 8;  // 8对齐
+            minSoftmaxSouterStepLen = (minSoftmaxSouterStepLen < maskSouter) ? minSoftmaxSouterStepLen : maskSouter;
+        }
+        this->softmaxSouterStepLen = minSoftmaxSouterStepLen;
         this->softmaxSouterStepLen = ((this->softmaxSouterStepLen > params->singleProcessSOuterSize) ||
         (this->softmaxSouterStepLen == 0)) ?
         params->singleProcessSOuterSize : this->softmaxSouterStepLen;
     }
     uint32_t souterSize = this->softmaxSouterStepLen;
 
+    uint32_t padSize = 0;
     if (params->usePseShift) {
+        if constexpr (PFAT::enablePrefix) {
+            padSize = params->isPrefixInnerIter ? params->pseShiftPadPrefixSize : params->pseShiftPadSize;
+        } else {
+            padSize = params->pseShiftPadSize;
+        }
         this->PseOrMaskCopyIn(params->pseShiftOffset, souterSize, params->isInnerTail, params->pseShiftCopyInCol,
-            params->singleProcessSInnerBmmTail, params->pseShiftPadSize, false);
+            params->singleProcessSInnerBmmTail, padSize, false);
     } else if (params->useMask && params->sparseBandSelect0) {  // 非band模式sparseBandSelect0为true，只需要关注前面的useMask
+        if constexpr (PFAT::enablePrefix) {
+            padSize = params->isPrefixInnerIter ? params->padPrefixSize : params->padSize;
+        } else {
+            padSize = params->padSize;
+        }
         this->PseOrMaskCopyIn(params->attenMaskOffset, souterSize, params->isInnerTail, params->maskCopyInCol,
-            params->singleProcessSInnerBmmTail, params->padSize, true);
+            params->singleProcessSInnerBmmTail, padSize, true);
     }
 
     this->Bmm1GmResCopyInUb(this->mmResUb[0], 0,
@@ -702,8 +822,12 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::SparseBandElewise
                                         params->maskCopyInCol, params->useMask, this->bmm1ResCopyInEvent[ubPingpong], 0);
     }
     if (params->sparseBandSelect1) {    // 选1的部分
+        uint32_t padSize = params->padSize;
+        if constexpr (PFAT::enablePrefix) {
+            padSize = params->isPrefixInnerIter ? params->padPrefixSize : params->padSize;
+        }
         this->PseOrMaskCopyIn(attenMaskOffsetPre, souterSize, params->isInnerTail, params->maskCopyInCol,
-            params->singleProcessSInnerBmmTail, params->padSize, true);
+            params->singleProcessSInnerBmmTail, padSize, true);
 
         pipe_barrier(PIPE_V);
         this->template ElewiseCompute<U>(this->mmResUb[ubPingpong], souterSize, params->singleProcessSInnerSizeNow,
@@ -725,7 +849,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1ResDoVecBmm2C
         if constexpr (!IsSameType<T, KV_T>::value && IsSameType<KV_T, int8_t>::value) {
             this->Bmm2Antiquant(params);
         }
-        this->Bmm2ComputeIterate();
+        this->Bmm2ComputeIterate(params->taskBatch, params->batchNOffset, params->sInnerOffsetDataSize);
     } else if (params->isSecondInnerIter) {                      
         bmm2ResUb = AllocBmm2UbRes(this->headParams, true, resShapeSize);    // 第二次不需要做加法，用Tbuf
         this->bmm2.WaitIterateAll();
@@ -735,7 +859,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1ResDoVecBmm2C
         if constexpr (!IsSameType<T, KV_T>::value && IsSameType<KV_T, int8_t>::value) {
             this->Bmm2Antiquant(params);
         }
-        this->Bmm2ComputeIterate();    // 触发当前循环的bmm2计算，使用headParams
+        this->Bmm2ComputeIterate(params->taskBatch, params->batchNOffset, params->sInnerOffsetDataSize);    // 触发当前循环的bmm2计算，使用headParams
         this->UpdateVmul(this->softmaxExpUb);
     } else {
         bmm2ResUb = AllocBmm2UbRes(this->headParams, false, resShapeSize);
@@ -749,7 +873,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1ResDoVecBmm2C
         if constexpr (!IsSameType<T, KV_T>::value && IsSameType<KV_T, int8_t>::value) {
             this->Bmm2Antiquant(params);
         }
-        this->Bmm2ComputeIterate();    // 触发当前循环的bmm2计算，使用headParams
+        this->Bmm2ComputeIterate(params->taskBatch, params->batchNOffset, params->sInnerOffsetDataSize);    // 触发当前循环的bmm2计算，使用headParams
         this->UpdateVmul(this->softmaxExpUb);
     }
 
@@ -795,13 +919,18 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::CheckRowInvalid(i
 
 template<typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::SInnerLoopFunc(int64_t sInnerFirstToken, int64_t sInnerLastToken, int curBatch,
-                                                                            int32_t preTokens, int32_t nextTokens) {
+                                                                            int64_t preTokens, int64_t nextTokens) {
     // params 传引用，当tailParams, params也跟着更新
     PFAComputeParam *&params = this->tailParams;                // 配置新任务，新任务会放到队列尾，使用tailParams
     int32_t basicSInnerSize = (int32_t)(params->singleProcessSInnerSize);
     int32_t startIndex = sInnerFirstToken / basicSInnerSize;
     int32_t endIndex = (sInnerLastToken + basicSInnerSize - 1) / basicSInnerSize;
     bool isS2Load = (this->maxInnerLoopTimes == 1);
+    if constexpr (PFAT::enablePrefix) {
+        if (this->actualKVPrefixLen < sInnerLastToken) {
+            endIndex = (this->actualKVPrefixLen + basicSInnerSize - 1) / basicSInnerSize + (sInnerLastToken - this->actualKVPrefixLen + basicSInnerSize - 1) / basicSInnerSize;
+        }
+    }
     if (endIndex > this->maxInnerLoopTimes) {
         endIndex = this->maxInnerLoopTimes;
     }
@@ -810,6 +939,9 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::SInnerLoopFunc(in
     // 上三角mask场景，动态last sinnersize， 根据上三角mask，计算出当前last inner iter的最紧凑sinnersize（包含所有mask 0值的最小sinnersize）
     int64_t firstInnerMargin = (sInnerFirstToken - startIndex * basicSInnerSize) / softmaxInnerBasicSize * softmaxInnerBasicSize;
     int64_t lastInnerMargin = (endIndex * basicSInnerSize - sInnerLastToken) / softmaxInnerBasicSize * softmaxInnerBasicSize;
+    if constexpr (PFAT::MM_TYPE == MatMulType::MM_PA) {
+        firstInnerMargin = 0; // 为保证PA情况mm不跨block搬运，firstInnerMargin需设置为0
+    }
     params->tensorAOffset = this->tensorACoreOffset;
     params->mm1SingleCoreN = params->singleProcessSInnerSize;
     params->isFirstInnerIter = true;
@@ -817,24 +949,43 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::SInnerLoopFunc(in
     params->taskBatch = curBatch;
     this->isSoftmaxLseNeedUpdate = false;
     for (int32_t sInnerLoopIdx = startIndex; sInnerLoopIdx < endIndex; sInnerLoopIdx++) {
+        params->sInnerLoopOffset = sInnerLoopIdx;  // S2对齐的offset
         params->isFirstInnerIter = (sInnerLoopIdx == startIndex);
         params->isSecondInnerIter = (sInnerLoopIdx == (startIndex + 1));
         params->isLastInnerIter = (sInnerLoopIdx == endIndex - 1);
+        if constexpr (PFAT::enablePrefix) {
+            params->isPrefixInnerIter = sInnerLoopIdx * basicSInnerSize < this->actualKVPrefixLen;
+        } else {
+            params->isPrefixInnerIter = 0;
+        }
         if (unlikely(isS2Load)) {
             params->isInnerTail = true;
         } else {
-            params->isInnerTail = (sInnerLoopIdx == this->maxInnerLoopTimes - 1);
+            params->isInnerTail = (sInnerLoopIdx == (int32_t)this->maxInnerLoopTimes - 1) || (sInnerLoopIdx == (int32_t)this->maxInnerLoopPrefixTimes - 1);
         }
 
         if (unlikely(params->isInnerTail)) {
-            lastInnerMargin = (sInnerLoopIdx * basicSInnerSize + params->unalignSInner - sInnerLastToken)
-                / softmaxInnerBasicSize * softmaxInnerBasicSize;
-            lastInnerMargin = (lastInnerMargin > 0) ? lastInnerMargin : 0;
-            params->mm1SingleCoreN = params->singleProcessSInnerSizeTail - lastInnerMargin;
-            params->singleProcessSInnerSizeNow = params->singleProcessSInnerSizeTail - lastInnerMargin;
-            params->singleProcessSInnerBmmTail = params->unalignSInner - lastInnerMargin;
-            params->maskCopyInCol = params->maskInnerTailAlign - lastInnerMargin;
-            params->pseShiftCopyInCol = params->pseShiftInnerTailAlign - lastInnerMargin;
+            if (!params->isPrefixInnerIter) {
+                lastInnerMargin = (sInnerLoopIdx * basicSInnerSize + params->unalignSInner - sInnerLastToken)
+                    / softmaxInnerBasicSize * softmaxInnerBasicSize;
+                lastInnerMargin = (lastInnerMargin > 0) ? lastInnerMargin : 0;
+                if constexpr (PFAT::enablePrefix) {
+                    lastInnerMargin = 0;
+                }
+                params->mm1SingleCoreN = params->singleProcessSInnerSizeTail - lastInnerMargin;
+                params->singleProcessSInnerSizeNow = params->singleProcessSInnerSizeTail - lastInnerMargin;
+                params->singleProcessSInnerBmmTail = params->unalignSInner - lastInnerMargin;
+                params->maskCopyInCol = params->maskInnerTailAlign - lastInnerMargin;
+                params->pseShiftCopyInCol = params->pseShiftInnerTailAlign - lastInnerMargin;
+            } else {
+                if constexpr (PFAT::enablePrefix) {
+                    params->mm1SingleCoreN = params->singleProcessSInnerPrefixSizeTail;
+                    params->singleProcessSInnerSizeNow = params->singleProcessSInnerPrefixSizeTail;
+                    params->singleProcessSInnerBmmTail = params->unalignSInnerPrefix;
+                    params->maskCopyInCol = params->maskInnerPrefixTailAlign;
+                    params->pseShiftCopyInCol = params->pseShiftInnerPrefixTailAlign;
+                }
+            }
         } else {
             params->mm1SingleCoreN = params->singleProcessSInnerSize;
             params->singleProcessSInnerSizeNow = params->singleProcessSInnerSize;
@@ -842,6 +993,9 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::SInnerLoopFunc(in
             params->maskCopyInCol = params->singleProcessSInnerSize;
             params->pseShiftCopyInCol = params->singleProcessSInnerSize;
             if (params->isLastInnerIter) {
+                if constexpr (PFAT::enablePrefix) {
+                    lastInnerMargin = 0;
+                }
                 params->mm1SingleCoreN -= lastInnerMargin;
                 params->singleProcessSInnerSizeNow -= lastInnerMargin;
                 params->singleProcessSInnerBmmTail -= lastInnerMargin;
@@ -850,16 +1004,19 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::SInnerLoopFunc(in
             }
         }
         if (params->isFirstInnerIter) {
+            if constexpr (PFAT::enablePrefix) {
+                firstInnerMargin = 0;
+            }
             params->mm1SingleCoreN -= firstInnerMargin;
             params->singleProcessSInnerSizeNow -= firstInnerMargin;
             params->singleProcessSInnerBmmTail -= firstInnerMargin;
             params->maskCopyInCol -= firstInnerMargin;
             params->pseShiftCopyInCol -= firstInnerMargin;
             params->tensorBOffset = this->GetBmm1TensorBOffset(params, sInnerLoopIdx, firstInnerMargin);
-            this->ComputeOffset(sInnerLoopIdx, firstInnerMargin);
+            this->ComputeOffset(params, sInnerLoopIdx, firstInnerMargin);
         } else {
-            params->tensorBOffset = this->GetBmm1TensorBOffset(params, sInnerLoopIdx);
-            this->ComputeOffset(sInnerLoopIdx, 0);
+            params->tensorBOffset = this->GetBmm1TensorBOffset(params, sInnerLoopIdx, 0);
+            this->ComputeOffset(params, sInnerLoopIdx, 0);
         }
 
         if (this->attentionMaskType == 2 || this->attentionMaskType == 3) {
@@ -933,9 +1090,9 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::ComputeEachCoreSI
         if constexpr (!IsSameType<T, KV_T>::value && IsSameType<KV_T, int8_t>::value) {
             this->Bmm1Antiquant(params);
         }
-        this->Bmm1ComputeIterate(params->tensorAOffset, params->tensorBOffset,
+        this->Bmm1ComputeIterate(params->tensorAOffset, params->tensorBOffset, params->taskBatch, params->batchNOffset, params->sInnerOffsetDataSize,
             params->singleProcessSOuterSize, params->mm1SingleCoreN, params->singleProcessSInnerBmmTail, params->gmPingpong,
-            params->taskBatch);
+            params->taskBatch, params->isPrefixInnerIter);
     }
     this->mm.WaitIterateAll();
 
@@ -946,9 +1103,9 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::ComputeEachCoreSI
         if constexpr (!IsSameType<T, KV_T>::value && IsSameType<KV_T, int8_t>::value) {
             this->Bmm1Antiquant(nextParams);
         }
-        this->Bmm1ComputeIterate(nextParams->tensorAOffset, nextParams->tensorBOffset,
+        this->Bmm1ComputeIterate(nextParams->tensorAOffset, nextParams->tensorBOffset, nextParams->taskBatch, nextParams->batchNOffset, nextParams->sInnerOffsetDataSize,
             nextParams->singleProcessSOuterSize, nextParams->mm1SingleCoreN, nextParams->singleProcessSInnerBmmTail, nextParams->gmPingpong,
-            nextParams->taskBatch);
+            nextParams->taskBatch, nextParams->isPrefixInnerIter);
     }
 
     Bmm1ResDoVecBmm2Compute();
@@ -987,9 +1144,28 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::ComputeEachCore(u
     int64_t actualSeqLengthsIdx = 0;
     // 必须传引用赋值params，因为head地址在内部更新了
     PFAComputeParam *&params = this->tailParams;
+    if constexpr (PFAT::enablePrefix) {
+        this->actualKVPrefixLen = this->tilingData->promptAttentionBaseParams.isActualSharedPrefixLenNull ?
+            this->tilingData->promptAttentionBaseParams.prefixSeqInnerSize : this->actualSharedPrefixLenGm.GetValue(0);
+    } else {
+        this->actualKVPrefixLen = 0;
+    }
 
     for (uint32_t loopNIdx = nLoopStart; loopNIdx < nLoopEnd; loopNIdx++) {
         params->batchNOffset = loopNIdx;
+        // prefix 部分batch为1
+        if constexpr (PFAT::enablePrefix) {
+            if (PFAT::layout == PFALayout::BNSD) {
+                this->tensorBPrefixCoreOffset = (int64_t)params->batchNOffset / (int64_t)this->headNumRatio * (int64_t)this->tilingData->promptAttentionBaseParams.headSize *
+                    (int64_t)this->tilingData->promptAttentionBaseParams.prefixSeqInnerSize;
+            } else {
+                this->tensorBPrefixCoreOffset = (int64_t)this->tailParams->batchNOffset / (int64_t)this->headNumRatio * (int64_t)this->tilingData->promptAttentionBaseParams.headSize;
+            }
+            this->valuePrefixCoreOffset = this->tensorBPrefixCoreOffset;
+        } else {
+            this->tensorBPrefixCoreOffset = 0;
+            this->valuePrefixCoreOffset = 0;
+        }
         if (loopNIdx != nLoopEnd - 1) {
             tmpSLoopEnd = sNum;
         } else {
@@ -1041,8 +1217,8 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::ComputeEachCore(u
                     this->singleProcessSOuterSizeWhole * this->singleProcessSOuterSizeWhole)) {
                         continue;
                 }
-                int64_t sInnerFirstToken = ClipSInnerToken(params->sOuterOffset - (int64_t)preTokens, 0, params->actualSeqLengthKVPerBatch);
-                int64_t sInnerLastToken = ClipSInnerToken(params->sOuterOffset + (int64_t)nextTokens + params->singleProcessSOuterSize, 0, params->actualSeqLengthKVPerBatch);
+                int64_t sInnerFirstToken = ClipSInnerToken(params->sOuterOffset - (int64_t)preTokens, 0, params->actualSeqLengthKVPerBatch + this->actualKVPrefixLen);
+                int64_t sInnerLastToken = ClipSInnerToken(params->sOuterOffset + (int64_t)nextTokens + params->singleProcessSOuterSize, 0, params->actualSeqLengthKVPerBatch + this->actualKVPrefixLen);
                 if (sInnerLastToken <= sInnerFirstToken) {
                     continue;
                 }
@@ -1077,18 +1253,25 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::ComputeEachCoreBa
     int64_t actualSeqLengthsIdx = this->isActualLenDimsNull ? this->tilingData->promptAttentionBaseParams.seqSize : this->actualSeqLengthsGm.GetValue(sIdx);
 
     PFAComputeParam *&params = this->tailParams;
+    if constexpr (PFAT::enablePrefix) {
+        this->actualKVPrefixLen = this->tilingData->promptAttentionBaseParams.isActualSharedPrefixLenNull ?
+            this->tilingData->promptAttentionBaseParams.prefixSeqInnerSize : this->actualSharedPrefixLenGm.GetValue(0);
+    } else {
+        this->actualKVPrefixLen = 0;
+    }
     if (this->attentionMaskType == 4) {
         this->GetSparseParam(&preTokens, &nextTokens, sIdx, params);
         actualSeqLengthsIdx = ((int64_t)actualSeqLengthsIdx >
-                               (int64_t)this->tilingData->promptAttentionBaseParams.seqInnerSize +
+                               (int64_t)this->tilingData->promptAttentionBaseParams.seqInnerSize + this->actualKVPrefixLen +
                                (int64_t)preTokens) ?
-                            this->tilingData->promptAttentionBaseParams.seqInnerSize + preTokens :
+                            this->tilingData->promptAttentionBaseParams.seqInnerSize + this->actualKVPrefixLen + preTokens :
                             actualSeqLengthsIdx;  // 该分核不会传actualseqlenkv, 不用改seqInnerSize
     } else {
         actualSeqLengthsIdx = (this->attentionMaskType == 0 && (int64_t)actualSeqLengthsIdx >
-                            (int64_t)this->tilingData->promptAttentionBaseParams.seqInnerSize +
+                            (int64_t)this->tilingData->promptAttentionBaseParams.seqInnerSize + this->actualKVPrefixLen +
                             (int64_t)this->tilingData->promptAttentionBaseParams.preTokens) ?
-                            (int64_t)this->tilingData->promptAttentionBaseParams.seqInnerSize + (int64_t)this->tilingData->promptAttentionBaseParams.preTokens :
+                            (int64_t)this->tilingData->promptAttentionBaseParams.seqInnerSize + this->actualKVPrefixLen + 
+                            (int64_t)this->tilingData->promptAttentionBaseParams.preTokens :
                             actualSeqLengthsIdx;
     }
 
@@ -1126,8 +1309,8 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::ComputeEachCoreBa
             this->singleProcessSOuterSizeWhole * this->singleProcessSOuterSizeWhole)) {
                 continue;
         }
-        int64_t sInnerFirstToken = ClipSInnerToken(params->sOuterOffset - preTokens, 0, params->actualSeqLengthKVPerBatch);
-        int64_t sInnerLastToken = ClipSInnerToken(params->sOuterOffset + nextTokens + params->singleProcessSOuterSize, 0, params->actualSeqLengthKVPerBatch);
+        int64_t sInnerFirstToken = ClipSInnerToken(params->sOuterOffset - preTokens, 0, params->actualSeqLengthKVPerBatch + this->actualKVPrefixLen);
+        int64_t sInnerLastToken = ClipSInnerToken(params->sOuterOffset + nextTokens + params->singleProcessSOuterSize, 0, params->actualSeqLengthKVPerBatch + this->actualKVPrefixLen);
         if (sInnerLastToken <= sInnerFirstToken) {
             continue;
         }
@@ -1165,9 +1348,9 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::InitEachCoreWorks
     this->bmm2ResGmDb[1].SetGlobalBuffer((__gm__ computeType*)this->workspaceGm[buff_offset +
         coreIdx * mm2ResSize * reuseWorkspaceRatio + mm2ResSize].GetPhyAddr());
 
-    if constexpr (!IsSameType<T, KV_T>::value && IsSameType<KV_T, int8_t>::value) {
+    buff_offset += blockNum * mm2ResSize * reuseWorkspaceRatio;
+    if constexpr (!IsSameType<T, KV_T>::value && IsSameType<KV_T, int8_t>::value) {  // 此处偏移过多，workspace可优化，可参考IFA
         GlobalTensor<T> workspaceGmAntiquant;
-        buff_offset = blockNum * (this->spmTmpSize + (mm1ResSize + mm2ResSize) * reuseWorkspaceRatio);
         //高精度模式workspace为fp32类型，但是antiquant结果为fp16类型
         workspaceGmAntiquant.SetGlobalBuffer((__gm__ T*)this->workspaceGm[buff_offset].GetPhyAddr());
         int64_t kvAntiquantSize = this->tilingData->promptAttentionSingleCoreParams.singleProcessSInnerSize * \
@@ -1176,6 +1359,25 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::InitEachCoreWorks
             coreIdx * kvAntiquantSize * reuseWorkspaceRatio].GetPhyAddr());
         this->valueGmAntiquant.SetGlobalBuffer((__gm__ T*)workspaceGmAntiquant[
             coreIdx * kvAntiquantSize * reuseWorkspaceRatio + kvAntiquantSize].GetPhyAddr());
+        buff_offset += blockNum * kvAntiquantSize * reuseWorkspaceRatio;
+    }
+
+    // 第一个核的4个结构体放完之后放第二个核的4个结构体，IFA是所有核的第一个结构体放完之后再放第二个
+    if constexpr (PFAT::MM_TYPE == MatMulType::MM_PA) {  // compute type不同，这里的偏移大小不同
+        GlobalTensor<uint32_t> workspaceGmPA;  //  存储PA回调结构体数据。
+        workspaceGmPA.SetGlobalBuffer((__gm__ uint32_t*)this->workspaceGm[buff_offset].GetPhyAddr());
+        int32_t PAStructSize = 64 / sizeof(uint32_t);  //  dcci cacheline 64B 对齐  16 * 4B = 64B
+        int32_t NumOfBmm = 2;
+        int32_t baseCBDataOffset = coreIdx * PAStructSize * NumOfBmm * reuseWorkspaceRatio;
+        this->bmm1CBDataGm[0].SetGlobalBuffer((__gm__ uint32_t*)workspaceGmPA[baseCBDataOffset].GetPhyAddr());
+        this->bmm1CBDataPtr[0] = (__gm__ uint32_t*)workspaceGmPA[baseCBDataOffset].GetPhyAddr();
+        this->bmm1CBDataGm[1].SetGlobalBuffer((__gm__ uint32_t*)workspaceGmPA[baseCBDataOffset + PAStructSize].GetPhyAddr());
+        this->bmm1CBDataPtr[1] = (__gm__ uint32_t*)workspaceGmPA[baseCBDataOffset + PAStructSize].GetPhyAddr();
+
+        this->bmm2CBDataGm[0].SetGlobalBuffer((__gm__ uint32_t*)workspaceGmPA[baseCBDataOffset + PAStructSize * reuseWorkspaceRatio].GetPhyAddr());
+        this->bmm2CBDataPtr[0] = (__gm__ uint32_t*)workspaceGmPA[baseCBDataOffset + PAStructSize * reuseWorkspaceRatio].GetPhyAddr();
+        this->bmm2CBDataGm[1].SetGlobalBuffer((__gm__ uint32_t*)workspaceGmPA[baseCBDataOffset + PAStructSize * reuseWorkspaceRatio + PAStructSize].GetPhyAddr());
+        this->bmm2CBDataPtr[1] = (__gm__ uint32_t*)workspaceGmPA[baseCBDataOffset + PAStructSize * reuseWorkspaceRatio + PAStructSize].GetPhyAddr();
     }
 }
 
@@ -1229,8 +1431,8 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::ComputeEachCoreSp
                     params->singleProcessSOuterSize = this->singleProcessSOuterSizeWhole;
                 }
                 params->sOuterOffset = sOuterLoopIdx * this->singleProcessSOuterSizeWhole;
-                int64_t sInnerFirstToken = ClipSInnerToken(params->sOuterOffset - preTokens, 0, params->actualSeqLengthKVPerBatch);
-                int64_t sInnerLastToken = ClipSInnerToken(params->sOuterOffset + nextTokens + params->singleProcessSOuterSize, 0, params->actualSeqLengthKVPerBatch);
+                int64_t sInnerFirstToken = ClipSInnerToken(params->sOuterOffset - preTokens, 0, params->actualSeqLengthKVPerBatch + this->actualKVPrefixLen);
+                int64_t sInnerLastToken = ClipSInnerToken(params->sOuterOffset + nextTokens + params->singleProcessSOuterSize, 0, params->actualSeqLengthKVPerBatch + this->actualKVPrefixLen);
                 if (sInnerLastToken <= sInnerFirstToken) {
                     continue;
                 }

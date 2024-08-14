@@ -87,7 +87,7 @@
      **说明：**
      query、key、value数据排布格式支持从多种维度解读，其中B（Batch）表示输入样本批量大小、S（Seq-Length）表示输入样本序列长度、H（Head-Size）表示隐藏层的大小、N（Head-Num）表示多头数、D（Head-Dim）表示隐藏层最小的单元尺寸，且满足D=H/N。
 
-  - numKeyValueHeads（int64\_t，计算输入）：Host侧的int，代表key、value中head个数，用于支持GQA（Grouped-Query Attention，分组查询注意力）场景，数据类型支持INT64。用户不特意指定时可传入默认值0，表示和key/value的head个数相等。限制：在BNSD场景下，需要与shape中的key/value的N轴shape值相同，且需要满足numHeads整除numKeyValueHeads，numHeads与numKeyValueHeads的比值不能大于64，否则报错，**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持默认值0**。
+  - numKeyValueHeads（int64\_t，计算输入）：Host侧的int，代表key、value中head个数，用于支持GQA（Grouped-Query Attention，分组查询注意力）场景，数据类型支持INT64。用户不特意指定时可传入默认值0，表示key/value和query的head个数相等。限制：在BNSD场景下，需要与shape中的key/value的N轴shape值相同，且需要满足numHeads整除numKeyValueHeads，numHeads与numKeyValueHeads的比值不能大于64，否则报错，**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持默认值0**。
 
   - sparseMode（int64\_t，计算输入）：Host侧的int，表示sparse的模式。数据类型支持INT64，**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持默认值0**。
     -  sparseMode为0时，代表defaultMask模式，如果attenmask未传入则不做mask操作，忽略preTokens和nextTokens（内部赋值为INT\_MAX）；如果传入，则需要传入完整的attenmask矩阵（S1 \* S2），表示preTokens和nextTokens之间的部分需要计算。

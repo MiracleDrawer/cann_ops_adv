@@ -43,7 +43,7 @@ TILING_DATA_FIELD_DEF(uint32_t, batchSize)
 TILING_DATA_FIELD_DEF(uint32_t, seqSize)
 TILING_DATA_FIELD_DEF(uint32_t, headSize)
 TILING_DATA_FIELD_DEF(uint32_t, blockSize)
-TILING_DATA_FIELD_DEF(uint32_t, maxBlockNumPerSeq)
+TILING_DATA_FIELD_DEF(uint32_t, maxBlockNumPerBatch)
 TILING_DATA_FIELD_DEF(float, scaleValue)
 TILING_DATA_FIELD_DEF(uint32_t, kvHeadNum)
 TILING_DATA_FIELD_DEF(uint32_t, qHeadNum)
@@ -62,12 +62,12 @@ TILING_DATA_FIELD_DEF(uint32_t, attenMaskFlag)
 TILING_DATA_FIELD_DEF(uint32_t, attenMaskSize)
 TILING_DATA_FIELD_DEF(uint32_t, softmaxLseFlag)
 TILING_DATA_FIELD_DEF(uint32_t, totalBlockNum)
-TILING_DATA_FIELD_DEF(uint32_t, paKvShapeType)
+TILING_DATA_FIELD_DEF(uint32_t, antiqSeqSize)
 END_TILING_DATA_DEF
 REGISTER_TILING_DATA_CLASS(IncreFlashAttentionBaseParamsOp, IncreFlashAttentionBaseParams)
 
 BEGIN_TILING_DATA_DEF(IncreFlashAttentionCoreParams)
-TILING_DATA_FIELD_DEF_ARR(uint32_t, 50, coreSidxEnd);  // 50:MAX_CORE_NUM
+TILING_DATA_FIELD_DEF_ARR(uint32_t, 50, coreSidxEnd);  // 50:MAX_CORE_NUM  coreSidxEnd数组首地址要保证8字节对齐
 END_TILING_DATA_DEF;
 REGISTER_TILING_DATA_CLASS(IncreFlashAttentionCoreParamsOp, IncreFlashAttentionCoreParams);
 
@@ -289,6 +289,18 @@ constexpr uint32_t KV_PADDING_SIZE_INPUT_INDEX = 14;
 constexpr uint32_t DIM_BNSD = 4;
 constexpr uint32_t DIM_BNSD_OR_BNSD = 4;
 constexpr uint32_t DIM_BSH = 3;
+constexpr uint32_t DIM_PER_TOKEN_KvSplit = 2;
+constexpr uint32_t DIM_PER_TOKEN = 3;
+constexpr uint32_t PER_TOKEN_MODE = 1;
+constexpr uint32_t DIM_PER_CHANNEL_BNSD = 4;
+constexpr uint32_t DIM_PER_CHANNEL_BSND = 3;
+constexpr uint32_t DIM_PER_CHANNEL_BSH = 2;
+constexpr uint32_t DIM_PER_TENSOR = 1;
+constexpr uint32_t PER_TOKEN_N = 0;
+constexpr uint32_t PER_TOKEN_B = 1;
+constexpr uint32_t PER_TOKEN_S = 2;
+constexpr uint32_t PER_TOKEN_Split_B = 0;
+constexpr uint32_t PER_TOKEN_Split_S = 1;
 constexpr uint32_t BNSD_B_IDX = 0;
 constexpr uint32_t BNSD_N_IDX = 1;
 constexpr uint32_t BNSD_S_IDX = 2;
@@ -338,6 +350,8 @@ class IFATiling {
     return passToOldTiling_;
   }
 
+  uint32_t GetAntiquantSeqLength();
+
  private:
   ge::graphStatus GetNpuInfo();
   ge::graphStatus PreProcess();
@@ -374,6 +388,8 @@ class IFATiling {
 
   ge::graphStatus CheckQuant2Shape(const gert::Shape& inputParaShape);
   ge::graphStatus ProcessQuant2Dtype();
+  ge::graphStatus CheckKVAntiQuantPerToken(const gert::Shape& inputParaShape);
+  ge::graphStatus CheckKVAntiQuantPerChannel(const gert::Shape& inputParaShape);
   ge::graphStatus CheckKVAntiQuantParaShapeLegal(const gert::Shape& inputParaShape);
   ge::graphStatus CheckAntiQuantParam(const gert::Tensor* antiquantScaleTensor,
                                       const gert::Tensor* antiquantOffsetTensor,
@@ -447,6 +463,7 @@ class IFATiling {
   uint32_t msdIterNum_ = 1;
   uint32_t antiquantMode_ = 0;
   uint32_t antiquantPerTensorFlag_ = 0;
+  uint32_t antiquantNum_ = 2;
 
   uint32_t headDim_ = 0;
   uint32_t seqSize_ = 0;
@@ -496,8 +513,7 @@ class IFATiling {
   bool kvAntiParamSplitFlag_ = false;
 
   bool pageAttentionFlag_ = false;
-  uint32_t pageAttentionKvLayoutType_ = kvCacheLayout::KV_CACHE_BSH;  // pa场景下kv的shape, 0:BSH 1:BNSD
-  uint32_t maxBlockNumPerSeq_ = 0;
+  uint32_t maxBlockNumPerBatch_ = 0;
   size_t kvPageResUbSize_ = 0;
   uint32_t totalBlockNum_ = 0;
 
@@ -509,6 +525,9 @@ class IFATiling {
 
   bool quantFlag_ = false;
   size_t quantUbSize_ = 0;
+
+  bool isOutQuantPerChnOut_ = false;
+  bool isOutQuantTypeBf16_ = false;
 
   uint32_t actualLenDims_ = 0;
   uint32_t maxActualseq_ = 0;
@@ -525,6 +544,7 @@ class IFATiling {
   bool splitKVFlag_ = false;
   uint32_t kvSplit_ = 0;
   bool splitKVFlagPrefix_ = false;
+  uint32_t antiqSeqSize_ = 0;
 
   IfaPerfMode perfMode_ = IfaPerfMode::NORMAL;
   TilingInOutMode inOutMode_ = TilingInOutMode::FP16_FP16;
@@ -564,6 +584,7 @@ class IFATiling {
 
 std::string DataTypeToSerialString(ge::DataType type);
 
+ge::graphStatus TilingPrepareForIncreFlashAttention(gert::TilingParseContext *context);
 ge::graphStatus TilingIncreFlashAttentionAdapter(gert::TilingContext* context, IncreFlashAttentionContext& ifaContext,
                                                  IncreFlashAttentionTilingDataV2& ifaTilingData);
 

@@ -84,7 +84,7 @@
      **说明：**
      query、key、value数据排布格式支持从多种维度解读，其中B（Batch）表示输入样本批量大小、S（Seq-Length）表示输入样本序列长度、H（Head-Size）表示隐藏层的大小、N（Head-Num）表示多头数、D（Head-Dim）表示隐藏层最小的单元尺寸，且满足D=H/N。
 
-  -   numKeyValueHeads（int64\_t，计算输入）：Host侧的int，代表key、value中head个数，用于支持GQA（Grouped-Query Attention，分组查询注意力）场景，数据类型支持INT64。用户不特意指定时可传入默认值0，表示和key/value的head个数相等。限制：在BNSD/NSD场景下，需要与shape中的key/value的N轴shape值相同，且需要满足numHeads整除numKeyValueHeads，numHeads与numKeyValueHeads的比值不能大于64，否则报错，**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持默认值0**。
+  -   numKeyValueHeads（int64\_t，计算输入）：Host侧的int，代表key、value中head个数，用于支持GQA（Grouped-Query Attention，分组查询注意力）场景，数据类型支持INT64。用户不特意指定时可传入默认值0，表示key/value和query的head个数相等。限制：在BNSD/NSD场景下，需要与shape中的key/value的N轴shape值相同，且需要满足numHeads整除numKeyValueHeads，numHeads与numKeyValueHeads的比值不能大于64，否则报错，**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持默认值0**。
   -   attentionOut（aclTensor\*，计算输出）：Device侧的aclTensor，公式中的输出，数据类型支持FLOAT16、BFLOAT16、INT8，[数据格式](common/数据格式.md)支持ND。限制：当inputLayout为BNSD_BSND时，输入query的shape是BNSD，输出shape为BSND；其余情况该入参的shape需要与入参query的shape保持一致，**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持FLOAT16**。
   -   workspaceSize（uint64\_t\*，出参）：返回用户需要在Device侧申请的workspace大小。
   -   executor（aclOpExecutor\*\*，出参）：返回op执行器，包含了算子计算流程。

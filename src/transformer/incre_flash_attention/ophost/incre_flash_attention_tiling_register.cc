@@ -20,6 +20,7 @@ using namespace ge;
 using namespace AscendC;
 namespace optiling {
 ge::graphStatus TilingPrepareForIncreFlashAttention(gert::TilingParseContext *context) {
+    (void)context;
     return ge::GRAPH_SUCCESS;
 }
 IMPL_OP_OPTILING(IncreFlashAttention)

@@ -52,6 +52,10 @@ static ge::graphStatus ConvertContextToParamsPFA(gert::TilingContext* context, C
     contextKeyParams.antiquantOffset = context->GetOptionalInputTensor(ANTIQUANT_OFFSET_INDEX);
     contextKeyParams.queryPaddingSize = context->GetOptionalInputTensor(QUERY_PADDING_SIZE_INDEX);
     contextKeyParams.kvPaddingSize = context->GetOptionalInputTensor(KV_PADDING_SIZE_INDEX);
+    contextKeyParams.blockTable = context->GetOptionalInputTensor(BLOCK_TABLE_INDEX);
+    contextKeyParams.keySharedPrefix = context->GetOptionalInputTensor(KEY_SHARED_PREFIX_INDEX);
+    contextKeyParams.valueSharedPrefix = context->GetOptionalInputTensor(VALUE_SHARED_PREFIX_INDEX);
+    contextKeyParams.actualSharedPrefixLen = context->GetOptionalInputTensor(ACTUAL_SHARED_PREFIX_LEN_INDEX);
     contextKeyParams.inputDataType = context->GetInputDesc(QUERY_INDEX)->GetDataType();
     contextKeyParams.kDataType = context->GetInputDesc(KEY_INDEX)->GetDataType();
     contextKeyParams.vDataType = context->GetInputDesc(VALUE_INDEX)->GetDataType();
@@ -62,7 +66,9 @@ static ge::graphStatus ConvertContextToParamsPFA(gert::TilingContext* context, C
     contextKeyParams.quantScale2Type = (context->GetOptionalInputDesc(QUANT_SCALE2_INDEX) != nullptr) ?
         context->GetOptionalInputDesc(QUANT_SCALE2_INDEX)->GetDataType() : ge::DT_FLOAT;
     contextKeyParams.quantOffset2Type = (context->GetOptionalInputDesc(QUANT_OFFSET2_INDEX) != nullptr) ?
-        context->GetOptionalInputDesc(QUANT_OFFSET2_INDEX)->GetDataType() : ge::DT_FLOAT;    
+        context->GetOptionalInputDesc(QUANT_OFFSET2_INDEX)->GetDataType() : ge::DT_FLOAT;
+    contextKeyParams.blockTableType = (context->GetOptionalInputDesc(BLOCK_TABLE_INDEX) != nullptr) ?
+        context->GetOptionalInputDesc(BLOCK_TABLE_INDEX)->GetDataType() : ge::DT_INT32;
     contextKeyParams.outputDataType = context->GetOutputDesc(ATTENTION_OUT_INDEX)->GetDataType();
     contextKeyParams.queryInputShape = context->GetInputShape(QUERY_INDEX);
     contextKeyParams.keyInputShape = context->GetInputShape(KEY_INDEX);
@@ -76,6 +82,7 @@ static ge::graphStatus ConvertContextToParamsPFA(gert::TilingContext* context, C
     contextKeyParams.offset2Shape = context->GetOptionalInputShape(QUANT_OFFSET2_INDEX);
     contextKeyParams.antiquantScaleShape = context->GetOptionalInputShape(ANTIQUANT_SCALE_INDEX);
     contextKeyParams.antiquantOffsetShape = context->GetOptionalInputShape(ANTIQUANT_OFFSET_INDEX);
+    contextKeyParams.blockTableShape = context->GetOptionalInputShape(BLOCK_TABLE_INDEX);
     contextKeyParams.outputShape = context->GetOutputShape(ATTENTION_OUT_INDEX);
     contextKeyParams.lseoutputShape = context->GetOutputShape(SOFTMAX_LSE_INDEX);
     auto attrs = context->GetAttrs();
@@ -90,6 +97,7 @@ static ge::graphStatus ConvertContextToParamsPFA(gert::TilingContext* context, C
     contextKeyParams.scaleValue = attrs->GetAttrPointer<float>(ATTR_SCALE_INDEX);
     contextKeyParams.layout = attrs->GetAttrPointer<char>(ATTR_INPUT_LAYOUT_INDEX);
     contextKeyParams.numKeyValueHeads = attrs->GetAttrPointer<int32_t>(ATTR_NUM_KV_HEADS_INDEX);
+    contextKeyParams.blockSize = attrs->GetAttrPointer<int32_t>(ATTR_BLOCK_SIZE_INDEX);
     contextKeyParams.workspaceSize = context->GetWorkspaceSizes(1);
     contextKeyParams.isBSNDOut = (string(contextKeyParams.layout) == "BNSD_BSND") ? 1 : 0;
     contextKeyParams.softmaxLseFlag = attrs->GetAttrPointer<bool>(SOFTMAX_LSE_FLAG_INDEX);
@@ -103,8 +111,15 @@ static ge::graphStatus ConvertContextToParamsPFA(gert::TilingContext* context, C
         batchOfK = contextKeyParams.keyInputShape->GetStorageShape().GetDim(0);
     }
 
-    if (batchOfQ != batchOfK) {
-        int64_t validBatchOfK = 0;
+    int64_t validBatchOfK = 0; // 获取实际输入的K的元素个数, 判断是否属于tensorlist场景
+    while (context->GetDynamicInputShape(KEY_INDEX, validBatchOfK) != nullptr) {
+        validBatchOfK++;
+        if (validBatchOfK > 1) { // 超过1个则break, 输入较大时节省时间, tensorlist场景还要单独校验是否为1
+            break;
+        }
+    }
+    if ((batchOfQ != batchOfK) && (validBatchOfK > 1) && (contextKeyParams.blockTable == nullptr)) {
+        validBatchOfK = 0;
         int64_t validBatchOfV = 0;
         int64_t cumulativeKeyS = 0;
         int64_t cumulativeValueS = 0;
@@ -216,7 +231,7 @@ static ge::graphStatus ConvertContextToParamsPFA(gert::TilingContext* context, C
 
     OPS_ERR_IF(((contextKeyParams.isKvContinuous == 0) &&
                 ((contextKeyParams.queryPaddingSize != nullptr) ||
-                (context->GetOptionalInputTensor(KV_PADDING_SIZE_INDEX) != nullptr))),
+                (contextKeyParams.kvPaddingSize != nullptr))),
                 OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "when tensorlist is used, left padding is not supported!"),
                 return ge::GRAPH_FAILED);
 
@@ -229,6 +244,12 @@ static ge::graphStatus ConvertContextToParamsPFA(gert::TilingContext* context, C
                 (contextKeyParams.kvPaddingSize->GetStorageShape().GetShapeSize() != 1 ||
                 contextKeyParams.kvPaddingSize->GetStorageShape().GetDimNum() != 1)),
                 OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "KV PaddingSize input is invalid!"),
+                return ge::GRAPH_FAILED);
+
+    OPS_ERR_IF(((contextKeyParams.blockTable != nullptr) &&
+                ((contextKeyParams.queryPaddingSize != nullptr) ||
+                (contextKeyParams.kvPaddingSize != nullptr))),
+                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "when page attention is used, left padding is not supported!"),
                 return ge::GRAPH_FAILED);
 
     OPS_ERR_IF(((contextKeyParams.queryPaddingSize != nullptr) &&
@@ -326,6 +347,7 @@ static ge::graphStatus ConvertContextToParamsIFA(gert::TilingContext& context,
   ifaContext.softmaxLseFlag = attrs->GetAttrPointer<bool>(SOFTMAX_LSE_FLAG_INDEX);
   ifaContext.keyAntiquantMode = attrs->GetAttrPointer<uint32_t>(KEY_ANTIQUANT_MODE_INDEX);
   ifaContext.valueAntiquantMode = attrs->GetAttrPointer<uint32_t>(VALUE_ANTIQUANT_MODE_INDEX);
+  ifaContext.innerPrecise = attrs->GetAttrPointer<uint32_t>(ATTR_INNER_PRECISE_INDEX);
 
   OPS_ERR_IF(context.GetWorkspaceSizes(1) == nullptr,
                   OPS_REPORT_VECTOR_INNER_ERR(context.GetNodeName(), "workSpaceSize got from ge is nullptr"),
@@ -348,7 +370,8 @@ ge::graphStatus DoOpTilingFusedInferAttentionScore(gert::TilingContext* context)
     OPS_ERR_IF((tempQ == nullptr),
                     OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "Query input is null pointer!"),
                     return ge::GRAPH_FAILED);
-    OPS_ERR_IF((tempQ->GetStorageShape().GetShapeSize() == 0),
+    OPS_ERR_IF((tempQ->GetStorageShape().GetShapeSize() == 0) &&
+                    (tempOut->GetStorageShape().GetShapeSize() != 0),
                     OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "Query input is empty!"),
                     return ge::GRAPH_FAILED);
     OPS_ERR_IF((tempQ->GetStorageShape().GetShapeSize() == gert::Shape::kInvalidDimValue),
@@ -423,7 +446,8 @@ ge::graphStatus DoOpTilingFusedInferAttentionScore(gert::TilingContext* context)
         }
     }
     OPS_ERR_IF((tempD > maxDlimit),
-                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "D should be less than or equal to 512 of Q/KV shape!"),
+                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "D should be less than or equal to 512 of Q/KV shape! but now D = %u. "
+                                            "When layout is BNSD, D is the last dimension of Q/KV shape, and layout is BSH, D = h / n", tempD),
                 return ge::GRAPH_FAILED);
     OPS_ERR_IF(((s == 1) && (inputLayoutStr == "BNSD_BSND")),
                 OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "BNSD_BSND layout is not supported when S is 1!"),
@@ -436,7 +460,46 @@ ge::graphStatus DoOpTilingFusedInferAttentionScore(gert::TilingContext* context)
     if (usingIFA) {
         // IFA tiling path
         IncreFlashAttentionTilingDataV2 ifaTilingData;
-        IncreFlashAttentionContext ifaContext{0};
+        IncreFlashAttentionContext ifaContext{.opName = nullptr,
+                                              .platformInfo = nullptr,
+                                              .query = {nullptr, nullptr},
+                                              .key = {nullptr, nullptr},
+                                              .value = {nullptr, nullptr},
+                                              .pseShift = {nullptr, nullptr},
+                                              .attenMask = {nullptr, nullptr},
+                                              .actualSeqLengths = {nullptr, nullptr},
+                                              .deqScale1 = {nullptr, nullptr},
+                                              .quantScale1 = {nullptr, nullptr},
+                                              .deqScale2 = {nullptr, nullptr},
+                                              .quantScale2 = {nullptr, nullptr},
+                                              .quantOffset2 = {nullptr, nullptr},
+                                              .antiquantScale = {nullptr, nullptr},
+                                              .antiquantOffset = {nullptr, nullptr},
+                                              .blockTable = {nullptr, nullptr},
+                                              .kvPaddingSize = {nullptr, nullptr},
+                                              .keyAntiquantScale = {nullptr, nullptr},
+                                              .keyAntiquantOffset = {nullptr, nullptr},
+                                              .valueAntiquantScale = {nullptr, nullptr},
+                                              .valueAntiquantOffset = {nullptr, nullptr},
+                                              .keySharedPrefix = {nullptr, nullptr},
+                                              .valueSharedPrefix = {nullptr, nullptr},
+                                              .actualSharedPrefixLen = {nullptr, nullptr},
+                                              .attenOut = {nullptr, nullptr},
+                                              .numHeads = nullptr,
+                                              .scaleValue = nullptr,
+                                              .kvHeadNums = nullptr,
+                                              .layOut = nullptr,
+                                              .blockSize = nullptr,
+                                              .innerPrecise = nullptr,
+                                              .antiquantMode = nullptr,
+                                              .softmaxLseFlag = nullptr,
+                                              .keyAntiquantMode = nullptr,
+                                              .valueAntiquantMode = nullptr,
+                                              .workSpaces = nullptr,
+                                              .kCache = {nullptr},
+                                              .vCache = {nullptr},
+                                              .tilingKey = 0,
+                                              .blockDim = 0};
         auto ret = ConvertContextToParamsIFA(*context, ifaContext);
         if (ret != ge::GRAPH_SUCCESS) {
           OPS_LOG_E(context->GetNodeName(), "Error occored while convert tilingContext to ifa context");
@@ -449,16 +512,69 @@ ge::graphStatus DoOpTilingFusedInferAttentionScore(gert::TilingContext* context)
         // PFA tiling process
         PromptFlashAttentionTilingData pfaTilingData;
         PromptFlashAttentionTiling pfa_tiling(nullptr);
-        ContextParamsForPFATiling contextParamsForPFATiling = {0};
-        PromptFlashAttentionCompileInfo tempCompileInfoPtr = {0};
+        ContextParamsForPFATiling contextParamsForPFATiling = {.pseShift = nullptr,
+                                                               .attentionMask = nullptr,
+                                                               .actualSeqenceLengthQ = nullptr,
+                                                               .actualSeqenceLengthKV = nullptr,
+                                                               .antiquantScale = nullptr,
+                                                               .antiquantOffset = nullptr,
+                                                               .queryPaddingSize = nullptr,
+                                                               .kvPaddingSize = nullptr,
+                                                               .blockTable = nullptr,
+                                                               .keySharedPrefix = nullptr,
+                                                               .valueSharedPrefix = nullptr,
+                                                               .actualSharedPrefixLen = nullptr,
+                                                               .inputDataType = ge::DataType::DT_FLOAT16,
+                                                               .kDataType = ge::DataType::DT_FLOAT16,
+                                                               .vDataType = ge::DataType::DT_FLOAT16,
+                                                               .pseShiftDataType = ge::DataType::DT_FLOAT16,
+                                                               .maskDataType = ge::DataType::DT_FLOAT16,
+                                                               .blockTableType = ge::DataType::DT_FLOAT16,
+                                                               .outputDataType = ge::DataType::DT_FLOAT16,
+                                                               .opName = nullptr,
+                                                               .queryInputShape = nullptr,
+                                                               .keyInputShape = nullptr,
+                                                               .valueInputShape = nullptr,
+                                                               .pseShiftShape = nullptr,
+                                                               .attentionMaskShape = nullptr,
+                                                               .deqScale1Shape = nullptr,
+                                                               .scale1Shape = nullptr,
+                                                               .deqScale2Shape = nullptr,
+                                                               .scale2Shape = nullptr,
+                                                               .offset2Shape = nullptr,
+                                                               .antiquantScaleShape = nullptr,
+                                                               .antiquantOffsetShape = nullptr,
+                                                               .blockTableShape = nullptr,
+                                                               .outputShape = nullptr,
+                                                               .lseoutputShape = nullptr,
+                                                               .innerPrecisePtr = nullptr,
+                                                               .headsNumber = nullptr,
+                                                               .sparseMode = nullptr,
+                                                               .preToken = nullptr,
+                                                               .nextToken = nullptr,
+                                                               .scaleValue = nullptr,
+                                                               .blockSize = nullptr,
+                                                               .layout = nullptr,
+                                                               .numKeyValueHeads = nullptr,
+                                                               .workspaceSize = nullptr,
+                                                               .compileInfoPtr = nullptr,
+                                                               .deqScaleType = ge::DataType::DT_FLOAT16,
+                                                               .deqScale2Type = ge::DataType::DT_FLOAT16,
+                                                               .quantScale2Type = ge::DataType::DT_FLOAT16,
+                                                               .quantOffset2Type = ge::DataType::DT_FLOAT16,
+                                                               .isKvContinuous = 0,
+                                                               .kTensorList = {nullptr},
+                                                               .vTensorList = {nullptr},
+                                                               .maxKVs = 0,
+                                                               .fromFused = 0,
+                                                               .emptyTensor = 0,
+                                                               .isBSNDOut = 0,
+                                                               .softmaxLseFlag = nullptr,
+                                                               .isSoftMaxLseEnable = false,
+                                                               .fromTilingSink = 0};
+        PromptFlashAttentionCompileInfo tempCompileInfoPtr = {0, 0, 0, 0, 0, 0, 0, 0,
+            platform_ascendc::SocVersion::ASCEND310P};
 
-        OPS_ERR_IF((attrs->GetAttrPointer<uint32_t>(ATTR_BLOCK_SIZE_INDEX) != nullptr) &&
-                   (*attrs->GetAttrPointer<uint32_t>(ATTR_BLOCK_SIZE_INDEX) != 0),
-                        OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "block_size is not supported!"),
-                        return ge::GRAPH_FAILED);
-        OPS_ERR_IF((context->GetOptionalInputTensor(BLOCK_TABLE_INDEX) != nullptr),
-                        OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "block_table is not supported!"),
-                        return ge::GRAPH_FAILED);
         OPS_ERR_IF((attrs->GetAttrPointer<uint64_t>(ANTIQUANT_MODE_INDEX) != nullptr) &&
                    (*attrs->GetAttrPointer<uint64_t>(ANTIQUANT_MODE_INDEX) != 0),
                         OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "antiquant_mode is not supported!"),

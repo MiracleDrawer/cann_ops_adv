@@ -23,22 +23,44 @@ using namespace AscendC;
 #define NEED_CUBE_TILING (true)
 #define NOT_NEED_CUBE_TILING (false)
 
-#define INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(templateClass, ...)                                                        \
-  do {                                                                                                               \
-    templateClass<IFAType<__VA_ARGS__>> op;                                                                          \
-    COPY_TILING_DATA_PREFIX(tiling, NEED_CUBE_TILING);                                                               \
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling, op.mm1Sp,                \
-                      bmm1tilingPrefix, op.mm2Sp, bmm2tilingPrefix);                                                 \
-    op.InitPrefix(query, keySharedPrefix, valueSharedPrefix, pseShift, attenMask, actualSharedPrefixLen, blocktable, \
-                  kvPaddingSize, attentionOut, softmaxLse, user, &tiling_data->tilingPrefix, tiling, &tPipe);        \
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,      \
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);            \
-    op.Process();                                                                                                    \
-    SyncAll(); /* workspace改为每个核单独使用即可去掉此处同步 */                                    \
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,       \
-            softmaxLse, user, &tiling_data->tilingBase, tiling, nullptr);                                            \
-    op.Process();                                                                                                    \
-    op.ProcessSysPrefixCombine();                                                                                    \
+#define INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(templateClass, ...)                                                          \
+  do {                                                                                                                 \
+    templateClass<IFAType<__VA_ARGS__>> op;                                                                            \
+    COPY_TILING_DATA_PREFIX(tiling, NEED_CUBE_TILING);                                                                 \
+    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling, op.mm1Sp,                  \
+                      bmm1tilingPrefix, op.mm2Sp, bmm2tilingPrefix);                                                   \
+    op.InitPrefix(query, keySharedPrefix, valueSharedPrefix, pseShift, attenMask, actualSharedPrefixLen, blocktable,   \
+                  kvPaddingSize, attentionOut, softmaxLse, user, &tiling_data->tilingPrefix, tiling, &tPipe);          \
+    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,        \
+                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);              \
+    op.Process();                                                                                                      \
+    SyncAll(); /* workspace改为每个核单独使用即可去掉此处同步 */                                                         \
+    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,         \
+            softmaxLse, user, &tiling_data->tilingBase, tiling, nullptr);                                              \
+    op.Process();                                                                                                      \
+    op.ProcessSysPrefixCombine();                                                                                      \
+  } while (0)
+
+#define INVOKE_IFA_GENERAL_OP_IMPL(templateClass, ...)                                                                 \
+  do {                                                                                                                 \
+    templateClass<IFAType<__VA_ARGS__>> op;                                                                            \
+    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);                                                                        \
+    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);                           \
+    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,         \
+            softmaxLse, user, tiling_data, tiling, &tPipe);                                                            \
+    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,        \
+                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);              \
+    op.Process();                                                                                                      \
+  } while (0)
+
+#define INVOKE_IFA_ALL_VEC_OP_IMPL(templateClass, ...)                                                                 \
+  do {                                                                                                                 \
+    templateClass<IFAType<__VA_ARGS__>> op;                                                                            \
+    COPY_TILING_DATA_NO_CUBE(tiling);                                                                                  \
+    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,         \
+            softmaxLse, user, tiling_data, &tPipe);                                                                    \
+    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset, user); \
+    op.Process();                                                                                                      \
   } while (0)
 
 #ifdef __DAV_C220_CUBE__
@@ -129,343 +151,98 @@ extern "C" __global__ __aicore__ void incre_flash_attention_FIAS(
 
 #if (ORIG_DTYPE_QUERY == DT_FLOAT16) && (ORIG_DTYPE_ATTENTION_OUT == DT_FLOAT16)
   if (TILING_KEY_IS(11000000000000000)) {
-    IncreFlashAttentionAttenAllVecNew<IFAType<half, half, half, half, false, false, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA_NO_CUBE(tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, &tPipe);
-    op.Process();
+    INVOKE_IFA_ALL_VEC_OP_IMPL(IncreFlashAttentionAttenAllVecNew, half, half, half, half, false, false, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(11000000000100000)) {
-    IncreFlashAttentionAttenAllVecNew<IFAType<half, half, half, half, false, true, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA_NO_CUBE(tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, &tPipe);
-    op.Process();
+    INVOKE_IFA_ALL_VEC_OP_IMPL(IncreFlashAttentionAttenAllVecNew, half, half, half, half, false, true, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(11000000000000001)) {
-    IncreFlashAttentionAttenAllVecNew<IFAType<half, half, half, half, false, false, LAYOUT::BSH>> op;
-    COPY_TILING_DATA_NO_CUBE(tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, &tPipe);
-    op.Process();
+    INVOKE_IFA_ALL_VEC_OP_IMPL(IncreFlashAttentionAttenAllVecNew, half, half, half, half, false, false, LAYOUT::BSH);
   } else if (TILING_KEY_IS(11000000000100001)) {
-    IncreFlashAttentionAttenAllVecNew<IFAType<half, half, half, half, false, true, LAYOUT::BSH>> op;
-    COPY_TILING_DATA_NO_CUBE(tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, &tPipe);
-    op.Process();
+    INVOKE_IFA_ALL_VEC_OP_IMPL(IncreFlashAttentionAttenAllVecNew, half, half, half, half, false, true, LAYOUT::BSH);
 #if (__CCE_AICORE__ > 200)
   } else if (TILING_KEY_IS(10000000000000000)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, half, half, half, false, false, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, half, half, false, false, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(12000000000000000)) {
     KERNEL_TASK_TYPE(12000000000000000, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, half, half, half, false, false, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, half, half, false, false, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(10000000000200000)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, half, half, half, true, false, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, half, half, true, false, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(12000000000200000)) {
     KERNEL_TASK_TYPE(12000000000200000, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, half, half, half, true, false, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, half, half, true, false, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(10000000000100000)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, half, half, half, false, true, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, half, half, false, true, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(10000000000300000)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, half, half, half, true, true, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, half, half, true, true, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(10000000000000001)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, half, half, half, false, false, LAYOUT::BSH>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, half, half, false, false, LAYOUT::BSH);
   } else if (TILING_KEY_IS(12000000000000001)) {
     KERNEL_TASK_TYPE(12000000000000001, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, half, half, half, false, false, LAYOUT::BSH>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, half, half, false, false, LAYOUT::BSH);
   } else if (TILING_KEY_IS(10000000000200001)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, half, half, half, true, false, LAYOUT::BSH>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, half, half, true, false, LAYOUT::BSH);
   } else if (TILING_KEY_IS(12000000000200001)) {
     KERNEL_TASK_TYPE(12000000000200001, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, half, half, half, true, false, LAYOUT::BSH>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, half, half, true, false, LAYOUT::BSH);
   } else if (TILING_KEY_IS(10000000000100001)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, half, half, half, false, true, LAYOUT::BSH>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, half, half, false, true, LAYOUT::BSH);
   } else if (TILING_KEY_IS(10000000000300001)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, half, half, half, true, true, LAYOUT::BSH>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, half, half, true, true, LAYOUT::BSH);
   } else if (TILING_KEY_IS(10000000000000300)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, half, half, false, false, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false, false, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(12000000000000300)) {
     KERNEL_TASK_TYPE(12000000000000300, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, half, half, false, false, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false, false, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(10000000000200300)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, half, half, true, false, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, true, false, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(12000000000200300)) {
     KERNEL_TASK_TYPE(12000000000200300, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, half, half, true, false, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, true, false, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(10000000000100300)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, half, half, false, true, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false, true, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(10000000000300300)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, half, half, true, true, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, true, true, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(10000000000000301)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, half, half, false, false, LAYOUT::BSH>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false, false, LAYOUT::BSH);
   } else if (TILING_KEY_IS(12000000000000301)) {
     KERNEL_TASK_TYPE(12000000000000301, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, half, half, false, false, LAYOUT::BSH>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false, false, LAYOUT::BSH);
   } else if (TILING_KEY_IS(10000000000200301)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, half, half, true, false, LAYOUT::BSH>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, true, false, LAYOUT::BSH);
   } else if (TILING_KEY_IS(12000000000200301)) {
     KERNEL_TASK_TYPE(12000000000200301, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, half, half, true, false, LAYOUT::BSH>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, true, false, LAYOUT::BSH);
   } else if (TILING_KEY_IS(10000000000100301)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, half, half, false, true, LAYOUT::BSH>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false, true, LAYOUT::BSH);
   } else if (TILING_KEY_IS(10000000000300301)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, half, half, true, true, LAYOUT::BSH>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, true, true, LAYOUT::BSH);
   } else if (TILING_KEY_IS(10000000000400300)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, half, half, false, false, LAYOUT::BNSD, true>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false, false, LAYOUT::BNSD, true);
   } else if (TILING_KEY_IS(12000000000400300)) {
     KERNEL_TASK_TYPE(12000000000400300, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, half, half, false, false, LAYOUT::BNSD, true>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false, false, LAYOUT::BNSD, true);
   } else if (TILING_KEY_IS(10000000000600300)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, half, half, true, false, LAYOUT::BNSD, true>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, true, false, LAYOUT::BNSD, true);
   } else if (TILING_KEY_IS(12000000000600300)) {
     KERNEL_TASK_TYPE(12000000000600300, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, half, half, true, false, LAYOUT::BNSD, true>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, true, false, LAYOUT::BNSD, true);
   } else if (TILING_KEY_IS(10000000000500300)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, half, half, false, true, LAYOUT::BNSD, true>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false, true, LAYOUT::BNSD, true);
   } else if (TILING_KEY_IS(10000000000700300)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, half, half, true, true, LAYOUT::BNSD, true>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, true, true, LAYOUT::BNSD, true);
   } else if (TILING_KEY_IS(10000000000400301)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, half, half, false, false, LAYOUT::BSH, true>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false, false, LAYOUT::BSH, true);
   } else if (TILING_KEY_IS(12000000000400301)) {
     KERNEL_TASK_TYPE(12000000000400301, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, half, half, false, false, LAYOUT::BSH, true>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false, false, LAYOUT::BSH, true);
   } else if (TILING_KEY_IS(10000000000600301)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, half, half, true, false, LAYOUT::BSH, true>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, true, false, LAYOUT::BSH, true);
   } else if (TILING_KEY_IS(12000000000600301)) {
     KERNEL_TASK_TYPE(12000000000600301, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, half, half, true, false, LAYOUT::BSH, true>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, true, false, LAYOUT::BSH, true);
   } else if (TILING_KEY_IS(10000000000500301)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, half, half, false, true, LAYOUT::BSH, true>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false, true, LAYOUT::BSH, true);
   } else if (TILING_KEY_IS(10000000000700301)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, half, half, true, true, LAYOUT::BSH, true>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
-
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, true, true, LAYOUT::BSH, true);
   } else if (TILING_KEY_IS(20000000000000000)) {
     INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, half, half, false, false,
                                       LAYOUT::BNSD, false, true);
@@ -499,90 +276,34 @@ extern "C" __global__ __aicore__ void incre_flash_attention_FIAS(
   } else if (TILING_KEY_IS(20000000000400301)) {
     INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false, false,
                                       LAYOUT::BSH, true, true);
-  } else if (TILING_KEY_IS(20000000010500301)) {
+  } else if (TILING_KEY_IS(20000000000500301)) {
     INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false, true,
                                       LAYOUT::BSH, true, true);
 #else
   } else if (TILING_KEY_IS(11000000000000300)) {  // kvDeq
-    IncreFlashAttentionAttenAllVecNew<IFAType<half, int8_t, half, half, false, false, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA_NO_CUBE(tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_ALL_VEC_OP_IMPL(IncreFlashAttentionAttenAllVecNew, half, int8_t, half, half, false, false, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(11000000000100300)) {
-    IncreFlashAttentionAttenAllVecNew<IFAType<half, int8_t, half, half, false, true, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA_NO_CUBE(tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_ALL_VEC_OP_IMPL(IncreFlashAttentionAttenAllVecNew, half, int8_t, half, half, false, true, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(11000000000000301)) {
-    IncreFlashAttentionAttenAllVecNew<IFAType<half, int8_t, half, half, false, false, LAYOUT::BSH>> op;
-    COPY_TILING_DATA_NO_CUBE(tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_ALL_VEC_OP_IMPL(IncreFlashAttentionAttenAllVecNew, half, int8_t, half, half, false, false, LAYOUT::BSH);
   } else if (TILING_KEY_IS(11000000000100301)) {
-    IncreFlashAttentionAttenAllVecNew<IFAType<half, int8_t, half, half, false, true, LAYOUT::BSH>> op;
-    COPY_TILING_DATA_NO_CUBE(tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_ALL_VEC_OP_IMPL(IncreFlashAttentionAttenAllVecNew, half, int8_t, half, half, false, true, LAYOUT::BSH);
   } else if (TILING_KEY_IS(11000000000200000)) {  // pageAttention
-    IncreFlashAttentionAttenAllVecNew<IFAType<half, half, half, half, true, false, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA_NO_CUBE(tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, &tPipe);
-    op.Process();
+    INVOKE_IFA_ALL_VEC_OP_IMPL(IncreFlashAttentionAttenAllVecNew, half, half, half, half, true, false, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(11000000000300000)) {
-    IncreFlashAttentionAttenAllVecNew<IFAType<half, half, half, half, true, true, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA_NO_CUBE(tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, &tPipe);
-    op.Process();
+    INVOKE_IFA_ALL_VEC_OP_IMPL(IncreFlashAttentionAttenAllVecNew, half, half, half, half, true, true, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(11000000000200001)) {
-    IncreFlashAttentionAttenAllVecNew<IFAType<half, half, half, half, true, false, LAYOUT::BSH>> op;
-    COPY_TILING_DATA_NO_CUBE(tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, &tPipe);
-    op.Process();
+    INVOKE_IFA_ALL_VEC_OP_IMPL(IncreFlashAttentionAttenAllVecNew, half, half, half, half, true, false, LAYOUT::BSH);
   } else if (TILING_KEY_IS(11000000000300001)) {
-    IncreFlashAttentionAttenAllVecNew<IFAType<half, half, half, half, true, true, LAYOUT::BSH>> op;
-    COPY_TILING_DATA_NO_CUBE(tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, &tPipe);
-    op.Process();
+    INVOKE_IFA_ALL_VEC_OP_IMPL(IncreFlashAttentionAttenAllVecNew, half, half, half, half, true, true, LAYOUT::BSH);
   } else if (TILING_KEY_IS(11000000000200300)) {  // pageAttention + kvDeq
-    IncreFlashAttentionAttenAllVecNew<IFAType<half, int8_t, half, half, true, false, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA_NO_CUBE(tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_ALL_VEC_OP_IMPL(IncreFlashAttentionAttenAllVecNew, half, int8_t, half, half, true, false, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(11000000000300300)) {
-    IncreFlashAttentionAttenAllVecNew<IFAType<half, int8_t, half, half, true, true, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA_NO_CUBE(tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_ALL_VEC_OP_IMPL(IncreFlashAttentionAttenAllVecNew, half, int8_t, half, half, true, true, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(11000000000200301)) {
-    IncreFlashAttentionAttenAllVecNew<IFAType<half, int8_t, half, half, true, false, LAYOUT::BSH>> op;
-    COPY_TILING_DATA_NO_CUBE(tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_ALL_VEC_OP_IMPL(IncreFlashAttentionAttenAllVecNew, half, int8_t, half, half, true, false, LAYOUT::BSH);
   } else if (TILING_KEY_IS(11000000000300301)) {
-    IncreFlashAttentionAttenAllVecNew<IFAType<half, int8_t, half, half, true, true, LAYOUT::BSH>> op;
-    COPY_TILING_DATA_NO_CUBE(tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_ALL_VEC_OP_IMPL(IncreFlashAttentionAttenAllVecNew, half, int8_t, half, half, true, true, LAYOUT::BSH);
 #endif
   }
 #endif
@@ -591,342 +312,89 @@ extern "C" __global__ __aicore__ void incre_flash_attention_FIAS(
 
 #if (ORIG_DTYPE_QUERY == DT_FLOAT16) && (ORIG_DTYPE_ATTENTION_OUT == DT_INT8)
   if (TILING_KEY_IS(10000000000003000)) {  // A16W16 fp16, out int8
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, half, int8_t, half, false, false, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, int8_t, half, false, false, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(12000000000003000)) {
     KERNEL_TASK_TYPE(12000000000003000, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, half, int8_t, half, false, false, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, int8_t, half, false, false, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(10000000000203000)) {  // A16W16 fp16, out int8
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, half, int8_t, half, true, false, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, int8_t, half, true, false, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(12000000000203000)) {
     KERNEL_TASK_TYPE(12000000000203000, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, half, int8_t, half, true, false, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, int8_t, half, true, false, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(10000000000103000)) {  // A16W16 fp16, out int8, FD
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, half, int8_t, half, false, true, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, int8_t, half, false, true, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(10000000000303000)) {  // A16W16 fp16, out int8, FD
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, half, int8_t, half, true, true, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, int8_t, half, true, true, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(10000000000003001)) {  // A16W16 fp16, out int8
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, half, int8_t, half, false, false, LAYOUT::BSH>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, int8_t, half, false, false, LAYOUT::BSH);
   } else if (TILING_KEY_IS(12000000000003001)) {
     KERNEL_TASK_TYPE(12000000000003001, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, half, int8_t, half, false, false, LAYOUT::BSH>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, int8_t, half, false, false, LAYOUT::BSH);
   } else if (TILING_KEY_IS(10000000000203001)) {  // A16W16 fp16, out int8
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, half, int8_t, half, true, false, LAYOUT::BSH>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, int8_t, half, true, false, LAYOUT::BSH);
   } else if (TILING_KEY_IS(12000000000203001)) {
     KERNEL_TASK_TYPE(12000000000203001, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, half, int8_t, half, true, false, LAYOUT::BSH>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, int8_t, half, true, false, LAYOUT::BSH);
   } else if (TILING_KEY_IS(10000000000103001)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, half, int8_t, half, false, true, LAYOUT::BSH>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, int8_t, half, false, true, LAYOUT::BSH);
   } else if (TILING_KEY_IS(10000000000303001)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, half, int8_t, half, true, true, LAYOUT::BSH>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, int8_t, half, true, true, LAYOUT::BSH);
   } else if (TILING_KEY_IS(10000000000003300)) {  // A16W8 fp16, out int
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, int8_t, half, false, false, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, false, false, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(12000000000003300)) {
     KERNEL_TASK_TYPE(12000000000003300, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, int8_t, half, false, false, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, false, false, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(10000000000203300)) {  // A16W8 fp16, out int
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, int8_t, half, true, false, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, true, false, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(12000000000203300)) {
     KERNEL_TASK_TYPE(12000000000203300, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, int8_t, half, true, false, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, true, false, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(10000000000103300)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, int8_t, half, false, true, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, false, true, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(10000000000303300)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, int8_t, half, true, true, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, true, true, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(10000000000003301)) {  // A16W8 out int8
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, int8_t, half, false, false, LAYOUT::BSH>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, false, false, LAYOUT::BSH);
   } else if (TILING_KEY_IS(12000000000003301)) {
     KERNEL_TASK_TYPE(12000000000003301, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, int8_t, half, false, false, LAYOUT::BSH>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, false, false, LAYOUT::BSH);
   } else if (TILING_KEY_IS(10000000000203301)) {  // A16W8 out int8
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, int8_t, half, true, false, LAYOUT::BSH>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, true, false, LAYOUT::BSH);
   } else if (TILING_KEY_IS(12000000000203301)) {
     KERNEL_TASK_TYPE(12000000000203301, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, int8_t, half, true, false, LAYOUT::BSH>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, true, false, LAYOUT::BSH);
   } else if (TILING_KEY_IS(10000000000103301)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, int8_t, half, false, true, LAYOUT::BSH>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, false, true, LAYOUT::BSH);
   } else if (TILING_KEY_IS(10000000000303301)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, int8_t, half, true, true, LAYOUT::BSH>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, true, true, LAYOUT::BSH);
   } else if (TILING_KEY_IS(10000000000403300)) {  // A16W8 fp16, pertoken, out int8
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, int8_t, half, false, false, LAYOUT::BNSD, true>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, false, false, LAYOUT::BNSD, true);
   } else if (TILING_KEY_IS(12000000000403300)) {
     KERNEL_TASK_TYPE(12000000000403300, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, int8_t, half, false, false, LAYOUT::BNSD, true>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, false, false, LAYOUT::BNSD, true);
   } else if (TILING_KEY_IS(10000000000603300)) {  // A16W8 fp16, pertoken, out int8
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, int8_t, half, true, false, LAYOUT::BNSD, true>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, true, false, LAYOUT::BNSD, true);
   } else if (TILING_KEY_IS(12000000000603300)) {
     KERNEL_TASK_TYPE(12000000000603300, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, int8_t, half, true, false, LAYOUT::BNSD, true>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, true, false, LAYOUT::BNSD, true);
   } else if (TILING_KEY_IS(10000000000503300)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, int8_t, half, false, true, LAYOUT::BNSD, true>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, false, true, LAYOUT::BNSD, true);
   } else if (TILING_KEY_IS(10000000000703300)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, int8_t, half, true, true, LAYOUT::BNSD, true>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, true, true, LAYOUT::BNSD, true);
   } else if (TILING_KEY_IS(10000000000403301)) {  // A16W8 out int8
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, int8_t, half, false, false, LAYOUT::BSH, true>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, false, false, LAYOUT::BSH, true);
   } else if (TILING_KEY_IS(12000000000403301)) {
     KERNEL_TASK_TYPE(12000000000403301, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, int8_t, half, false, false, LAYOUT::BSH, true>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, false, false, LAYOUT::BSH, true);
   } else if (TILING_KEY_IS(10000000000603301)) {  // A16W8 out int8
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, int8_t, half, true, false, LAYOUT::BSH, true>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, true, false, LAYOUT::BSH, true);
   } else if (TILING_KEY_IS(12000000000603301)) {
     KERNEL_TASK_TYPE(12000000000603301, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, int8_t, half, true, false, LAYOUT::BSH, true>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, true, false, LAYOUT::BSH, true);
   } else if (TILING_KEY_IS(10000000000503301)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, int8_t, half, false, true, LAYOUT::BSH, true>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, false, true, LAYOUT::BSH, true);
   } else if (TILING_KEY_IS(10000000000703301)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<half, int8_t, int8_t, half, true, true, LAYOUT::BSH, true>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
-
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, true, true, LAYOUT::BSH, true);
   } else if (TILING_KEY_IS(20000000000003000)) {  // A16W16 fp16, out int8
     INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, int8_t, half, false, false,
                                       LAYOUT::BNSD, false, true);
@@ -969,373 +437,89 @@ extern "C" __global__ __aicore__ void incre_flash_attention_FIAS(
 
 #if (ORIG_DTYPE_QUERY == DT_BF16) && (ORIG_DTYPE_ATTENTION_OUT == DT_BF16)
   if (TILING_KEY_IS(10000000000022220)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<
-        IFAType<bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, false, false, LAYOUT::BNSD>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, false, false, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(12000000000022220)) {
     KERNEL_TASK_TYPE(12000000000022220, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, false, false, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, false, false, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(10000000000222220)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<
-        IFAType<bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, true, false, LAYOUT::BNSD>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, true, false, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(12000000000222220)) {
     KERNEL_TASK_TYPE(12000000000222220, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, true, false, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, true, false, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(10000000000122220)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<
-        IFAType<bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, false, true, LAYOUT::BNSD>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, false, true, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(10000000000322220)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<
-        IFAType<bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, true, true, LAYOUT::BNSD>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, true, true, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(10000000000022221)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<
-        IFAType<bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, false, false, LAYOUT::BSH>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, false, false, LAYOUT::BSH);
   } else if (TILING_KEY_IS(12000000000022221)) {
     KERNEL_TASK_TYPE(12000000000022221, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, false, false, LAYOUT::BSH>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, false, false, LAYOUT::BSH);
   } else if (TILING_KEY_IS(10000000000222221)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<
-        IFAType<bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, true, false, LAYOUT::BSH>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, true, false, LAYOUT::BSH);
   } else if (TILING_KEY_IS(12000000000222221)) {
     KERNEL_TASK_TYPE(12000000000222221, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, true, false, LAYOUT::BSH>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, true, false, LAYOUT::BSH);
   } else if (TILING_KEY_IS(10000000000122221)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<
-        IFAType<bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, false, true, LAYOUT::BSH>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, false, true, LAYOUT::BSH);
   } else if (TILING_KEY_IS(10000000000322221)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<
-        IFAType<bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, true, true, LAYOUT::BSH>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, bfloat16_t, bfloat16_t, true, true, LAYOUT::BSH);
   } else if (TILING_KEY_IS(10000000000022320)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<
-        IFAType<bfloat16_t, int8_t, bfloat16_t, bfloat16_t, false, false, LAYOUT::BNSD>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t, false, false, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(12000000000022320)) {
     KERNEL_TASK_TYPE(12000000000022320, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<bfloat16_t, int8_t, bfloat16_t, bfloat16_t, false, false, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t, false, false, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(10000000000222320)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<
-        IFAType<bfloat16_t, int8_t, bfloat16_t, bfloat16_t, true, false, LAYOUT::BNSD>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t, true, false, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(12000000000222320)) {
     KERNEL_TASK_TYPE(12000000000222320, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<bfloat16_t, int8_t, bfloat16_t, bfloat16_t, true, false, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t, true, false, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(10000000000122320)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<
-        IFAType<bfloat16_t, int8_t, bfloat16_t, bfloat16_t, false, true, LAYOUT::BNSD>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t, false, true, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(10000000000322320)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<
-        IFAType<bfloat16_t, int8_t, bfloat16_t, bfloat16_t, true, true, LAYOUT::BNSD>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t, true, true, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(10000000000022321)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<
-        IFAType<bfloat16_t, int8_t, bfloat16_t, bfloat16_t, false, false, LAYOUT::BSH>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t, false, false, LAYOUT::BSH);
   } else if (TILING_KEY_IS(12000000000022321)) {
     KERNEL_TASK_TYPE(12000000000022321, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<bfloat16_t, int8_t, bfloat16_t, bfloat16_t, false, false, LAYOUT::BSH>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t, false, false, LAYOUT::BSH);
   } else if (TILING_KEY_IS(10000000000222321)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<
-        IFAType<bfloat16_t, int8_t, bfloat16_t, bfloat16_t, true, false, LAYOUT::BSH>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t, true, false, LAYOUT::BSH);
   } else if (TILING_KEY_IS(12000000000222321)) {
     KERNEL_TASK_TYPE(12000000000222321, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<bfloat16_t, int8_t, bfloat16_t, bfloat16_t, true, false, LAYOUT::BSH>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t, true, false, LAYOUT::BSH);
   } else if (TILING_KEY_IS(10000000000122321)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<
-        IFAType<bfloat16_t, int8_t, bfloat16_t, bfloat16_t, false, true, LAYOUT::BSH>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t, false, true, LAYOUT::BSH);
   } else if (TILING_KEY_IS(10000000000322321)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<bfloat16_t, int8_t, bfloat16_t, bfloat16_t, true, true, LAYOUT::BSH>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t, true, true, LAYOUT::BSH);
   } else if (TILING_KEY_IS(10000000000422320)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<
-        IFAType<bfloat16_t, int8_t, bfloat16_t, bfloat16_t, false, false, LAYOUT::BNSD, true>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t, false, false, LAYOUT::BNSD, true);
   } else if (TILING_KEY_IS(12000000000422320)) {
     KERNEL_TASK_TYPE(12000000000422320, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<bfloat16_t, int8_t, bfloat16_t, bfloat16_t, false, false, LAYOUT::BNSD, true>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t, false, false, LAYOUT::BNSD, true);
   } else if (TILING_KEY_IS(10000000000622320)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<
-        IFAType<bfloat16_t, int8_t, bfloat16_t, bfloat16_t, true, false, LAYOUT::BNSD, true>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t, true, false, LAYOUT::BNSD, true);
   } else if (TILING_KEY_IS(12000000000622320)) {
     KERNEL_TASK_TYPE(12000000000622320, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<bfloat16_t, int8_t, bfloat16_t, bfloat16_t, true, false, LAYOUT::BNSD, true>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t, true, false, LAYOUT::BNSD, true);
   } else if (TILING_KEY_IS(10000000000522320)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<
-        IFAType<bfloat16_t, int8_t, bfloat16_t, bfloat16_t, false, true, LAYOUT::BNSD, true>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t, false, true, LAYOUT::BNSD, true);
   } else if (TILING_KEY_IS(10000000000722320)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<
-        IFAType<bfloat16_t, int8_t, bfloat16_t, bfloat16_t, true, true, LAYOUT::BNSD, true>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t, true, true, LAYOUT::BNSD, true);
   } else if (TILING_KEY_IS(10000000000422321)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<
-        IFAType<bfloat16_t, int8_t, bfloat16_t, bfloat16_t, false, false, LAYOUT::BSH, true>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t, false, false, LAYOUT::BSH, true);
   } else if (TILING_KEY_IS(12000000000422321)) {
     KERNEL_TASK_TYPE(12000000000422321, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<bfloat16_t, int8_t, bfloat16_t, bfloat16_t, false, false, LAYOUT::BSH, true>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t, false, false, LAYOUT::BSH, true);
   } else if (TILING_KEY_IS(10000000000622321)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<
-        IFAType<bfloat16_t, int8_t, bfloat16_t, bfloat16_t, true, false, LAYOUT::BSH, true>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t, true, false, LAYOUT::BSH, true);
   } else if (TILING_KEY_IS(12000000000622321)) {
     KERNEL_TASK_TYPE(12000000000622321, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<bfloat16_t, int8_t, bfloat16_t, bfloat16_t, true, false, LAYOUT::BSH, true>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t, true, false, LAYOUT::BSH, true);
   } else if (TILING_KEY_IS(10000000000522321)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<
-        IFAType<bfloat16_t, int8_t, bfloat16_t, bfloat16_t, false, true, LAYOUT::BSH, true>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t, false, true, LAYOUT::BSH, true);
   } else if (TILING_KEY_IS(10000000000722321)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<
-        IFAType<bfloat16_t, int8_t, bfloat16_t, bfloat16_t, true, true, LAYOUT::BSH, true>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
-
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t, true, true, LAYOUT::BSH, true);
   } else if (TILING_KEY_IS(20000000000022220)) {
     INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, bfloat16_t,
                                       bfloat16_t, false, false, LAYOUT::BNSD, false, true);
@@ -1362,396 +546,105 @@ extern "C" __global__ __aicore__ void incre_flash_attention_FIAS(
                                       bfloat16_t, false, true, LAYOUT::BSH, false, true);
   } else if (TILING_KEY_IS(20000000000422320)) {
     INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t,
-                                      bfloat16_t, false, false, LAYOUT::BNSD, true, false);
+                                      bfloat16_t, false, false, LAYOUT::BNSD, true, true);
   } else if (TILING_KEY_IS(20000000000522320)) {
     INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t,
-                                      bfloat16_t, false, true, LAYOUT::BNSD, true, false);
+                                      bfloat16_t, false, true, LAYOUT::BNSD, true, true);
   } else if (TILING_KEY_IS(20000000000422321)) {
     INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t,
-                                      bfloat16_t, false, false, LAYOUT::BSH, true, false);
+                                      bfloat16_t, false, false, LAYOUT::BSH, true, true);
   } else if (TILING_KEY_IS(20000000000522321)) {
     INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t,
-                                      bfloat16_t, false, true, LAYOUT::BSH, true, false);
+                                      bfloat16_t, false, true, LAYOUT::BSH, true, true);
   }
 
 #endif
 
 #if (ORIG_DTYPE_QUERY == DT_BF16) && (ORIG_DTYPE_ATTENTION_OUT == DT_INT8)
   if (TILING_KEY_IS(10000000000023220)) {  // A16W16 BF16 out int8
-    IncreFlashAttentionAttenSplitBbn2s2Us2<
-        IFAType<bfloat16_t, bfloat16_t, int8_t, bfloat16_t, false, false, LAYOUT::BNSD>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, int8_t, bfloat16_t, false, false, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(12000000000023220)) {
     KERNEL_TASK_TYPE(12000000000023220, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<bfloat16_t, bfloat16_t, int8_t, bfloat16_t, false, false, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, int8_t, bfloat16_t, false, false, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(10000000000223220)) {  // A16W16 BF16 out int8
-    IncreFlashAttentionAttenSplitBbn2s2Us2<
-        IFAType<bfloat16_t, bfloat16_t, int8_t, bfloat16_t, true, false, LAYOUT::BNSD>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, int8_t, bfloat16_t, true, false, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(12000000000223220)) {
     KERNEL_TASK_TYPE(12000000000223220, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<bfloat16_t, bfloat16_t, int8_t, bfloat16_t, true, false, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, int8_t, bfloat16_t, true, false, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(10000000000123220)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<
-        IFAType<bfloat16_t, bfloat16_t, int8_t, bfloat16_t, false, true, LAYOUT::BNSD>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, int8_t, bfloat16_t, false, true, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(10000000000323220)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<
-        IFAType<bfloat16_t, bfloat16_t, int8_t, bfloat16_t, true, true, LAYOUT::BNSD>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, int8_t, bfloat16_t, true, true, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(10000000000023221)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<
-        IFAType<bfloat16_t, bfloat16_t, int8_t, bfloat16_t, false, false, LAYOUT::BSH>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, int8_t, bfloat16_t, false, false, LAYOUT::BSH);
   } else if (TILING_KEY_IS(12000000000023221)) {
     KERNEL_TASK_TYPE(12000000000023221, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<bfloat16_t, bfloat16_t, int8_t, bfloat16_t, false, false, LAYOUT::BSH>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, int8_t, bfloat16_t, false, false, LAYOUT::BSH);
   } else if (TILING_KEY_IS(10000000000223221)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<
-        IFAType<bfloat16_t, bfloat16_t, int8_t, bfloat16_t, true, false, LAYOUT::BSH>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, int8_t, bfloat16_t, true, false, LAYOUT::BSH);
   } else if (TILING_KEY_IS(12000000000223221)) {
     KERNEL_TASK_TYPE(12000000000223221, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<bfloat16_t, bfloat16_t, int8_t, bfloat16_t, true, false, LAYOUT::BSH>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, int8_t, bfloat16_t, true, false, LAYOUT::BSH);
   } else if (TILING_KEY_IS(10000000000123221)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<
-        IFAType<bfloat16_t, bfloat16_t, int8_t, bfloat16_t, false, true, LAYOUT::BSH>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, int8_t, bfloat16_t, false, true, LAYOUT::BSH);
   } else if (TILING_KEY_IS(10000000000323221)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<bfloat16_t, bfloat16_t, int8_t, bfloat16_t, true, true, LAYOUT::BSH>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, int8_t, bfloat16_t, true, true, LAYOUT::BSH);
   } else if (TILING_KEY_IS(10000000000023320)) {  // A16W8 BF16 out int8
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<bfloat16_t, int8_t, int8_t, bfloat16_t, false, false, LAYOUT::BNSD>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t, false, false, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(12000000000023320)) {
     KERNEL_TASK_TYPE(12000000000023320, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<bfloat16_t, int8_t, int8_t, bfloat16_t, false, false, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t, false, false, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(10000000000223320)) {  // A16W8 BF16 out int8
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<bfloat16_t, int8_t, int8_t, bfloat16_t, true, false, LAYOUT::BNSD>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t, true, false, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(12000000000223320)) {
     KERNEL_TASK_TYPE(12000000000223320, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<bfloat16_t, int8_t, int8_t, bfloat16_t, true, false, LAYOUT::BNSD>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t, true, false, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(10000000000123320)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<bfloat16_t, int8_t, int8_t, bfloat16_t, false, true, LAYOUT::BNSD>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t, false, true, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(10000000000323320)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<bfloat16_t, int8_t, int8_t, bfloat16_t, true, true, LAYOUT::BNSD>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t, true, true, LAYOUT::BNSD);
   } else if (TILING_KEY_IS(10000000000023321)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<bfloat16_t, int8_t, int8_t, bfloat16_t, false, false, LAYOUT::BSH>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t, false, false, LAYOUT::BSH);
   } else if (TILING_KEY_IS(12000000000023321)) {
     KERNEL_TASK_TYPE(12000000000023321, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<bfloat16_t, int8_t, int8_t, bfloat16_t, false, false, LAYOUT::BSH>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t, false, false, LAYOUT::BSH);
   } else if (TILING_KEY_IS(10000000000223321)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<bfloat16_t, int8_t, int8_t, bfloat16_t, true, false, LAYOUT::BSH>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t, true, false, LAYOUT::BSH);
   } else if (TILING_KEY_IS(12000000000223321)) {
     KERNEL_TASK_TYPE(12000000000223321, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<bfloat16_t, int8_t, int8_t, bfloat16_t, true, false, LAYOUT::BSH>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t, true, false, LAYOUT::BSH);
   } else if (TILING_KEY_IS(10000000000123321)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<bfloat16_t, int8_t, int8_t, bfloat16_t, false, true, LAYOUT::BSH>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t, false, true, LAYOUT::BSH);
   } else if (TILING_KEY_IS(10000000000323321)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<bfloat16_t, int8_t, int8_t, bfloat16_t, true, true, LAYOUT::BSH>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t, true, true, LAYOUT::BSH);
   } else if (TILING_KEY_IS(10000000000423320)) {  // A16W8 BF16 out int8 per token
-    IncreFlashAttentionAttenSplitBbn2s2Us2<
-        IFAType<bfloat16_t, int8_t, int8_t, bfloat16_t, false, false, LAYOUT::BNSD, true>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t, false, false, LAYOUT::BNSD, true);
   } else if (TILING_KEY_IS(12000000000423320)) {
     KERNEL_TASK_TYPE(12000000000423320, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<bfloat16_t, int8_t, int8_t, bfloat16_t, false, false, LAYOUT::BNSD, true>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t, false, false, LAYOUT::BNSD, true);
   } else if (TILING_KEY_IS(10000000000623320)) {  // A16W8 BF16 out int8 per token
-    IncreFlashAttentionAttenSplitBbn2s2Us2<
-        IFAType<bfloat16_t, int8_t, int8_t, bfloat16_t, true, false, LAYOUT::BNSD, true>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t, true, false, LAYOUT::BNSD, true);
   } else if (TILING_KEY_IS(12000000000623320)) {
     KERNEL_TASK_TYPE(12000000000623320, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<bfloat16_t, int8_t, int8_t, bfloat16_t, true, false, LAYOUT::BNSD, true>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t, true, false, LAYOUT::BNSD, true);
   } else if (TILING_KEY_IS(10000000000523320)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<
-        IFAType<bfloat16_t, int8_t, int8_t, bfloat16_t, false, true, LAYOUT::BNSD, true>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t, false, true, LAYOUT::BNSD, true);
   } else if (TILING_KEY_IS(10000000000723320)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<
-        IFAType<bfloat16_t, int8_t, int8_t, bfloat16_t, true, true, LAYOUT::BNSD, true>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t, true, true, LAYOUT::BNSD, true);
   } else if (TILING_KEY_IS(10000000000423321)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<
-        IFAType<bfloat16_t, int8_t, int8_t, bfloat16_t, false, false, LAYOUT::BSH, true>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t, false, false, LAYOUT::BSH, true);
   } else if (TILING_KEY_IS(12000000000423321)) {
     KERNEL_TASK_TYPE(12000000000423321, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<bfloat16_t, int8_t, int8_t, bfloat16_t, false, false, LAYOUT::BSH, true>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t, false, false, LAYOUT::BSH, true);
   } else if (TILING_KEY_IS(10000000000623321)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<
-        IFAType<bfloat16_t, int8_t, int8_t, bfloat16_t, true, false, LAYOUT::BSH, true>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t, true, false, LAYOUT::BSH, true);
   } else if (TILING_KEY_IS(12000000000623321)) {
     KERNEL_TASK_TYPE(12000000000623321, KERNEL_TYPE_MIX_AIC_1_1);
-    IncreFlashAttentionAttenSplitBbn2s2Us2<IFAType<bfloat16_t, int8_t, int8_t, bfloat16_t, true, false, LAYOUT::BSH, true>> op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut, softmaxLse, user,
-      tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-      keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t, true, false, LAYOUT::BSH, true);
   } else if (TILING_KEY_IS(10000000000523321)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<
-        IFAType<bfloat16_t, int8_t, int8_t, bfloat16_t, false, true, LAYOUT::BSH, true>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t, false, true, LAYOUT::BSH, true);
   } else if (TILING_KEY_IS(10000000000723321)) {
-    IncreFlashAttentionAttenSplitBbn2s2Us2<
-        IFAType<bfloat16_t, int8_t, int8_t, bfloat16_t, true, true, LAYOUT::BSH, true>>
-        op;
-    COPY_TILING_DATA(tiling, NEED_CUBE_TILING);
-    REGIST_MATMUL_OBJ(&tPipe, GetSysWorkSpacePtr(), op.mm, bmm1tiling, op.bmm2, bmm2tiling);
-    op.Init(query, key, value, pseShift, attenMask, actualSeqLengths, blocktable, kvPaddingSize, attentionOut,
-            softmaxLse, user, tiling_data, tiling, &tPipe);
-    op.InitQuant(deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScale, antiquantOffset,
-                 keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, valueAntiquantOffset, user);
-    op.Process();
-
+    INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t, true, true, LAYOUT::BSH, true);
   } else if (TILING_KEY_IS(20000000000023220)) {  // A16W16 BF16 out int8
     INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, int8_t,
                                       bfloat16_t, false, false, LAYOUT::BNSD, false, true);

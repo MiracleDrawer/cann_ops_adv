@@ -12,7 +12,9 @@ add_ops_compile_options(
         OPTIONS --cce-auto-sync=off
                 -Wno-deprecated-declarations
                 -Werror
+                -mllvm -cce-aicore-hoist-movemask=false
 )
+
 set(fused_infer_attention_score_depends transformer/incre_flash_attention transformer/prompt_flash_attention 
     PARENT_SCOPE)
 

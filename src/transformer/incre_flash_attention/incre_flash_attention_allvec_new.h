@@ -288,7 +288,7 @@ class IncreFlashAttentionAttenAllVecNew {
 
   // pageAttention
   uint32_t kvCacheBlockSize = 0;
-  uint32_t maxBlockNumPerSeq = 0;
+  uint32_t maxBlockNumPerBatch = 0;
   uint64_t s2BatchOffset = 0;
   uint64_t s2BatchBaseOffset = 0;
   uint64_t blockTableBaseOffset = 0;
@@ -427,7 +427,7 @@ __aicore__ inline void IncreFlashAttentionAttenAllVecNew<IFAT>::InitTilingData()
   // 是否输出lse
   softmaxLseFlag = tilingData->baseParams.softmaxLseFlag;
 
-  maxBlockNumPerSeq = tilingData->baseParams.maxBlockNumPerSeq;
+  maxBlockNumPerBatch = tilingData->baseParams.maxBlockNumPerBatch;
   kvCacheBlockSize = tilingData->baseParams.blockSize;
 
   coreStartIdx = tilingData->increFlashAttentionCoreParams.coreSidxEnd;
@@ -904,7 +904,7 @@ __aicore__ inline void IncreFlashAttentionAttenAllVecNew<IFAT>::CalcBN2OffsetAnd
 
       break;
   }
-  blockTableBaseOffset = bIdx * maxBlockNumPerSeq;
+  blockTableBaseOffset = bIdx * maxBlockNumPerBatch;
   s2BatchBaseOffset = kvPaddingBeginOffset;  // 需确认PA是否从左padding起始位置开始分片
   attenMaskCoreOffset = bIdx * attentMaskSize + kvPaddingBeginOffset;
   if constexpr (FLASH_DECODE) {

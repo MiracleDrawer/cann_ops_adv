@@ -328,7 +328,7 @@ TEST_F(Ts_Ifa_Ascend910B2, case_kvAntiQuant_unflash_splitB_largeS)
     cs.mParam.antiQuantType = AntiQuantShapeType::_2_N_D;
     cs.mParam.numHeads = 11;
     cs.mParam.kvNumHeads = 1;
-    cs.mOpInfo.mExp.mSuccess = true;
+    cs.mOpInfo.mExp.mSuccess = false;
     ASSERT_TRUE(cs.Init());
     ASSERT_EQ(cs.Run(), cs.mOpInfo.mExp.mSuccess);
 }
@@ -434,7 +434,7 @@ TEST_F(Ts_Ifa_Ascend910B2, case_kvAntiquant_bf16_quant_scale2_type_3)
     cs.mParam.actualSeqLength = {1};
     cs.mParam.quantType = QuantShapeType::POST_1;
     cs.mParam.antiQuantType = AntiQuantShapeType::_2_H;
-    cs.mOpInfo.mExp.mSuccess = true;
+    cs.mOpInfo.mExp.mSuccess = false;
     ASSERT_TRUE(cs.Init());
     ASSERT_EQ(cs.Run(), cs.mOpInfo.mExp.mSuccess);
 }

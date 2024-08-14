@@ -116,7 +116,7 @@ graphStatus PromptHostExecuteFunc(OpExecuteContext* host_api_ctx)
                                 innerPrecise, output);
 
   OPS_ERR_IF(api_ret != GRAPH_SUCCESS,
-    OPS_LOG_E("aclnnfallback", "api_ret faild:%d", api_ret), return GRAPH_FAILED);
+    OPS_LOG_E("aclnnfallback", "api_ret faild:%u", api_ret), return GRAPH_FAILED);
 
   return GRAPH_SUCCESS;
 }

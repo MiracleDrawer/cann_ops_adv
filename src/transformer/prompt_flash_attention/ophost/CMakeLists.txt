@@ -12,7 +12,9 @@ add_ops_compile_options(
         OPTIONS --cce-auto-sync=off
                 -Wno-deprecated-declarations
                 -Werror
+                -mllvm -cce-aicore-hoist-movemask=false
 )
+
 add_ops_compile_options(
         OP_NAME PromptFlashAttention
         COMPUTE_UNIT ascend310p1

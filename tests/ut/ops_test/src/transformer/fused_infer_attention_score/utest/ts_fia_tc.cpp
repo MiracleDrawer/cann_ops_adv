@@ -330,7 +330,7 @@ TEST_F(Ts_Fia_Ascend910B1, case_actual_share_prefix_bnsd)
     cs.keySharedPrefix = Tensor("keySharedPrefix", {1, 10, 0, 10}, "4", ge::DT_INT8, ge::FORMAT_ND);
     cs.valueSharedPrefix = Tensor("valueSharedPrefix", {1, 10, 0, 10}, "4", ge::DT_INT8, ge::FORMAT_ND);
     cs.actualSharedPrefixLen = Tensor("actualSharedPrefixLen", {1, 10, 0, 10}, "4", ge::DT_INT8, ge::FORMAT_ND);
-    cs.mOpInfo.mExp.mSuccess = false;
+    cs.mOpInfo.mExp.mSuccess = true;
     ASSERT_EQ(cs.Run(), cs.mOpInfo.mExp.mSuccess);
 }
 
