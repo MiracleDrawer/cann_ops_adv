@@ -102,3 +102,36 @@ uint32_t PlatformInfoManager::InitializePlatformInfo()
 }
 
 } // namespace fe
+
+
+namespace op {
+// add stub func for GetCurrentPlatformInfo()&GetSocVersion() in aclnn
+enum class SocVersion {
+    ASCEND910B = 1,
+    ASCEND310P = 6
+};
+
+class PlatformInfo {
+public:
+    SocVersion GetSocVersion() const;
+};
+
+SocVersion PlatformInfo::GetSocVersion() const
+{
+    auto *platform = Platform::GetGlobalPlatform();
+    std::string socVersion("Ascend910B");
+    if (platform != nullptr) {
+        platform->socSpec.Get("version", "Short_SoC_version", socVersion);
+    }
+    if (socVersion == "Ascend310P") {
+        return SocVersion::ASCEND310P;
+    }
+    return SocVersion::ASCEND910B;
+}
+
+static PlatformInfo platformInfo;
+
+const PlatformInfo &GetCurrentPlatformInfo() {
+    return platformInfo;
+}
+} // namespace op
