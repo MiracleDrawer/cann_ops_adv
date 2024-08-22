@@ -18,14 +18,14 @@ test_program=$2
 
 echo "=========================================== Run $case_name ===================================="
 
-echo "=========================================== Excute $case_name sample start ===================="
+echo "=========================================== Execute $case_name sample start ===================="
 # execute test program
 ${test_program}
 if [ $? -ne 0 ];then
-    echo "Error: Excute ${test_program} failed."
+    echo "Error: Execute ${test_program} failed."
     exit 1
 fi
-echo "=========================================== Excute $case_name sample end ======================"
+echo "=========================================== Execute $case_name sample end ======================"
 
 echo "=========================================== Run $case_name success =============================="
 exit 0
