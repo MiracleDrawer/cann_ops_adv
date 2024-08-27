@@ -77,8 +77,8 @@ cann-ops-adv，是基于昇腾硬件的融合算子库（adv表示advanced）。
 | FlashAttentionScoreGrad    | 完成FlashAttentionScore算子的反向计算。                      | <li>[FlashAttentionScoreGrad](./docs/FlashAttentionScoreGrad.md) <br/> <li>[FlashAttentionUnpaddingScoreGrad](./docs/FlashAttentionUnpaddingScoreGrad.md) |
 | FlashAttentionScoreV2      | 训练场景下，使用FlashAttention算法实现self-attention（自注意力）的计算。相较于FlashAttentionScore，新增psetype、q_start_idx、kv_start_idx参数。 | <li>[FlashAttentionScoreV2](./docs/FlashAttentionScoreV2.md)<br/> <li>[FlashAttentionVarLenScoreV2](./docs/FlashAttentionVarLenScoreV2.md) |
 | FlashAttentionScoreGradV2  | FlashAttentionScoreV2的反向计算，相较于FlashAttentionScoreGard，新增psetype、q_start_idx、kv_start_idx参数。 | <li>[FlashAttentionScoreGradV2](./docs/FlashAttentionScoreGradV2.md) <br/> <li>[FlashAttentionUnpaddingScoreGradV2](./docs/FlashAttentionUnpaddingScoreGradV2.md) |
-| FusedInferAttentionScore   | 融合PromptFlashAttentionV3，IncreFlashAttentionV4的功能 。<br/>IFA新增:  lse输出、per-token伪量化特性。<br/>PFA新增: lse输出、伪量化、左Padding特性。 | [FusedInferAttentionScore](./docs/FusedInferAttentionScore.md) |
-| FusedInferAttentionScoreV2 | 在FusedInferAttentionScore基础上， IFA 新增kv伪量化参数分离。 | [FusedInferAttentionScoreV2](./docs/FusedInferAttentionScoreV2.md) |
+| FusedInferAttentionScore   | 融合PromptFlashAttentionV3，IncreFlashAttentionV4的功能。 <br/>IFA新增:  lse输出、per-token伪量化特性。<br/>PFA新增: lse输出、伪量化、左Padding、Paged Attention特性。 | [FusedInferAttentionScore](./docs/FusedInferAttentionScore.md) |
+| FusedInferAttentionScoreV2 | 在FusedInferAttentionScore基础上， IFA 新增kv伪量化参数分离。<br/>PFA新增：prefix特性。 | [FusedInferAttentionScoreV2](./docs/FusedInferAttentionScoreV2.md) |
 | IncreFlashAttention        | 使用FlashAttention算法实现self-attention（自注意力）的计算。 | [IncreFlashAttention](./docs/IncreFlashAttention.md)         |
 | IncreFlashAttentionV2      | 在IncreFlashAttention基础上新增量化特性。                    | [IncreFlashAttentionV2](./docs/IncreFlashAttentionV2.md)     |
 | IncreFlashAttentionV3      | 在IncreFlashAttentionV2基础上新增位置编码、page attention、kv cache反量化特性。 | [IncreFlashAttentionV3](./docs/IncreFlashAttentionV3.md)     |
@@ -87,12 +87,12 @@ cann-ops-adv，是基于昇腾硬件的融合算子库（adv表示advanced）。
 | PromptFlashAttentionV2     | 相较于PromptFlashAttention新增量化特性、sparse特性、指定key/value的有效Sequence Length特性。 | [PromptFlashAttentionV2](./docs/PromptFlashAttentionV2.md)   |
 | PromptFlashAttentionV3     | 相较于PromptFlashAttentionV2新增支持指定精度模式特性。       | [PromptFlashAttentionV3](./docs/PromptFlashAttentionV3.md)   |
 
-以上算子当前支持Atlas A2 训练系列产品。
+以上算子当前仅支持Atlas A2 训练系列产品。
 ## 环境准备<a name="1"></a>
 
 cann-ops-adv支持由源码编译，进行源码编译前，请根据如下步骤完成相关环境准备。
 
-1. **获取CANN软件包**
+1. **获取CANN开发套件包**
 
    请从[Link](https://www.hiascend.com/developer/download/community/result?module=cann)获取配套版本的CANN开发套件包Ascend-cann-toolkit\_\<cann_version>\_linux\-\<arch>.run和算子二进制包Ascend-cann-kernels-\<soc_version>_\<cann_version>\_linux.run（二进制包，算子运行时依赖），开放项目与CANN社区版本的配套关系可参见[开放项目与CANN版本配套表](https://gitee.com/ascend/cann-community/blob/master/README.md#cannversionmap)。
 
@@ -130,7 +130,7 @@ cann-ops-adv支持由源码编译，进行源码编译前，请根据如下步�
      # sudo make install                  # 非root用户安装googletest
      ```
 
-3. **安装CANN软件包**
+3. **安装CANN开发套件包**
 
    执行安装命令时，请确保安装用户对软件包具有可执行权限。
 
@@ -181,19 +181,21 @@ cann-ops-adv支持由源码编译，进行源码编译前，请根据如下步�
 
 ## 源码下载
 
-执行如下命令，下载cann-ops-adv仓源码：
+开发者可以通过如下命令下载本仓源码：
 
   ```bash
-  git clone https://gitee.com/ascend/cann-ops-adv.git
+  git clone -b ${tag_version} https://gitee.com/ascend/cann-ops-adv.git
   ```
 
+${tag_version}请替换为具体的标签名称，本源码仓与CANN版本的配套关系可参见[开放项目与CANN版本配套表](https://gitee.com/ascend/cann-community/blob/master/README.md#cannversionmap)。
 
 ## 编译执行
 
 ### 自定义算子包编译
 
+进入本仓代码根目录，执行如下命令：
+
   ```bash
-  cd cann-ops-adv
   mkdir build && cd build     # 在融合算子源码根目录下创建临时目录并进入
   cmake ..
   make package -j 并发数      # 编译并生成自定义算子run包，并发数请替换为实际取值
@@ -209,7 +211,9 @@ cann-ops-adv支持由源码编译，进行源码编译前，请根据如下步�
   Self-extractable archive "CANN-custom_ops-<cann_version>-linux.<arch>.run" successfully created.
   ```
 
-编译成功后在 `cann-ops-adv/output` 目录生成自定义算子包：CANN-custom_ops-\<cann_version>-linux.\<arch>.run。
+编译成功后在 `本仓代码根目录/output` 目录生成自定义算子包：CANN-custom_ops-\<cann_version>-linux.\<arch>.run。
+
+其中，\<cann_version>表示软件版本号，\<arch>表示操作系统架构。
 
 ### 自定义算子包安装<a name="2"></a>
 
@@ -224,10 +228,9 @@ cann-ops-adv支持由源码编译，进行源码编译前，请根据如下步�
 
 ### 单元测试编译执行
 
-UT（单元测试用例），用来看护编译是否正常，依次执行如下命令：
+UT（单元测试用例），用来看护编译是否正常，进入本仓代码根目录，依次执行如下命令：
 
   ```bash
-  cd cann-ops-adv
   mkdir build && cd build             # 在融合算子源码根目录下创建临时目录并进入
   cmake .. -DTESTS_UT_OPS_TEST=ALL    # 指定编译所有融合算子的单元测试用例
   make ops_test_utest -j 并发数        # 编译并执行所有融合算子的单元测试用例，并发数请替换为实际取值
@@ -237,10 +240,9 @@ UT（单元测试用例），用来看护编译是否正常，依次执行如下
 
 ### 示例工程编译执行
 
-此操作需要在真实NPU环境上进行，并且依赖CANN开发套件包和算子二进制包，因此在编译前，需要参见[环境准备](#1)章节安装配套版本的CANN开发套件包和算子二进制包，并设置环境变量。
+此操作需要在真实NPU环境上进行，并且依赖CANN开发套件包和算子二进制包，因此在编译前，需要参见[环境准备](#1)章节安装配套版本的CANN开发套件包和算子二进制包，并设置环境变量，然后进入本仓代码根目录，依次执行如下命令：
 
   ```bash
-  cd cann-ops-adv
   mkdir build && cd build                 # 在融合算子源码根目录下创建临时目录并进入
   cmake .. -DTESTS_EXAMPLE_OPS_TEST=ALL   # 指定编译所有examples用例示例
   make                                    # 编译并执行所有examples用例
@@ -248,10 +250,9 @@ UT（单元测试用例），用来看护编译是否正常，依次执行如下
 
 上述cmake编译参数详细解释请参见[cmake编译参数说明](./docs/common/cmake编译参数说明.md)。
 
-**说明**：当前还提供了一键式编译脚本，命令如下，执行完自定义算子包一键式编译命令，需要完成[自定义算子包安装](#2)后，才能执行后续命令。
+**说明**：当前还提供了一键式编译脚本，进入本仓代码根目录，可执行命令如下，您还可以通过**bash build.sh --help**命令查询更多可用参数；执行完自定义算子包一键式编译命令，需要完成[自定义算子包安装](#2)后，才能执行后续命令。
 
   ```bash
-  cd cann-ops-adv
   bash build.sh         #自定义算子包编译
   bash build.sh -t      #单元测试编译执行
   bash build.sh -e      #示例工程编译执行
@@ -269,7 +270,7 @@ cann-ops-adv仓提供了如下融合算子的代码实现设计，方便开发�
 - [FA/FAG算子设计介绍](./docs/common/FA-FAG算子设计介绍.md)
 - [FFN算子设计介绍](./docs/common/FFN算子设计介绍.md)
 - [IFA算子设计介绍](./docs/common/IFA算子设计介绍.md)
-- [PFA算子设计介绍](./docs/common/PromptFlashAttention算子设计介绍.md)
+- [PFA算子设计介绍](./docs/common/PFA算子设计介绍.md)
 
 ## 贡献指南
 

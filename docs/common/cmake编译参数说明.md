@@ -54,6 +54,8 @@
   -DASCEND_OP_NAME="flash_attention_score" -DTILING_KEY="10000000000220132943;10000000100220130943"
   ```
 
+  **说明：**当前版本只有FlashAttentionScore、FlashAttentionScoreGrad、FlashAttentionScoreV2、FlashAttentionScoreGradV2融合算子支持该参数。
+
 - **CMAKE_INSTALL_PREFIX**：编译完成后，自定义算子包生成目录，未设置时默认生成在根目录的output目录。示例如下：
 
    ```shell

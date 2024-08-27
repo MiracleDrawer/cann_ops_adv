@@ -75,7 +75,7 @@ Atlas A2 训练系列产品
 
   - prefixOptional（aclIntArray\*，计算输入）：Host侧的aclIntArray，可选参数，代表prefix稀疏计算场景每个Batch的N值，数据类型支持INT64，[数据格式](common/数据格式.md)支持ND；综合约束请见[约束与限制](#1)。
 
-  - scaleValueOptional（double，计算输入）：Host侧的double，公式中的scale，代表缩放系数，作为计算流中Muls的scalar值，数据类型支持DOUBLE，一般设置为D^-0.5。
+  - scaleValueOptional（double，计算输入）：Host侧的double，可选参数，公式中的scale，代表缩放系数，作为计算流中Muls的scalar值，数据类型支持DOUBLE，一般设置为D^-0.5。
 
   - keepProbOptional（double，计算输入）：Host侧的double，可选参数，代表dropMaskOptional中1的比例，数据类型支持DOUBLE；综合约束请见[约束与限制](#1)。
 
@@ -90,7 +90,7 @@ Atlas A2 训练系列产品
     **说明：**
     query、key、value数据排布格式支持从多种维度解读，其中B（Batch）表示输入样本批量大小、S（Seq-Length）表示输入样本序列长度、H（Head-Size）表示隐藏层的大小、N（Head-Num）表示多头数、D（Head-Dim）表示隐藏层最小的单元尺寸，且满足D=H/N。
 
-  - innerPreciseOptional（int64_t，计算输入）：Host侧的int64_t。数据类型支持INT64，用于提升精度，默认配置为0即可。
+  - innerPreciseOptional（int64_t，计算输入）：Host侧的int64_t，可选参数，数据类型支持INT64，用于提升精度，默认配置为0即可。
 
     **说明：** 当前0、1为保留配置值，2为使能无效行计算，其功能是避免在计算过程中存在整行mask进而导致精度有损失，但是该配置会导致性能下降。
 
