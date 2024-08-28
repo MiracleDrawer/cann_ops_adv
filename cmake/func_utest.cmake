@@ -735,9 +735,9 @@ function(OpsTest_RunLaunch)
             ${ARGN}
     )
     if (NOT UT_NO_EXEC)
+        set(LD_LIBRARY_PATH_ "LD_LIBRARY_PATH=$ENV{LD_LIBRARY_PATH}:${ASCEND_CANN_PACKAGE_PATH}/compiler/lib64:${ASCEND_CANN_PACKAGE_PATH}/toolkit/tools/simulator/Ascend910B1/lib")
         if (ENABLE_ASAN OR ENABLE_UBSAN)
             # 采用链接 ASAN/MSAN 动态库方式执行, 受 SAN 机制限制, 若采用静态库, 则会导致如 OpTiling/OpProto 内 SAN 功能失效.
-            set(LD_LIBRARY_PATH_ "LD_LIBRARY_PATH=$ENV{LD_LIBRARY_PATH}:${ASCEND_CANN_PACKAGE_PATH}/compiler/lib64:${ASCEND_CANN_PACKAGE_PATH}/toolkit/tools/simulator/Ascend910B1/lib")
             message(STATUS "${SAN_LD_PRELOAD}")
             if (ENABLE_ASAN)
                 # 谨慎修改 ASAN_OPTIONS_ 取值, 当前出现告警会使 UT 失败.
@@ -772,7 +772,6 @@ function(OpsTest_RunLaunch)
                 )
             endif ()
         else()
-            set(LD_LIBRARY_PATH_ "LD_LIBRARY_PATH=$ENV{LD_LIBRARY_PATH}")
             # 用例执行
             add_custom_command(
                     TARGET ${TMP_EXECUTABLE} POST_BUILD

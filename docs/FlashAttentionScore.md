@@ -137,6 +137,7 @@ Atlas A2 训练系列产品
 
 - 该接口与PyTorch配合使用时，需要保证CANN相关包与PyTorch相关包的版本匹配。
 - 输入query、key、value的B：batchsize必须相等。
+- 输入query、key、value的D：Head-Dim必须相等。
 - 输入query、key、value的input_layout必须一致。
 - 输入query、key、value、realShiftOptional的数据类型必须一致。
 - 输入key/value的shape必须一致。
