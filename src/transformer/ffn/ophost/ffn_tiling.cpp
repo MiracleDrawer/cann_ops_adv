@@ -16,6 +16,7 @@
 #include "ffn_tiling.h"
 
 #include <algorithm>
+#include <climits>
 #include <register/op_impl_registry.h>
 
 #include "tiling/data_copy_transpose_tiling.h"
@@ -97,7 +98,7 @@ constexpr uint32_t SIXTEEN_ALIGN_CONSTANT = 16;
 constexpr uint32_t ALIGN32 = 31;
 constexpr uint32_t ALIGN64 = 64;
 constexpr uint32_t UB_DIVIDE_NUM = 3;
-constexpr uint32_t UB_DIVIDE_NUM_N1_ZERO = 12; // 按quant需要使用的最大份数计算，同时预留高阶API使用的内存
+constexpr uint32_t UB_DIVIDE_NUM_N1_ZERO = 12;
 constexpr uint32_t UB_DIVIDE_NUM_HIGH_PRECISION = 9;
 constexpr uint32_t UB_DIVIDE_NUM_QUANT = 7;
 constexpr uint32_t UB_DIVIDE_NUM_QUANT_DEQ_FLOAT32 = 26;
@@ -149,19 +150,19 @@ constexpr int32_t HIGH_PRECISION = 0;
 constexpr int32_t HIGH_PERFORMANCE = 1;
 constexpr uint32_t MAX_EXPERT_PARALLELISM = 10;
 
-inline uint32_t SixteenAlign(uint32_t a)
+inline static uint32_t SixteenAlign(uint32_t a)
 {
-    // 16向下对齐
+    // 16 align down
     return a & INVERSE_FIFTEEN;
 }
 
-inline uint32_t SixteenAlignUp(uint32_t a)
+inline static uint32_t SixteenAlignUp(uint32_t a)
 {
-    // 16向上对齐
+    // 16 aligin up
     return (a + FIFTEEN) & INVERSE_FIFTEEN;
 }
 
-inline uint32_t Ceil(uint32_t a, uint32_t b)
+inline static uint32_t Ceil(uint32_t a, uint32_t b)
 {
     if (b == 0) {
         return a;
@@ -169,7 +170,7 @@ inline uint32_t Ceil(uint32_t a, uint32_t b)
     return (a + b - 1) / b;
 }
 
-bool IsPrivateFormat(ge::Format format)
+static bool IsPrivateFormat(ge::Format format)
 {
     if (format == ge::FORMAT_NC1HWC0 || format == ge::FORMAT_FRACTAL_Z || format == ge::FORMAT_NDC1HWC0 ||
         format == ge::FORMAT_FRACTAL_Z_3D || format == ge::FORMAT_FRACTAL_NZ || format == ge::FORMAT_NC1HWC0_C04) {
@@ -237,8 +238,7 @@ protected:
     ge::graphStatus FFNSetMM2Tiling(const gert::TilingContext *context, const matmul_tiling::PlatformInfo &platInfo,
                                     matmul_tiling::DataType matmulDtype);
     ge::graphStatus FFNSetUbDivideBlk();
-    ge::graphStatus FFNCalUbSize(uint32_t baseN, uint32_t divideBlkNum, uint32_t ioBlkNum, uint32_t ubBlockAlign,
-                                 uint32_t &baseM);
+    ge::graphStatus FFNCalUbSize(uint32_t baseN, uint32_t divideBlkNum, uint32_t ioBlkNum, uint32_t &baseM);
     inline ge::graphStatus N1EqualZeroWithBias2(uint64_t ubSize);
     ge::graphStatus TilingCalcAndSetting(const gert::TilingContext *context,
                                          const matmul_tiling::PlatformInfo &platInfo,
@@ -328,7 +328,7 @@ private:
     bool isTilingDataValid = false;
 
     ActiveType GetActiveType(const gert::TilingContext *context, const char *activeType) const;
-    ge::graphStatus GetBs(const gert::StorageShape *xShape);
+    ge::graphStatus GetBs(const gert::TilingContext *context, const gert::StorageShape *xShape);
     void CalMM2Single(uint32_t baseM2, uint32_t baseN2);
     void AdjustMM2MNLoops(const uint32_t align, uint32_t &m2Loops, uint32_t &n2Loops);
     void PrintFFNTiling(const gert::TilingContext *context, bool debugLevel);
@@ -394,9 +394,9 @@ ActiveType FFNTiling::GetActiveType(const gert::TilingContext *context, const ch
     return ActiveType::INVALID_TYPE;
 }
 
-ge::graphStatus FFNTiling::GetBs(const gert::StorageShape *xShape)
+ge::graphStatus FFNTiling::GetBs(const gert::TilingContext *context, const gert::StorageShape *xShape)
 {
-    uint64_t tempBs;
+    int64_t tempBs;
     if (is310P) {
         tempBs = xShape->GetStorageShape().GetDim(1) * xShape->GetStorageShape().GetDim(DIMS_2);
     } else {
@@ -406,9 +406,14 @@ ge::graphStatus FFNTiling::GetBs(const gert::StorageShape *xShape)
             tempBs *= xShape->GetStorageShape().GetDim(i);
         }
     }
-    if (tempBs < MAX_UINT32) {
-        bs = tempBs;
-    }
+    OPS_ERR_IF(xDataTypeSize == 0, OPS_REPORT_VECTOR_INNER_ERR(context, "get x dtype size is 0"),
+               return ge::GRAPH_FAILED);
+    int32_t numInOneBlk = BLOCK_SIZE_FFN / xDataTypeSize;
+    int32_t maxBs = INT_MAX / numInOneBlk * numInOneBlk;
+    OPS_ERR_IF(tempBs > maxBs,
+               OPS_REPORT_VECTOR_INNER_ERR(context, "32Byte-aligned M dim cannot be greater than INT32_MAX"),
+               return ge::GRAPH_FAILED);
+    bs = static_cast<uint64_t>(tempBs);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -428,7 +433,7 @@ void FFNTiling::CheckMSD()
     bool isMsdN1K1 =
         (n1 % BEST_BASEN_MSD == 0) && n1 > MSD_N_THRESHOLD && (k1 % BEST_BASEN_MSD == 0) && k1 > MSD_K_THRESHOLD;
     isMsdCase = isMsdN1K1 && (xDataType == ge::DT_BF16 || xDataType == ge::DT_FLOAT16) && weight1Dtype == ge::DT_INT8 &&
-                maxTokensCheckOpt <= bestMaxTokenMsd && bs <= 512; // 512: Msd单专家可接受最大m
+                maxTokensCheckOpt <= bestMaxTokenMsd && bs <= 512; // 512: max M value in msd-scenario
 }
 
 ge::graphStatus FFNTiling::TilingCalcAndSetting(const gert::TilingContext *context,
@@ -462,15 +467,15 @@ ge::graphStatus FFNTiling::FFNGetScaleGroupNum(const gert::TilingContext *contex
     uint32_t scale1GroupNum = 1;
     uint32_t scale2GroupNum = 1;
     isPerGroup = false;
-    if (context->GetOptionalInputTensor(ANTIQUANT_SCALE1_INDEX)) { // 当前要求scale1\scale2的维度数量相同
+    if (context->GetOptionalInputTensor(ANTIQUANT_SCALE1_INDEX)) {
         const gert::StorageShape *antiScale1Shape = context->GetOptionalInputShape(ANTIQUANT_SCALE1_INDEX);
         uint32_t antiScale1DimNum = antiScale1Shape->GetStorageShape().GetDimNum();
         const gert::StorageShape *antiScale2Shape = context->GetOptionalInputShape(ANTIQUANT_SCALE2_INDEX);
-        if (tokensArrTensor == nullptr && antiScale1DimNum == DIMS_2) { // scale shape为(G,N)
+        if (tokensArrTensor == nullptr && antiScale1DimNum == DIMS_2) { // scale shape is (G,N)
             scale1GroupNum = antiScale1Shape->GetStorageShape().GetDim(0);
             scale2GroupNum = antiScale2Shape->GetStorageShape().GetDim(0);
             isPerGroup = true;
-        } else if (tokensArrTensor != nullptr && antiScale1DimNum == DIMS_3) { // scale shape为(E,G,N)
+        } else if (tokensArrTensor != nullptr && antiScale1DimNum == DIMS_3) { // scale shape is (E,G,N)
             scale1GroupNum = antiScale1Shape->GetStorageShape().GetDim(1);
             scale2GroupNum = antiScale2Shape->GetStorageShape().GetDim(1);
             isPerGroup = true;
@@ -488,9 +493,9 @@ ge::graphStatus FFNTiling::FFNGetQuantScale(const gert::TilingContext *context, 
         if (quantScaleShape != nullptr) {
             uint32_t quantScaleDimNum = quantScaleShape->GetStorageShape().GetDimNum();
             uint32_t scaleShape0 = quantScaleShape->GetStorageShape().GetDim(0);
-            if (tokensArrTensor == nullptr && scaleShape0 == n1) { // quant scale shape为(N)
+            if (tokensArrTensor == nullptr && scaleShape0 == n1) { // quant scale shape is (N)
                 isSmooth = true;
-            } else if (tokensArrTensor != nullptr && quantScaleDimNum == DIMS_2) { // quant scale shape为(E,N)
+            } else if (tokensArrTensor != nullptr && quantScaleDimNum == DIMS_2) { // quant scale shape is(E,N)
                 isSmooth = true;
             }
         } else {
@@ -531,7 +536,8 @@ ge::graphStatus FFNTiling::GetInputShape(const gert::TilingContext *context)
     tilingData.ffnBaseParams.set_tokensIndexFlag(tokensIndexFlag);
 
     // high-dimension input fuses m-axis
-    GetBs(xShape);
+    OPS_ERR_IF(GetBs(context, xShape) != ge::GRAPH_SUCCESS,
+               OPS_REPORT_VECTOR_INNER_ERR(context, "Get M dim value failed"), return ge::GRAPH_FAILED);
     k1 = xShape->GetStorageShape().GetDim(xShape->GetStorageShape().GetDimNum() - 1);
     auto tokensArrTensor = context->GetOptionalInputTensor(TOKENS_ARR_INDEX);
     if (tokensArrTensor) {
@@ -605,10 +611,11 @@ ge::graphStatus FFNTiling::TilingWithDifferentKN(gert::TilingContext *context, c
     matmul_tiling::PlatformInfo mmPlatInfo = MmGetPlatInfo(compileInfoPtr);
     ge::graphStatus tilingStatus = ge::GRAPH_FAILED;
 
-    // 符合tiling分支条件的n1大小至少需支持20核时的专家并行，k1至少需支持L1上右矩阵配合对应baseN能搬满BEST_L1_PARTA大小
+    // n1 can be divided to 20 cores at least, BEST_BASEN for each, and the second matrix cannot load to L1 fully
+    // In this scenario, tiling might be computed in performance branch
     bool whetherN1K1Satisfy = k1 > BEST_L1_PART2 / ((BEST_BASEN / CONSTANT_TWO) * xDataTypeSize) &&
                               n1 > BEST_BASEN * aicNum / (CONSTANT_TWO * CONSTANT_TWO);
-    // 根据n1, k1, datatype，筛选走进该tiling分支的case
+    // cases in 310P will  also be in performance branch
     if ((n1 != 0 && k1 == n2 && n1 == SixteenAlign(n1) && whetherN1K1Satisfy) || is310P) {
         tilingStatus = TilingCalcAndSetting(context, mmPlatInfo, static_cast<matmul_tiling::DataType>(xDataType));
     }
@@ -843,8 +850,7 @@ ge::graphStatus FFNTiling::FFNSetUbDivideBlk()
     return ge::GRAPH_FAILED;
 }
 
-ge::graphStatus FFNTiling::FFNCalUbSize(uint32_t baseN, uint32_t divideBlkNum, uint32_t ioBlkNum, uint32_t ubBlockAlign,
-                                        uint32_t &baseM)
+ge::graphStatus FFNTiling::FFNCalUbSize(uint32_t baseN, uint32_t divideBlkNum, uint32_t ioBlkNum, uint32_t &baseM)
 {
     if (divideBlkNum == 0 || baseN == 0 || ubBlockAlign == 0) {
         return ge::GRAPH_FAILED;
@@ -857,7 +863,7 @@ ge::graphStatus FFNTiling::FFNCalUbSize(uint32_t baseN, uint32_t divideBlkNum, u
         return ge::GRAPH_FAILED;
     }
     baseM = ubCalSize / baseN;   // activate function baseM
-    baseM = SixteenAlign(baseM); // align down
+    baseM = SixteenAlign(baseM);
     tilingData.ffnSingleCoreParams.set_ubCalSize(ubCalSize);
     if (isMsdCase) {
         tilingData.ffnSingleCoreParams.set_ubRestBytes(ubSize_ + ((expertNum * sizeof(int64_t) + ALIGN32) & ~ALIGN32));
@@ -890,12 +896,13 @@ ge::graphStatus FFNTiling::CalMM1BaseM(const gert::TilingContext *context, const
     if (baseN == 0) {
         return ge::GRAPH_FAILED;
     }
-    OPS_ERR_IF(FFNCalUbSize(baseN, ubDivideBlkNum, ubIoBlkNum, ubBlockAlign, baseM) != ge::GRAPH_SUCCESS,
+    OPS_ERR_IF(FFNCalUbSize(baseN, ubDivideBlkNum, ubIoBlkNum, baseM) != ge::GRAPH_SUCCESS,
                OPS_REPORT_VECTOR_INNER_ERR(context, "calculate ub failed."), return ge::GRAPH_FAILED);
 
     uint32_t maxBaseM = std::min<uint32_t>(SixteenAlign(maxTokens), MAX_BASEM);
     baseM = std::min<uint32_t>(mm1VaildUbBytes / baseN, baseM);
-    // 基于使能double buffer的L0C内存计算baseM1(cube)
+
+    // calculate cube baseM by l0c size
     baseM = std::min<uint32_t>(l0CSize / (baseN * FP32_DATATYPE_SIZE), baseM);
     baseM = std::min<uint32_t>(maxBaseM, baseM);
     baseM = SixteenAlign(baseM); // align down
@@ -945,21 +952,21 @@ ge::graphStatus FFNTiling::CalMM1TilingBaseMNBasicBlock(const gert::TilingContex
 ge::graphStatus FFNTiling::CalMMTilingBaseMNBasicBlock(const uint64_t basicBlkOperTimes, const uint32_t n,
                                                        uint32_t &baseM, uint32_t &baseN) const
 {
-    graphStatus ret = ge::GRAPH_FAILED; // 该参数用于记录baseM baseN是否重新计算过，只有提前计算过的情况下才提前返回
+    bool isRecomputed = false; // variable indicates whether baseM/baseN is recomputed
     uint32_t blockDimM = Ceil(maxTokens, baseM);
     uint32_t blockDimN = Ceil(n, baseN);
     uint64_t blockDim = blockDimM * blockDimN;
     if (blockDimM == 1) {
         baseN = Ceil(n, basicBlkOperTimes);
         baseN = SixteenAlignUp(baseN);
-        ret = ge::GRAPH_SUCCESS;
+        isRecomputed = true;
     } else if (blockDimN == 1) {
         baseM = Ceil(maxTokens, basicBlkOperTimes);
         baseM = SixteenAlignUp(baseM);
-        ret = ge::GRAPH_SUCCESS;
+        isRecomputed = true;
     }
     blockDim = Ceil(maxTokens, baseM) * Ceil(n, baseN);
-    if (blockDim >= basicBlkOperTimes && ret == ge::GRAPH_SUCCESS) {
+    if (blockDim >= basicBlkOperTimes && isRecomputed) {
         return ge::GRAPH_SUCCESS;
     }
 
@@ -1017,10 +1024,10 @@ ge::graphStatus FFNTiling::CalMM1TilingBaseMNKBasicBlock(const gert::TilingConte
                    OPS_REPORT_VECTOR_INNER_ERR(context, "mm1 calculate baseMN failed."), return ge::GRAPH_FAILED);
     }
 
-    // 基于使能double buffer的L0A,L0B内存计算baseK
+    // calculate baseK in considering l0B double buffer, so divide 2
     baseK1_ = (platInfo.l0BSize / CONSTANT_TWO) / (baseN * xDataTypeSize);
     baseK1_ = std::min<uint32_t>((platInfo.l0ASize / CONSTANT_TWO) / (baseM1_ * xDataTypeSize), baseK1_);
-    baseK1_ = SixteenAlign(baseK1_); // align down
+    baseK1_ = SixteenAlign(baseK1_);
     if (baseK1_ == 0) {
         return ge::GRAPH_FAILED;
     }
@@ -1044,14 +1051,15 @@ ge::graphStatus FFNTiling::CalMM1TilingBaseMNK(const gert::TilingContext *contex
     } else {
         baseN = BEST_BASEN;
     }
-    // 基于使能double buffer的L0B内存计算baseK
+    // calculate baseK in considering l0B double buffer, so divide 2
     baseK1_ = (platInfo.l0BSize / CONSTANT_TWO) / (baseN * xDataTypeSize);
     baseK1_ = SixteenAlign(baseK1_); // align down
     if (baseK1_ == 0) {
         return ge::GRAPH_FAILED;
     }
-    // 基于使能double buffer的L0A内存和L0C内存计算baseM1(cube)
+
     uint32_t maxBaseM = platInfo.l0CSize / (baseN * FP32_DATATYPE_SIZE);
+    // calculate baseM in considering l0A double buffer, so divide 2
     baseM1_ = std::min<uint32_t>((platInfo.l0ASize / CONSTANT_TWO) / (baseK1_ * xDataTypeSize), maxBaseM);
     if (maxTokens <= TINY_TOKEN_BOUND) {
         baseM1_ = TINY_TOKEN_BOUND;
@@ -1062,17 +1070,17 @@ ge::graphStatus FFNTiling::CalMM1TilingBaseMNK(const gert::TilingContext *contex
     if (baseM1_ == 0) {
         return ge::GRAPH_FAILED;
     }
-    // 基于ub内存计算baseM(vector)
+    // calculate vector baseM by ub size
     uint32_t baseM = mm1VaildUbBytes / (baseN * xDataTypeSize);
     if (FFNSetUbDivideBlk() == ge::GRAPH_SUCCESS) {
-        OPS_ERR_IF(FFNCalUbSize(baseN, ubDivideBlkNum, ubIoBlkNum, ubBlockAlign, baseM) != ge::GRAPH_SUCCESS,
+        OPS_ERR_IF(FFNCalUbSize(baseN, ubDivideBlkNum, ubIoBlkNum, baseM) != ge::GRAPH_SUCCESS,
                    OPS_REPORT_VECTOR_INNER_ERR(context, "calculate ub failed."), return ge::GRAPH_FAILED);
     }
     baseM = SixteenAlign(baseM);
     if (baseM == 0) {
         return ge::GRAPH_FAILED;
     }
-    // 依据baseM1_%baseM==0找到符合条件的baseM
+    // baseM in cube can be divided by baseM in ub
     uint32_t cubeMFactor = baseM1_ / SIXTEEN_ALIGN_CONSTANT;
     uint32_t vectorMFactor = baseM / SIXTEEN_ALIGN_CONSTANT;
     for (uint32_t i = vectorMFactor; i >= 1; --i) {
@@ -1093,7 +1101,7 @@ ge::graphStatus FFNTiling::CalMM2TilingBaseMNKBasicBlock(const gert::TilingConte
 {
     uint32_t coreNum = tilingData.ffnBaseParams.get_coreNum();
     uint32_t baseN = std::min<uint32_t>(SixteenAlign(n2), BEST_BASEN);
-    // 基于并使能double buffer的L0C内存计算baseM
+
     uint32_t baseM = std::min<uint32_t>(maxTokens, platInfo.l0CSize / (baseN * FP32_DATATYPE_SIZE));
     baseM = std::min<uint32_t>(SixteenAlign(baseM), MAX_BASEM);
     uint64_t blockDim = Ceil(maxTokens, baseM) * Ceil(n2, baseN);
@@ -1101,7 +1109,7 @@ ge::graphStatus FFNTiling::CalMM2TilingBaseMNKBasicBlock(const gert::TilingConte
     OPS_ERR_IF(CalMMTilingBaseMNBasicBlock(basicBlkOperTimes, n2, baseM, baseN) != ge::GRAPH_SUCCESS,
                OPS_REPORT_VECTOR_INNER_ERR(context, "mm2 calculate baseMN failed."), return ge::GRAPH_FAILED);
 
-    // 基于使能double buffer的L0A,L0B内存计算baseK
+    // calculate baseK in considering l0B double buffer, so divide 2
     baseK2_ = (platInfo.l0BSize / CONSTANT_TWO) / (baseN * xDataTypeSize);
     baseK2_ = std::min<uint32_t>((platInfo.l0ASize / CONSTANT_TWO) / (baseM * xDataTypeSize), baseK2_);
     baseK2_ = SixteenAlign(baseK2_);
@@ -1126,13 +1134,13 @@ ge::graphStatus FFNTiling::CalMM2TilingBaseMNK(const matmul_tiling::PlatformInfo
     if (tilingData.ffnBaseParams.get_n2() < baseN) {
         return ge::GRAPH_FAILED;
     }
-    // 基于使能double buffer的L0B内存计算baseK
+    // calculate baseK in considering l0B double buffer, so divide 2
     baseK2_ = (platInfo.l0BSize / CONSTANT_TWO) / (baseN * xDataTypeSize);
     baseK2_ = SixteenAlign(baseK2_); // align down
     if (baseK2_ == 0) {
         return ge::GRAPH_FAILED;
     }
-    // 基于并使能double buffer的L0A内存和L0C内存计算baseM
+    // calculate baseM in considering l0A double buffer, so l0ASize divide 2
     uint32_t maxBaseM = platInfo.l0CSize / (baseN * FP32_DATATYPE_SIZE);
     uint32_t baseM = std::min<uint32_t>((platInfo.l0ASize / CONSTANT_TWO) / (baseK2_ * xDataTypeSize), maxBaseM);
     if (maxTokens <= TINY_TOKEN_BOUND) {
@@ -1165,7 +1173,7 @@ void FFNTiling::SetBiasInfo(const gert::TilingContext *context, matmul_tiling::M
 void FFNTiling::FFNCalMMStep(const uint32_t baseM, const uint32_t baseN, const uint32_t baseK,
                              TCubeTiling &mmTilingData)
 {
-    // 计算开启dublebuffer之后搬运至L1是所需的参数
+    // whether enable double buffer in L1B
     bool divTwo = (maxTokens <= SMALL_TOKEN_BOUND && expertNum > 1);
     uint32_t bestL1Part1 = BEST_L1_PART1;
     uint32_t bestL1Part2 = BEST_L1_PART2;
@@ -1204,7 +1212,8 @@ void FFNTiling::FFNCalMMStep(const uint32_t baseM, const uint32_t baseN, const u
     mmTilingData.set_stepN(mmStepN);
     mmTilingData.set_stepM(mmStepM);
 
-    xDataTypeSize = GetSizeByDataType(xDataType); // msd方案计算设置tiling需要，改过该值，tiling设置完后，恢复原值
+    // xDataTypeSize is modified in msd-branch, so get the right value again
+    xDataTypeSize = GetSizeByDataType(xDataType);
 }
 
 ge::graphStatus FFNTiling::FFNSetMM1Tiling(const gert::TilingContext *context,
@@ -1295,14 +1304,14 @@ ge::graphStatus FFNTiling::FFNGlu(gert::TilingContext *context, uint64_t ubSize,
                    ge::GRAPH_SUCCESS,
                OPS_REPORT_VECTOR_INNER_ERR(context, "FFN Glu set mm2 tiling faild"), return ge::GRAPH_FAILED);
 
-    context->SetTilingKey(2); // 使用模板2
+    context->SetTilingKey(2); // 2: for glu template
     size_t *workspaces = context->GetWorkspaceSizes(1);
-    auto workspace1Size = baseM1_ * baseN1_ * xDataTypeSize * 4 * aivNum; // 使用左右+pingpong共4份
-    auto workspace2Size = maxTokens * n1 / 2 * xDataTypeSize;             // n1方向shape切分成两半
+    auto workspace1Size = baseM1_ * baseN1_ * xDataTypeSize * 4 * aivNum; // 4: pingpong buffer and left/right part
+    auto workspace2Size = maxTokens * n1 / 2 * xDataTypeSize; // 2: dim in n1 should be divided by 2
     tilingData.ffnBaseParams.set_workspace1Size(workspace1Size);
     tilingData.ffnBaseParams.set_workspace2Size(workspace2Size);
     workspaces[0] = workspace1Size + workspace2Size + SYS_WORKSPACE_SIZE;
-    // 不支持tilingDataSize超限的情况
+    // Check tiling data size not greater than capacity
     OPS_ERR_IF(tilingData.GetDataSize() > context->GetRawTilingData()->GetCapacity(),
                OPS_REPORT_VECTOR_INNER_ERR(context, "actual tiling data size %zu > context tiling data size %zu",
                                            tilingData.GetDataSize(), context->GetRawTilingData()->GetCapacity()),
@@ -1314,23 +1323,23 @@ ge::graphStatus FFNTiling::FFNGlu(gert::TilingContext *context, uint64_t ubSize,
 
 ge::graphStatus FFNTiling::FFNGluParamsCheck(const gert::TilingContext *context) const
 {
-    // 不支持n1为奇数的情况
+    // n1 should be a even number
     OPS_ERR_IF((n1 % 2 != 0),
                OPS_REPORT_VECTOR_INNER_ERR(context, "the glu activation function only supports n1 is even"),
                return ge::GRAPH_FAILED);
-    // gelu激活函数只支持float16，不支持其他数据类型的情况
+
     OPS_ERR_IF((xDataType != ge::DT_FLOAT16),
                OPS_REPORT_VECTOR_INNER_ERR(
                    context, "the glu activation function only supports the data type is float16, the dtype is %s",
                    TypeUtils::DataTypeToSerialString(xDataType).c_str()),
                return ge::GRAPH_FAILED);
-    // 不支持有专家数的情况
+    // only supported in no-expert scenario
     bool hasExperts = context->GetOptionalInputTensor(TOKENS_ARR_INDEX) != nullptr;
     OPS_ERR_IF(
         hasExperts,
         OPS_REPORT_VECTOR_INNER_ERR(context, "the glu activation function only supports the scene without experts"),
         return ge::GRAPH_FAILED);
-    // 不支持k2不等于n1/2的情况
+    // k2 should be equal to n1/2
     const gert::StorageShape *weight2Shape = context->GetInputShape(WEIGHT2_INDEX);
     size_t kIndex = hasExperts ? 1 : 0;
     auto k2 = weight2Shape->GetStorageShape().GetDim(kIndex);
@@ -1370,7 +1379,7 @@ ge::graphStatus FFNTiling::SetMMTilingType(const gert::TilingContext *context, b
 ge::graphStatus FFNTiling::FFNGluCalMM1Tiling(uint64_t ubSize, uint64_t l0CSize)
 {
     int64_t mm1VaildUbBytes = ubSize / GLU_UB_DIVIDE_NUM_FP16;
-    uint32_t tempN1 = n1 / 2; // n1方向上切成两半分别计算
+    uint32_t tempN1 = n1 / 2; // 2: n1 dim should divide 2
 
     uint32_t baseN = BEST_BASEN;
     uint32_t baseM;
@@ -1380,7 +1389,7 @@ ge::graphStatus FFNTiling::FFNGluCalMM1Tiling(uint64_t ubSize, uint64_t l0CSize)
     if (baseN < MATMUL_MIN_SHAPE) {
         baseN = MATMUL_MIN_SHAPE;
     }
-    // 基于ub内存计算baseM(vector)
+    // calculate vector baseM by ub size
     uint32_t maxBaseM = mm1VaildUbBytes / (baseN * xDataTypeSize);
     baseM = std::min(MAX_UB_BLOCK / baseN, maxBaseM);
     while (maxTokens < baseM) {
@@ -1390,13 +1399,13 @@ ge::graphStatus FFNTiling::FFNGluCalMM1Tiling(uint64_t ubSize, uint64_t l0CSize)
         baseM = MATMUL_MIN_SHAPE;
     }
 
-    // cube基本块与vector基本块是否满足倍数关系
+    // cube basic block size should be a multiple of vector basic block
     uint32_t aicAIVFactor = 4;
     if (baseM * aicAIVFactor <= maxTokens) {
         baseM1_ = baseM * aicAIVFactor;
         baseN1_ = baseN;
-        // 是否可以填满L0C
-        uint32_t maxBaseM = l0CSize / (baseN1_ * FP32_DATATYPE_SIZE);
+        // basic block size cannot exceed l0c size
+        maxBaseM = l0CSize / (baseN1_ * FP32_DATATYPE_SIZE);
         if (baseN1_ == BEST_BASEN && maxBaseM < maxTokens) {
             baseM1_ = maxBaseM;
         }
@@ -1419,7 +1428,7 @@ ge::graphStatus FFNTiling::FFNGluSetMM1Tiling(gert::TilingContext *context, uint
     SetMMTilingType(context, true, matmulDtype, mm1);
 
     uint32_t tilingCoreNum = aivNum;
-    uint32_t tempN1 = n1 / 2; // n1方向上切成两半分别计算
+    uint32_t tempN1 = n1 / 2; // 2: n1 dim should divide 2
 
     uint32_t n1Loops = (tempN1 + baseN1_ - 1) / baseN1_;
     if (n1Loops > tilingCoreNum) {
@@ -1454,7 +1463,6 @@ ge::graphStatus FFNTiling::FFNGluSetMM1Tiling(gert::TilingContext *context, uint
 ge::graphStatus FFNTiling::FFNGluCalMM2Tiling(uint64_t l0CSize)
 {
     baseN2_ = GLU_BASEN;
-    auto n2 = tilingData.ffnBaseParams.get_n2();
     while (n2 < baseN2_) {
         baseN2_ = baseN2_ >> 1;
     }
@@ -1604,7 +1612,6 @@ inline ge::graphStatus FFNTiling::N1EqualZeroWithBias2(uint64_t ubSize)
 
 ge::graphStatus FFNTiling::FFNSingleCoreTiling(const gert::TilingContext *context, uint64_t ubSize)
 {
-    uint32_t n1 = tilingData.ffnBaseParams.get_n1();
     if (n1 == 0) {
         auto bias2 = context->GetOptionalInputDesc(BIAS2_INDEX);
         if (bias2 != NULL) {
@@ -1639,7 +1646,7 @@ ge::graphStatus FFNTiling::FFNSingleCoreTiling(const gert::TilingContext *contex
     uint32_t maxBaseM = mm1VaildUbBytes / (baseN * xDataTypeSize);
     uint32_t baseM = MAX_BASE_BLOCK / baseN;
     if (FFNSetUbDivideBlk() == ge::GRAPH_SUCCESS) {
-        OPS_ERR_IF(FFNCalUbSize(baseN, ubDivideBlkNum, ubIoBlkNum, ubBlockAlign, baseM) != ge::GRAPH_SUCCESS,
+        OPS_ERR_IF(FFNCalUbSize(baseN, ubDivideBlkNum, ubIoBlkNum, baseM) != ge::GRAPH_SUCCESS,
                    OPS_REPORT_VECTOR_INNER_ERR(context, "antiquant calculate ub failed."), return ge::GRAPH_FAILED);
     }
     while (baseM > maxBaseM || maxTokens < baseM) {
@@ -1858,10 +1865,12 @@ void FFNTiling::AdjustMM2MNLoops(const uint32_t align, uint32_t &m2Loops, uint32
 uint64_t FFNTiling::SelectQuantTilingKey() const
 {
     if (isSmooth) {
-        return QUANT_SMOOTH_KEY; // quant进行scale smooth per-channel量化操作
-    } else if (outputDtype == ge::DT_BF16) {
+        return QUANT_SMOOTH_KEY;
+    }
+    if (outputDtype == ge::DT_BF16) {
         return QUANT_BF16_KEY;
-    } else if (deqscaleDtype == ge::DT_FLOAT) {
+    }
+    if (deqscaleDtype == ge::DT_FLOAT) {
         return QUANT_DEQ_FLOAT32_KEY;
     }
     return QUANT_KEY;
@@ -1877,7 +1886,6 @@ uint64_t FFNTiling::SelectTilingKey() const
         return HIGH_PRECISION_BF16_KEY;
     }
 
-    // xDataType SHOULD BE ge::DT_FLOAT16
     if (n1 == 0) {
         return HIGH_PERFORMANCE_KEY;
     }
@@ -1903,20 +1911,20 @@ ge::graphStatus FFNTiling::FFNSetTilingKey(gert::TilingContext *context, uint64_
     if (is310P) {
         return ge::GRAPH_SUCCESS;
     }
-    // ADD FEATURE KEY OFFSET
+    // add featurekey offset
     if (key == HIGH_PERFORMANCE_KEY || key == QUANT_KEY) {
-        uint64_t featurekey = 0;
+        uint64_t featureKey = 0;
         if (isTilingDataValid && tilingData.mm1TilingData.get_baseM() == tilingData.mm2TilingData.get_baseM() &&
             tilingData.mm1TilingData.get_baseN() == tilingData.mm2TilingData.get_baseN() &&
             tilingData.mm1TilingData.get_baseK() == tilingData.mm2TilingData.get_baseK()) {
-            featurekey += ONE_MATMUL; // Enable 1 mm
+            featureKey += ONE_MATMUL; // Enable 1 mm
             if (maxTokensCheckOpt <= SMALL_TOKEN_BOUND && key == QUANT_KEY &&
                 tilingData.mm1TilingData.get_stepN() == CONSTANT_TWO &&
                 tilingData.mm2TilingData.get_stepN() == CONSTANT_TWO) {
-                featurekey += 1; // enable stepN=2
+                featureKey += 1; // enable stepN=2
             }
         }
-        key = featurekey + key;
+        key = featureKey + key;
     }
     context->SetTilingKey(key);
     return ge::GRAPH_SUCCESS;
@@ -1926,7 +1934,6 @@ ge::graphStatus FFNTiling::FFNSetTilingData(gert::TilingContext *context)
 {
     uint64_t key = SelectTilingKey();
     FFNSetTilingKey(context, key);
-    uint32_t expertNum = tilingData.ffnBaseParams.get_expertNum();
     size_t *workspaces = context->GetWorkspaceSizes(1);
     uint32_t aicNum = tilingData.ffnBaseParams.get_coreNum();
     uint32_t mm1TilingBaseN = tilingData.mm1TilingData.get_baseN();
@@ -2005,5 +2012,5 @@ ASCENDC_EXTERN_C ge::graphStatus TilingPrepareForFFN(gert::TilingParseContext *c
     ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_C, compileInfoPtr->l0CSize);
     return ge::GRAPH_SUCCESS;
 }
-IMPL_OP_OPTILING(FFN).Tiling(TilingFFN).TilingParse<FFNCompileInfo>(TilingPrepareForFFN); // 向框架注册入口函数
+IMPL_OP_OPTILING(FFN).Tiling(TilingFFN).TilingParse<FFNCompileInfo>(TilingPrepareForFFN);
 } // namespace optiling

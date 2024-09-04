@@ -87,7 +87,7 @@ __aicore__ inline void DataCopyPad2D(const GlobalTensor<T> dst, const LocalTenso
     DataCopyExtParams params;
     params.blockCount = dim1;
     params.blockLen = dim0 * sizeof(T);
-    params.srcStride = matmul::CeilDiv((srcFullDim0 - dim0) * sizeof(T), static_cast<uint64_t>(ONE_BLK_SIZE));
+    params.srcStride = (srcFullDim0 - dim0) * sizeof(T) / static_cast<uint32_t>(ONE_BLK_SIZE);
     params.dstStride = (dstFullDim0 - dim0) * sizeof(T);
     DataCopyPad(dst, src, params);
 }
@@ -351,7 +351,7 @@ template <typename xT, typename wT, typename mm1Type, typename mm2Type, typename
 __aicore__ inline void
 FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::InitWorkspace(__gm__ uint8_t *workSpace)
 {
-    // 初始化Global
+    // init global buffer
     uint32_t maxParallelExpertNum1 = Max<uint32_t>(cubeCoreNum / Ceil(n1, tilingData->mm1TilingData.baseN), 1);
     uint32_t maxParallelExpertNum2 = Max<uint32_t>(cubeCoreNum / Ceil(n2, tilingData->mm2TilingData.baseN), 1);
     uint32_t usedWorkspaceSize = 0;
@@ -370,16 +370,16 @@ FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::InitWorkspace(__gm__ 
 
     uint32_t reduceMaxWorkspaceGmSize = FACTOR_FOR_FLOAT_ALIGN_TO_32BYTE * totalTokens * sizeof(float);
     reduceMax1WorkspaceGm_.SetGlobalBuffer((__gm__ float *)(workSpace + usedWorkspaceSize));
-    InitOutput(reduceMax1WorkspaceGm_, reduceMaxWorkspaceGmSize); // workspace清零
+    InitOutput(reduceMax1WorkspaceGm_, reduceMaxWorkspaceGmSize); // clear workspace
     usedWorkspaceSize += reduceMaxWorkspaceGmSize;
     reduceSum1WorkspaceGm_.SetGlobalBuffer((__gm__ float *)(workSpace + usedWorkspaceSize));
-    InitOutput(reduceSum1WorkspaceGm_, reduceMaxWorkspaceGmSize); // workspace清零
+    InitOutput(reduceSum1WorkspaceGm_, reduceMaxWorkspaceGmSize); // clear workspace
     usedWorkspaceSize += reduceMaxWorkspaceGmSize;
     reduceMax2WorkspaceGm_.SetGlobalBuffer((__gm__ float *)(workSpace + usedWorkspaceSize));
-    InitOutput(reduceMax2WorkspaceGm_, reduceMaxWorkspaceGmSize); // workspace清零
+    InitOutput(reduceMax2WorkspaceGm_, reduceMaxWorkspaceGmSize); // clear workspace
     usedWorkspaceSize += reduceMaxWorkspaceGmSize;
     reduceSum2WorkspaceGm_.SetGlobalBuffer((__gm__ float *)(workSpace + usedWorkspaceSize));
-    InitOutput(reduceSum2WorkspaceGm_, reduceMaxWorkspaceGmSize); // workspace清零
+    InitOutput(reduceSum2WorkspaceGm_, reduceMaxWorkspaceGmSize); // clear workspace
     SyncAll<true>();
 }
 
@@ -387,14 +387,14 @@ template <typename xT, typename wT, typename mm1Type, typename mm2Type, typename
 __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::AllocLocalTensor(TPipe *tPipe)
 {
     pipe = tPipe;
-    // 初始化UB Tbuffer
+    // init ub Tbuf
     uint32_t reduceMaxUbSize = FACTOR_FOR_FLOAT_ALIGN_TO_32BYTE * maxTokens * sizeof(float);
     uint32_t expertTokensUbSize = AlignUp<UB_BLOCK_UNIT_SIZE>(expertNum * sizeof(int64_t));
 
     tmpBuffSize = ubSize - ubCalcShape_ * (sizeof(float) + sizeof(half)) - reduceMaxUbSize - expertTokensUbSize;
     pipe->InitBuffer(tmpBuff_, tmpBuffSize);
 
-    // 初始化UB TQUEUE
+    // init ub TQue
     pipe->InitBuffer(inQueueX_, 1, ubCalcShape_ * sizeof(float));
     pipe->InitBuffer(outQueueY_, 1, ubCalcShape_ * sizeof(half));
     pipe->InitBuffer(inQueueReduceMax_, 1, reduceMaxUbSize);
@@ -421,14 +421,15 @@ __aicore__ inline void
 FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::MM1VectorTiling(TilingConfig &tilingParams)
 {
     uint32_t vecBlockDimK_ = tilingParams.aivNumPerExpert;
-    uint32_t vecBaseK_ = Ceil(tilingParams.k, vecBlockDimK_); // k根据分核获得baseK大小
-    // baseK 256向上对齐
+    uint32_t vecBaseK_ = Ceil(tilingParams.k, vecBlockDimK_);
+    // baseK 128 align up
     vecBaseK_ = (vecBaseK_ + NUM_ALIGN_TO_ONE_HUNDRED_TWEENTY_EIGHT) & (~NUM_ALIGN_TO_ONE_HUNDRED_TWEENTY_EIGHT);
-    vecBlockDimK_ = Ceil(tilingParams.k, vecBaseK_); // k向上对齐后重新计算需要核数 (k核数必定小于原vecBlockDimK_)
+    vecBlockDimK_ = Ceil(tilingParams.k, vecBaseK_); // recompute coreNum in K-axis
     uint32_t vecBlockDimM_ =
-        tilingParams.aivNumPerExpert / vecBlockDimK_; // 根据新k分核，重新计算m分核 (m核数必定多余原核数)
-    uint32_t vecSingleM_ = Ceil(tilingParams.mVec, vecBlockDimM_); // 根据m分核求singleM
-    vecBlockDimM_ = Ceil(tilingParams.mVec, vecSingleM_);          // 防止计算tail时出现回绕
+        tilingParams.aivNumPerExpert / vecBlockDimK_; // recompute coreNum in M-axis
+     // recompute singleM and M-axis coreNum
+    uint32_t vecSingleM_ = Ceil(tilingParams.mVec, vecBlockDimM_);
+    vecBlockDimM_ = Ceil(tilingParams.mVec, vecSingleM_);
     uint32_t vecSingleMTail_ = tilingParams.mVec - (vecBlockDimM_ - 1) * vecSingleM_;
     uint32_t vecBaseM_ = ubCalcShape_ / vecBaseK_;
     vecBaseM_ = vecBaseM_ < vecSingleM_ ? vecBaseM_ : vecSingleM_;
@@ -456,7 +457,7 @@ FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::MM2VectorTiling(uint3
 template <typename xT, typename wT, typename mm1Type, typename mm2Type, typename c1T, typename yT, typename biasT>
 __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::CubeTiling(TilingConfig &tilingParams)
 {
-    tilingParams.cubeSingleM = ANTIQUANT_MSD_STEP * tilingParams.mCube; // 需确保单核上2m一次性算完
+    tilingParams.cubeSingleM = ANTIQUANT_MSD_STEP * tilingParams.mCube; // M-axis is twice size ori m in msd-method
     tilingParams.cubeSingleM = (tilingParams.cubeSingleM + NUM_ALIGN_TO_SIXTEEN) & (~NUM_ALIGN_TO_SIXTEEN);
     tilingParams.cubeSingleM =
         tilingParams.cubeSingleM > tilingParams.cubeBaseM ? tilingParams.cubeSingleM : tilingParams.cubeBaseM;
@@ -596,7 +597,7 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
     Abs(middleResult2, middleResult1, curBaseM * alignedBaseK);
     pipe_barrier(PIPE_V);
 
-    // 计算ReduceMax
+    // calc ReduceMax
     LocalTensor<float> blockReduceMaxInUb = outQueueY_.AllocTensor<float>();
     for (uint32_t idxM = 0; idxM < curBaseM; ++idxM) {
         ReduceMax(blockReduceMaxInUb[idxM * FACTOR_FOR_FLOAT_ALIGN_TO_32BYTE], middleResult2[idxM * curBaseK],
@@ -628,7 +629,7 @@ template <typename xT, typename wT, typename mm1Type, typename mm2Type, typename
 __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::CalcReduceSum(
     uint32_t gmReduceOffset, uint32_t curBaseM, uint32_t curBaseK, GlobalTensor<float> reduceSumWorkspaceGm)
 {
-    // 计算ReduceSum
+    // calc ReduceSum
     LocalTensor<float> blockReduceSumInUb = outQueueY_.AllocTensor<float>();
     for (uint32_t idxM = 0; idxM < curBaseM; ++idxM) {
         ReduceSum(blockReduceSumInUb[idxM * FACTOR_FOR_FLOAT_ALIGN_TO_32BYTE], middleResult1[idxM * curBaseK],
@@ -667,8 +668,8 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
     DataCopyExtParams aMaxInParams;
     aMaxInParams.blockLen = FACTOR_FOR_FLOAT_ALIGN_TO_32BYTE * dtypeSizeFP32_;
     aMaxInParams.blockCount = curBaseM;
-    aMaxInParams.srcStride = 0; // 8 - dtypeSizeFP32_
-    aMaxInParams.dstStride = 0; // (8 - 4) / 32
+    aMaxInParams.srcStride = 0;
+    aMaxInParams.dstStride = 0;
     DataCopyPad(aMaxLocal, reduceMaxWorkspaceGm[gmReduceOffset], aMaxInParams, padParams);
     inQueueReduceMax_.EnQue(aMaxLocal);
     LocalTensor<float> aMaxInUb = inQueueReduceMax_.DeQue<float>();
@@ -787,8 +788,8 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
     DataCopyExtParams aMaxInParams;
     aMaxInParams.blockLen = FACTOR_FOR_FLOAT_ALIGN_TO_32BYTE * dtypeSizeFP32_;
     aMaxInParams.blockCount = m;
-    aMaxInParams.srcStride = 0; // 8 - dtypeSizeFP32_
-    aMaxInParams.dstStride = 0; // (8 - 4) / 32
+    aMaxInParams.srcStride = 0;
+    aMaxInParams.dstStride = 0;
     uint32_t reduceMaxWorkspaceOffset =
         mmExpertParallInfo.GlobalOffset[expertIdxInParaGroupMM] * FACTOR_FOR_FLOAT_ALIGN_TO_32BYTE;
     DataCopyPad(aMaxLocal, reduceMaxWorkspaceGm[reduceMaxWorkspaceOffset], aMaxInParams, padParams);
@@ -808,8 +809,8 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
     DataCopyExtParams aSumInParams;
     aSumInParams.blockLen = FACTOR_FOR_FLOAT_ALIGN_TO_32BYTE * dtypeSizeFP32_;
     aSumInParams.blockCount = curV2BaseM;
-    aSumInParams.srcStride = 0; // 8 - dtypeSizeFP32_
-    aSumInParams.dstStride = 0; // (8 - 4) / 32
+    aSumInParams.srcStride = 0;
+    aSumInParams.dstStride = 0;
     DataCopyPad(aSumLocal, reduceSumWorkspaceGm[reduceSumOffset], aSumInParams, padParams);
     inQueueReduceMax_.EnQue(aSumLocal);
 }
@@ -829,16 +830,16 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
     pipe_barrier(PIPE_V);
     inQueueX_.FreeTensor(offsetF16InUb);
     // (m, 8) (1, n) -> (m, n)
-    uint32_t mask = DATASIZE_EACH_REPEAT_TIME / sizeof(float); // 64
+    uint32_t mask = DATASIZE_EACH_REPEAT_TIME / sizeof(float);
     uint32_t mainRepeatN = curV2BaseN / mask;
     uint32_t tailN = curV2BaseN % mask;
     BinaryRepeatParams repeatParams;
     repeatParams.dstBlkStride = 1;
     repeatParams.src0BlkStride = 0;
     repeatParams.src1BlkStride = 1;
-    repeatParams.dstRepStride = FACTOR_FOR_FLOAT_ALIGN_TO_32BYTE; // 8
+    repeatParams.dstRepStride = FACTOR_FOR_FLOAT_ALIGN_TO_32BYTE;
     repeatParams.src0RepStride = 0;
-    repeatParams.src1RepStride = FACTOR_FOR_FLOAT_ALIGN_TO_32BYTE; // 8
+    repeatParams.src1RepStride = FACTOR_FOR_FLOAT_ALIGN_TO_32BYTE;
     for (uint32_t idxM = 0; idxM < curV2BaseM; ++idxM) {
         Mul(middleResult2[idxM * curV2BaseN], v2Asum[idxM * FACTOR_FOR_FLOAT_ALIGN_TO_32BYTE], tmpScaleAndOffset, mask,
             mainRepeatN, repeatParams);
@@ -878,7 +879,7 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
     // m0
     // m1
 
-    // 处理C1
+    // process C1
     LocalTensor<int32_t> c1S32InUb = tmpBuff_.GetWithOffset<int32_t>(ubCalcShape_, 0);
     LocalTensor<int32_t> c2S32InUb = tmpBuff_.GetWithOffset<int32_t>(ubCalcShape_, 2 * ubCalcShape_ * sizeof(float));
     event_t eventIdMte2ToV0 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_V));
@@ -890,7 +891,7 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
     pipe_barrier(PIPE_V);
     Muls(middleResult1, middleResult1, static_cast<float>(1.0 / 128), curV2BaseM * curBaseNAligned);
 
-    // 处理C2
+    // process C2
     DataCopyPad2D(c2S32InUb, workspaceMMOutputGm[tilingParams.mCube * tilingParams.n + MMOutputOffset], curV2BaseM,
                   curV2BaseN, tilingParams.n);
     SetFlag<HardEvent::MTE2_V>(eventIdMte2ToV1);
@@ -900,7 +901,7 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
     pipe_barrier(PIPE_V);
     Muls(middleResult3, middleResult3, static_cast<float>(1.0 / (128 * 128)), curV2BaseM * curBaseNAligned);
     pipe_barrier(PIPE_V);
-    // 处理C1+C2
+    // process C1+C2
     Add(middleResult1, middleResult3, middleResult1, curV2BaseM * curBaseNAligned);
     pipe_barrier(PIPE_V);
 }
@@ -910,7 +911,7 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
                                                                                               uint32_t curV2BaseN,
                                                                                               uint32_t offsetM)
 {
-    // 乘Amax获得C (m, n) * (m, 8) -> (m, n)
+    // multiply with Amax to get C (m, n) * (m, 8) -> (m, n)
     uint32_t mask = DATASIZE_EACH_REPEAT_TIME / sizeof(float); // 64
     uint32_t mainRepeatN = curV2BaseN / mask;
     uint32_t tailN = curV2BaseN % mask;
@@ -918,8 +919,8 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
     repeatParams.dstBlkStride = 1;
     repeatParams.src0BlkStride = 1;
     repeatParams.src1BlkStride = 0;
-    repeatParams.dstRepStride = FACTOR_FOR_FLOAT_ALIGN_TO_32BYTE;  // 8
-    repeatParams.src0RepStride = FACTOR_FOR_FLOAT_ALIGN_TO_32BYTE; // 8
+    repeatParams.dstRepStride = FACTOR_FOR_FLOAT_ALIGN_TO_32BYTE;
+    repeatParams.src0RepStride = FACTOR_FOR_FLOAT_ALIGN_TO_32BYTE;
     repeatParams.src1RepStride = 0;
     for (uint32_t idxM = 0; idxM < curV2BaseM; ++idxM) {
         Mul(middleResult3[idxM * curV2BaseN], middleResult1[idxM * curV2BaseN],
@@ -940,17 +941,17 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
     uint32_t curV2BaseM, uint32_t curV2BaseN, const TilingConfig &tilingParams)
 {
     uint32_t curBaseNAligned = (curV2BaseN + NUM_ALIGN_TO_THIRTYTWO) & (~NUM_ALIGN_TO_THIRTYTWO);
-    // 和处理后的offset相加
+    // add with processed offset
     Add(middleResult2, middleResult2, middleResult3, curV2BaseM * curBaseNAligned);
     pipe_barrier(PIPE_V);
 
-    // 和scale相乘 (m, n) * (1, n) -> (m, n)
+    // multiply with scale (m, n) * (1, n) -> (m, n)
     for (uint32_t idxM = 0; idxM < curV2BaseM; ++idxM) {
         Mul(middleResult3[idxM * curV2BaseN], middleResult2[idxM * curV2BaseN], tmpScaleAndOffset, curBaseNAligned);
     }
     pipe_barrier(PIPE_V);
 
-    // 如果有bias，加bias
+    // add bias
     if (tilingParams.hasBias) {
         uint32_t usedTmpBufferSize =
             (countOfFloatUbCalcShape * ubCalcShape_ + maxTokens * FACTOR_FOR_FLOAT_ALIGN_TO_32BYTE) * sizeof(float) +
@@ -1017,7 +1018,7 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
         ubCalcShape_ * sizeof(half);
     LocalTensor<float> tmpLocal =
         tmpBuff_.GetWithOffset<float>((tmpBuffSize - usedTmpBufferSize) / sizeof(float), usedTmpBufferSize);
-    // 如果有bias，DataCopy进ub，如果是fp16场景需转fp32
+    // add bias, firstly convert to float32 if xT is float16
     if constexpr (IsSameType<xT, half>::value) {
         LocalTensor<biasT> bias = inQueueX_.AllocTensor<biasT>();
         DataCopyPad2D(bias, biasGm[offsetAndScaleOffset], 1, curV2BaseN, tilingParams.n);
@@ -1045,7 +1046,7 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
     // mm1 is float16 and 32-byte aligned. mm1 is float32 and 64-byte aligned.
     computeBaseN1 = AlignUp<GetNumInUbBlock<xT>()>(curV2BaseN);
     computeSize = curV2BaseM * computeBaseN1;
-    ActivationCompute(computeSize); // GELU compute
+    ActivationCompute(computeSize);
 }
 
 template <typename xT, typename wT, typename mm1Type, typename mm2Type, typename c1T, typename yT, typename biasT>
@@ -1106,21 +1107,21 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
     if (curCubeNIdx == tilingParams1.cubeBlockDimN - 1) {
         curCubeSingleCoreN = tilingParams1.n - (tilingParams1.cubeBlockDimN - 1) * tilingParams1.cubeSingleN;
     }
-    // 对MM1的左矩阵进行预处理
+    // preprocess MM1's first matrix
     uint32_t cubeOffsetN = curCubeNIdx * tilingParams1.cubeSingleN;
     PreProcessMM1(tilingParams1, mm1ExpertParallInfo);
     event_t eventIdMTE3ToMTE2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE3_MTE2));
     uint32_t v2BaseN = (tilingParams1.cubeSingleN + NUM_ALIGN_TO_THIRTYTWO) & (~NUM_ALIGN_TO_THIRTYTWO);
     uint32_t v2BaseM = ubCalcShape_ / v2BaseN;
     uint32_t coreIdxThreshold = expertIdxInParaGroupMM1 * tilingParams1.aicNumPerExpert + tilingParams1.cubeBlockDimN;
-    // MM1 cube计算开始
+    // MM1 matrix multiplication
     if (coreIdx < coreIdxThreshold && subBlockIdx_ == 0) {
         MM1Compute(curCubeSingleCoreN, cubeOffsetN, tilingParams1, mm1ExpertParallInfo);
     }
     curV2BaseM1 = v2BaseM;
     curV2BaseN1 = curCubeSingleCoreN;
     uint32_t syncCount2 = Ceil(maxTokenInParallelGroup, v2BaseM);
-    // MM1 cube计算与offset scale处理并行
+    // MM1 cube computation and scale/offset process in parallel
     for (uint32_t offsetM = 0; offsetM < tilingParams1.mCube; offsetM += v2BaseM) {
         if (offsetM + curV2BaseM1 >= tilingParams1.mCube) {
             curV2BaseM1 = tilingParams1.mCube - offsetM;
@@ -1138,14 +1139,14 @@ __aicore__ inline void FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>
             SyncAll<true>();
         }
         if (coreIdx < coreIdxThreshold && subBlockIdx_ == 0) {
-            // MM1 cube计算结束，开始对cube计算结果进行后处理
+            // mm1 result postprocess
             ProcessC1C2(curV2BaseM1, curV2BaseN1, MMOutputOffset, tilingParams1, workspaceMM1OutputGm_);
             CalcCMatrix(curV2BaseM1, curV2BaseN1, offsetM);
             AddOffsetAndMulScale(curV2BaseM1, curV2BaseN1, tilingParams1);
-            // 激活层计算
+            // activation
             Elewise1(curV2BaseM1, curV2BaseN1);
         }
-        // MM2 左矩阵输入进行预处理
+        // preprocess MM2's first matrix
         MM2VectorTiling(tilingParams1.cubeSingleN, tilingParams1.cubeBlockDimN, curV2BaseM1, tilingParams2);
         PreProcessMM2(offsetM, curV2BaseN1, tilingParams2, syncCount2, mm1ExpertParallInfo);
         if (offsetM + curV2BaseM1 < tilingParams1.mCube) {
@@ -1164,15 +1165,16 @@ FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::ComputeExpertMM2(Tili
     for (uint32_t i = mm2ExpertParallInfo.start; i < mm2ExpertParallInfo.size;
          i += mm2ExpertParallInfo.expertParallelism) {
         expertIdxInParaGroupMM2 = Min<uint32_t>(coreIdx / tilingParams2.aicNumPerExpert,
-                                                mm2ExpertParallInfo.expertParallelism - 1); // 当前并行的专家中的idx
+                                                mm2ExpertParallInfo.expertParallelism - 1);
         expertIdxInParaGroupMM2 += curIterCount * mm2ExpertParallInfo.expertParallelism;
         expertIdxInParaGroupMM2 = Min<uint32_t>(expertIdxInParaGroupMM2, mm2ExpertParallInfo.size - 1);
-        currentExpertMM2 = mm2ExpertParallInfo.expertIdxBuf[expertIdxInParaGroupMM2]; // 所有专家中的idx
+        currentExpertMM2 = mm2ExpertParallInfo.expertIdxBuf[expertIdxInParaGroupMM2];
         currentTokensMM2 = ubTokens.GetValue(currentExpertMM2);
         tilingParams2.mCube = currentTokensMM2;
         CubeTiling(tilingParams2);
+        // coreNum used by previous expert in this loop
         preExpertUsedCoreInIter = (expertIdxInParaGroupMM2 - curIterCount * mm2ExpertParallInfo.expertParallelism) *
-                                  tilingParams2.aicNumPerExpert; // 表示当次for循环内前面的专家用掉的aic核数
+                                  tilingParams2.aicNumPerExpert;
         curCubeNIdx = (coreIdx - preExpertUsedCoreInIter) % tilingParams2.cubeBlockDimN;
         uint32_t curCubeSingleCoreN = tilingParams2.cubeSingleN;
         if (curCubeNIdx == tilingParams2.cubeBlockDimN - 1) {
@@ -1183,13 +1185,13 @@ FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::ComputeExpertMM2(Tili
         uint32_t v2BaseN = curCubeSingleCoreN;
         v2BaseN = (v2BaseN + NUM_ALIGN_TO_THIRTYTWO) & (~NUM_ALIGN_TO_THIRTYTWO);
         uint32_t v2BaseM = ubCalcShape_ / v2BaseN;
-        // MM2 cube计算开始
+        // MM2 cube multiplication
         if (coreIdx < preExpertUsedCoreInIter + tilingParams2.cubeBlockDimN && subBlockIdx_ == 0) {
             MM2Compute(curCubeSingleCoreN, cubeOffsetN, tilingParams2, mm2ExpertParallInfo, curIterCount);
         }
         curV2BaseM2 = v2BaseM;
-        curV2BaseN2 = v2BaseN;
-        // MM2 cube计算结束，开始对cube计算结果进行后处理
+        curV2BaseN2 = curCubeSingleCoreN;
+        // mm2 result postprocess
         CubeResultPostProcess(tilingParams2, mm2ExpertParallInfo, curIterCount, v2BaseM, i);
         curIterCount += 1;
     }
@@ -1247,11 +1249,11 @@ FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::ComputeExpert(ExpertP
     uint32_t coreNumEachExpert1 = cubeCoreNum / mm1ExpertParallInfo.expertParallelism;
     uint32_t coreNumEachExpert2 = cubeCoreNum / mm2ExpertParallInfo.expertParallelism;
     uint32_t coreNumEachExpert1Vec = coreNum / mm1ExpertParallInfo.expertParallelism;
-    // 获取MM1 cube计算时每个aic对应的并行专家组中的索引，及全局索引，并获取对应的需要处理的专家的token数
+    // get expertIdx and corresponding expert tokens for each cube core
     expertIdxInParaGroupMM1 = Min<uint32_t>(coreIdx / coreNumEachExpert1, mm1ExpertParallInfo.expertParallelism - 1);
     currentExpertMM1 = mm1ExpertParallInfo.expertIdxBuf[expertIdxInParaGroupMM1];
     currentTokensMM1 = ubTokens.GetValue(currentExpertMM1);
-    // 获取MM1 vecto左矩阵预处理时每个aiv对应的并行专家组中的索引，并获取对应的需要处理的专家的token数
+    // get expertIdx and corresponding expert tokens for each vector core
     expertIdxInParaGroupMM1Pre =
         Min<uint32_t>(coreIdx / coreNumEachExpert1Vec, mm1ExpertParallInfo.expertParallelism - 1);
     currentExpertMM1Pre = mm1ExpertParallInfo.expertIdxBuf[expertIdxInParaGroupMM1Pre];
@@ -1259,7 +1261,7 @@ FFNAntiQuantMSD<xT, wT, mm1Type, mm2Type, c1T, yT, biasT>::ComputeExpert(ExpertP
     tilingParams1.SetBaseParams(currentTokensMM1, currentTokensMM1Pre, n1, k1, hasBias1);
     tilingParams1.SetTilingParams(tilingData->mm1TilingData.baseM, tilingData->mm1TilingData.baseN, coreNumEachExpert1,
                                   coreNumEachExpert1Vec);
-    // MM2 临时传入mCube，后续在ComputeExpertMM2中修改
+
     tilingParams2.SetBaseParams(currentTokensMM1, currentTokensMM1, n2, k2, hasBias2);
     tilingParams2.SetTilingParams(tilingData->mm2TilingData.baseM, tilingData->mm2TilingData.baseN, coreNumEachExpert2,
                                   coreNumEachExpert1);

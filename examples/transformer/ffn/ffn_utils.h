@@ -55,14 +55,14 @@ template <typename T> void SaveOutResult(std::string &fileName, std::vector<int6
                            size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return);
     std::ofstream file(fileName, std::ios::binary);
-    // 保存文件
+    // Save data to file
     file.write(static_cast<char *>((void *)resultData.data()), size * sizeof(T));
     file.close();
 }
 
 int Init(int32_t deviceId, aclrtContext *context, aclrtStream *stream)
 {
-    // 固定写法，AscendCL初始化
+    // Init AscendCL
     auto ret = aclInit(nullptr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
     ret = aclrtSetDevice(deviceId);
@@ -91,7 +91,7 @@ int ReadBinFileNNop(std::string &filePath, void *buffer, size_t bufferSize)
 
     file.seekg(0, file.end);
     uint64_t binFileBufferLen = file.tellg();
-    CHECK_RET(binFileBufferLen > 0, std::cout << "File size is 0.\n"; file.close(); return -1);
+    CHECK_RET(binFileBufferLen == bufferSize, LOG_PRINT("Check file size failed.\n"); file.close(); return -1);
 
     file.seekg(0, file.beg);
     file.read(static_cast<char *>(buffer), binFileBufferLen);
@@ -104,56 +104,56 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
                     aclDataType dataType, aclTensor **tensor)
 {
     auto size = GetShapeSize(shape) * sizeof(T);
-    // 调用aclrtMalloc申请device侧内存
+    // Malloc device memory
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMalloc failed. ERROR: %d\n", ret); return ret);
 
-    // 调用aclrtMemcpy将host侧数据拷贝到device侧内存上
+    // Copy host data to device memory
     ret = aclrtMemcpy(*deviceAddr, size, hostData.data(), size, ACL_MEMCPY_HOST_TO_DEVICE);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMemcpy failed. ERROR: %d\n", ret); return ret);
 
-    // 计算连续tensor的strides
+    // Create strides for contiguous tensor
     std::vector<int64_t> strides(shape.size(), 1);
     for (int64_t i = static_cast<int64_t>(shape.size()) - 2; i >= 0; i--) {
         strides[i] = shape[i + 1] * strides[i + 1];
     }
 
-    // 调用aclCreateTensor接口创建aclTensor
+    // Create aclTensor
     *tensor = aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, aclFormat::ACL_FORMAT_ND,
                               shape.data(), shape.size(), *deviceAddr);
     return 0;
 }
 
-int CreateAclTensor(std::string &filePath, const std::vector<int64_t> &shape, int typeSize, void **deviceAddr,
-                    aclDataType dataType, aclTensor **tensor)
+int CreateAclTensor(std::string &filePath, const std::vector<int64_t> &shape, void **deviceAddr, aclDataType dataType,
+                    aclTensor **tensor)
 {
-    auto size = GetShapeSize(shape) * typeSize;
-    // 调用aclrtMalloc申请device侧内存
+    auto size = GetShapeSize(shape) * aclDataTypeSize(dataType);
+    // Malloc device memory
     auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMalloc failed. ERROR: %d\n", ret); return ret);
 
-    // 调用aclrtMallocHost申请host侧内存
+    // Malloc host memory
     void *binBufferHost = nullptr;
     ret = aclrtMallocHost(&binBufferHost, size);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMallocHost failed. ERROR: %d\n", ret); return ret);
 
-    // 读取文件
+    // Read input data file
     ret = ReadBinFileNNop(filePath, binBufferHost, size);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ReadBinFileNNop failed. ERROR: %d\n", ret);
               (void)aclrtFreeHost(binBufferHost); return ret);
 
-    // 调用aclrtMemcpy将host侧数据拷贝到device侧内存上
+    // Copy host data to device memory
     ret = aclrtMemcpy(*deviceAddr, size, binBufferHost, size, ACL_MEMCPY_HOST_TO_DEVICE);
     (void)aclrtFreeHost(binBufferHost);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMemcpy failed. ERROR: %d\n", ret); return ret);
 
-    // 计算连续tensor的strides
+    // Create strides for contiguous tensor
     std::vector<int64_t> strides(shape.size(), 1);
     for (int64_t i = shape.size() - 2; i >= 0; i--) {
         strides[i] = shape[i + 1] * strides[i + 1];
     }
 
-    // 调用aclCreateTensor接口创建aclTensor
+    // Create aclTensor
     *tensor = aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, aclFormat::ACL_FORMAT_ND,
                               shape.data(), shape.size(), *deviceAddr);
     return 0;
@@ -199,7 +199,7 @@ struct FFNDevAddr {
 
 void FreeResource(FFNParams &tensors, FFNDevAddr &addrs, int32_t deviceId, aclrtContext *context, aclrtStream *stream)
 {
-    // 释放aclTensor，需要根据具体API的接口定义修改
+    // Release aclTensor
     if (tensors.x != nullptr) {
         aclDestroyTensor(tensors.x);
     }
@@ -242,7 +242,7 @@ void FreeResource(FFNParams &tensors, FFNDevAddr &addrs, int32_t deviceId, aclrt
     if (tensors.y != nullptr) {
         aclDestroyTensor(tensors.y);
     }
-    // 释放device资源
+    // Release device resource
     if (addrs.x != nullptr) {
         aclrtFree(addrs.x);
     }

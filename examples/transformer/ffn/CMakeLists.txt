@@ -7,55 +7,44 @@
 # See LICENSE in the root of the software repository for the full text of the License.
 # ======================================================================================================================
 
-add_executable(test_ffn
-        test_ffn.cpp
-)
-
-add_executable(test_ffn_v2
-        test_ffn_v2.cpp
-)
-
-add_executable(test_ffn_v3
-        test_ffn_v3.cpp
-)
 
 if (_SocName MATCHES ascend910b*)
-        add_execute_example(
-                TARGET_NAME test_ffn
-                SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/run_ffn_case.sh
-                TEST_CASE ffn_case
-                ACLNN_FUNC "aclnnFFN"
+        add_executable(ffn_v2_antiquant
+                test_ffn_v2.cpp
         )
         add_execute_example(
-                TARGET_NAME test_ffn_v2
+                TARGET_NAME ffn_v2_antiquant
                 SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/run_ffn_case.sh
-                TEST_CASE ffn_v2_case
+                TEST_CASE ffn_v2_antiquant
                 ACLNN_FUNC "aclnnFFNV2"
         )
+
+        add_executable(ffn_v3_quant_token_index_flag
+                test_ffn_v3_quant.cpp
+        )
         add_execute_example(
-                TARGET_NAME test_ffn_v3
+                TARGET_NAME ffn_v3_quant_token_index_flag
                 SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/run_ffn_case.sh
-                TEST_CASE ffn_v3_case
+                TEST_CASE ffn_v3_quant_token_index_flag
                 ACLNN_FUNC "aclnnFFNV3"
         )
+
+        add_executable(ffn_v3_float16_high_precision
+                test_ffn_v3.cpp
+        )
+        add_execute_example(
+                TARGET_NAME ffn_v3_float16_high_precision
+                SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/run_ffn_case.sh
+                TEST_CASE ffn_v3_float16_high_precision
+                ACLNN_FUNC "aclnnFFNV3"
+        )
+        install(TARGETS ffn_v2_antiquant ffn_v3_quant_token_index_flag ffn_v3_float16_high_precision
+                LIBRARY DESTINATION lib
+                ARCHIVE DESTINATION lib
+                RUNTIME DESTINATION bin
+                OPTIONAL
+        )
+else()
+        message(STATUS "FFN has no example for SocName(${_SocName}), skip.")
 endif()
 
-add_execute_example(
-        TARGET_NAME test_ffn_v2
-        SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/run_ffn_case.sh
-        TEST_CASE ffn_v2_case_no_expert
-        ACLNN_FUNC "aclnnFFNV2"
-)
-add_execute_example(
-        TARGET_NAME test_ffn_v3
-        SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/run_ffn_case.sh
-        TEST_CASE ffn_v3_case_no_expert
-        ACLNN_FUNC "aclnnFFNV3"
-)
-
-install(TARGETS test_ffn test_ffn_v2 test_ffn_v3
-        LIBRARY DESTINATION lib
-        ARCHIVE DESTINATION lib
-        RUNTIME DESTINATION bin
-        OPTIONAL
-)

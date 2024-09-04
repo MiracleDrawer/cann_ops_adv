@@ -39,7 +39,8 @@ constexpr size_t kffnInputantiquantOffset1 = 12;
 constexpr size_t kffnInputantiquantOffset2 = 13;
 constexpr size_t kffnOutput = 0;
 
-inline aclTensor *GeTensor2AclTensor(const gert::Tensor *geTensor, bool enableTranspose = false, bool enableNZ = false)
+inline static aclTensor *GeTensor2AclTensor(const gert::Tensor *geTensor, bool enableTranspose = false,
+                                            bool enableNZ = false)
 {
     if (geTensor == nullptr) {
         return nullptr;
@@ -62,7 +63,7 @@ inline aclTensor *GeTensor2AclTensor(const gert::Tensor *geTensor, bool enableTr
     for (size_t i = 0; i < gert_shape.GetDimNum(); ++i) {
         shape.push_back(gert_shape.GetDim(i));
     }
-    // 计算连续tensor的strides
+    // calculate tensor strides
     std::vector<int64_t> strides(shape.size(), 1);
     for (int64_t i = shape.size() - 2; i >= 0; i--) {
         strides[i] = shape[i + 1] * strides[i + 1];
@@ -74,15 +75,13 @@ inline aclTensor *GeTensor2AclTensor(const gert::Tensor *geTensor, bool enableTr
         viewShape.push_back(origin_shape.GetDim(i));
     }
 
-    // 对于transpose后的tensor对后两维度进行strides, viewShape转换
+    // when tensor is transposed, last two dims in strides and viewShape should swap
     if (enableTranspose) {
-        // dimM 为倒数第二维， dimN 为倒数第一维度
         auto dimM = shape.size() - 2;
         auto dimN = shape.size() - 1;
         auto swap = strides[dimN];
         strides[dimN] = strides[dimM];
         strides[dimM] = swap;
-        // 修改viewShape
         viewShape[dimN] = shape[dimM];
         viewShape[dimM] = shape[dimN];
     }
@@ -97,7 +96,7 @@ inline aclTensor *GeTensor2AclTensor(const gert::Tensor *geTensor, bool enableTr
     return out;
 }
 
-graphStatus FFNExecuteFunc(OpExecuteContext *host_api_ctx)
+static graphStatus FFNExecuteFunc(OpExecuteContext *host_api_ctx)
 {
     OPS_ERR_IF(host_api_ctx == nullptr, OPS_LOG_E("aclnnfallback", "host_api_ctx is null"), return GRAPH_FAILED);
 
@@ -149,7 +148,8 @@ graphStatus FFNExecuteFunc(OpExecuteContext *host_api_ctx)
                                   scale_ge, offset_ge, deq_scale1_ge, deq_scale2_ge, antiquant_scale1_ge,
                                   antiquant_scale2_ge, antiquant_offset1_ge, antiquant_offset2_ge, activation_type_ge,
                                   *inner_pricise_ge, *tokens_index_flag_ge, output_acl);
-    OPS_ERR_IF((api_ret != GRAPH_SUCCESS), OPS_LOG_E("aclnnfallback", "api_ret faild:%u", api_ret), return GRAPH_FAILED);
+    OPS_ERR_IF((api_ret != GRAPH_SUCCESS), OPS_LOG_E("aclnnfallback", "api_ret faild:%u", api_ret),
+               return GRAPH_FAILED);
 
     return GRAPH_SUCCESS;
 }

@@ -16,7 +16,7 @@ import os
 if __name__ == '__main__':
     test_case = sys.argv[1]
     print_head = "====================== Show sample " + test_case + " result start ================="
-    file = test_case + '.bin'
+    file = test_case + '_y.bin'
     if not os.path.isfile(file):
         raise RuntimeError(f"Invalid case name:", test_case)
     y = np.fromfile(file, dtype=np.float16)
