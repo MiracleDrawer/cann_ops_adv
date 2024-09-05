@@ -188,17 +188,12 @@ class IncreFlashAttentionAttenSplitBbn2s2Us2 {
       uint32_t baseRowOffsetInBlock = baseRowOffsetInSingle % kvCacheBlockSize; // 处理大包搬运时baseN < blocksize的情况
 
       uint32_t blockElementCnt = 32 / sizeof(KV_T);
-      uint32_t alignedUseN = ((useN - 1 + blockElementCnt) / blockElementCnt) * blockElementCnt;
+      uint32_t alignedUseN = ((useN - 1 + 16) / 16) * 16; // 16:16元素对齐
 
       if (bmm1BaseN == kvCacheBlockSize) { // bmm1BaseN = kvCacheBlockSize时不需要考虑k方向step，一次拷贝效率更高
           // 大包模式，非尾块情况下useN = stepN * baseN，尾块情况下可能小于 baseN
-          if (useN < bmm1BaseN) {
-            CopyND2NZ(dst[copyFinishRowCnt * blockElementCnt], src[srcOffset],
-                      0, 0, currentCopyRowCnt, useK, bmm1Kb, 1, 0, 0, false, useN);
-          } else {
-            CopyND2NZ(dst[copyFinishRowCnt * blockElementCnt], src[srcOffset],
-                      0, 0, currentCopyRowCnt, useK, bmm1Kb, 1, 0, 0, false, alignedUseN);
-          }
+          CopyND2NZ(dst[copyFinishRowCnt * blockElementCnt], src[srcOffset], 0, 0, currentCopyRowCnt, useK,
+                    bmm1Kb, 1, 0, 0, false, alignedUseN);
       } else {
           for (int i = 0; i < bmm1StepKb; i++) { // K方向多Step
             uint32_t dstOffset = copyFinishRowCnt * blockElementCnt + i * bmm1BaseK * currentCopyRowCnt;
@@ -449,6 +444,7 @@ class IncreFlashAttentionAttenSplitBbn2s2Us2 {
   static constexpr T FP16_ATTEN_MASK_SCALAR_VALUE = -10000;            // 用于mask为fp16类型
   bool antiqOffsetExistFlag = false;
   uint32_t msdIterNum = 0U;
+  bool antiquantPerHeadFlag = false;
   uint32_t antiquantPerTensorFlag = 0U;
   uint64_t sUnitSize = 0;
 
@@ -572,6 +568,8 @@ class IncreFlashAttentionAttenSplitBbn2s2Us2 {
 
   __aicore__ inline void CopyAntiquantScale(LocalTensor<T>& castUb, GlobalTensor<Q_T> srcGm, uint64_t offset);
 
+  __aicore__ inline void CopyAntiquantParamsPerTokenHead(GlobalTensor<ANTIQ_PARAMS_T> srcGm, uint64_t offset,
+                                                         uint32_t columnCount, uint32_t actualColumnCount);
   __aicore__ inline void CopyAntiquantParamsPerToken(GlobalTensor<ANTIQ_PARAMS_T> srcGm, uint64_t offset,
                                                      uint32_t columnCount, uint32_t actualColumnCount);
 
@@ -752,6 +750,7 @@ __aicore__ inline void IncreFlashAttentionAttenSplitBbn2s2Us2<IFAT>::InitTilingD
   batchContinuous = tilingData->baseParams.batchContinuousFlag;
   msdIterNum = tilingData->baseParams.msdIterNum;
   antiquantPerTensorFlag = tilingData->baseParams.antiquantPerTensorFlag;
+  antiquantPerHeadFlag = (tilingData->baseParams.antiquantPerHeadFlag == 1);
 
   headDimAlign = Align(headDim, BYTE_BLOCK);  // 32个数字对齐
 
@@ -1331,8 +1330,15 @@ __aicore__ inline void IncreFlashAttentionAttenSplitBbn2s2Us2<IFAT>::CalcBN2Offs
     antiqParamOffset = n2Idx * headDim;
   }
   antiqKeyParamCoreOffsetPerToken = bIdx * antiqSeqSize + kvPaddingBeginOffset;
+  if (antiquantPerHeadFlag) {
+    antiqKeyParamCoreOffsetPerToken = bIdx * antiqSeqSize * kvHeadNum + kvPaddingBeginOffset +
+                                      n2Idx * antiqSeqSize;
+  }
   if (flashDecodeFlag) {
     antiqKeyParamCoreOffsetPerToken += s2Idx * sInnerLoopSize;
+  }
+  if (antiquantPerHeadFlag) {
+    antiqParamOffset = n2Idx;
   }
   // out quant
   perChannelQuantOffset = n2Idx * headDim * gSize;
@@ -1418,8 +1424,17 @@ __aicore__ inline void IncreFlashAttentionAttenSplitBbn2s2Us2<IFAT>::UpdateOffse
     antiqParamOffset = n2Idx * headDim;
   }
   antiqKeyParamCoreOffsetPerToken = bIdx * antiqSeqSize + kvPaddingBeginOffset;
+  if (antiquantPerHeadFlag) {
+    antiqParamOffset = n2Idx;
+    antiqKeyParamCoreOffsetPerToken = bIdx * kvHeadNum * antiqSeqSize + n2Idx * antiqSeqSize +
+                                      kvPaddingBeginOffset;
+  }
   if (flashDecodeFlag) {
-    antiqKeyParamCoreOffsetPerToken += s2Idx * sInnerLoopSize;
+    if (antiquantPerHeadFlag) {
+      antiqKeyParamCoreOffsetPerToken += s2Idx * sInnerLoopSize * kvHeadNum + n2Idx * kvSeqSize;
+    } else {
+      antiqKeyParamCoreOffsetPerToken += s2Idx * sInnerLoopSize;
+    }
   }
   // out quant
   perChannelQuantOffset = n2Idx * headDim * gSize;
@@ -1466,7 +1481,7 @@ template <typename IFAT>
 __aicore__ inline void IncreFlashAttentionAttenSplitBbn2s2Us2<IFAT>::CopyAntiquantScale(LocalTensor<T>& castUb,
                                                                                         GlobalTensor<Q_T> srcGm,
                                                                                         uint64_t offset) {
-  if (antiquantPerTensorFlag == 1) {
+  if (antiquantPerHeadFlag || antiquantPerTensorFlag == 1) {
     if constexpr (AscendC::IsSameType<Q_T, half>::value) {
       Duplicate(castUb, static_cast<T>(srcGm.GetValue(offset)), headDimAlign);
     } else if constexpr (AscendC::IsSameType<Q_T, bfloat16_t>::value) {
@@ -1498,8 +1513,20 @@ __aicore__ inline void IncreFlashAttentionAttenSplitBbn2s2Us2<IFAT>::CopyAntiqua
 }
 
 template <typename IFAT>
+__aicore__ inline void IncreFlashAttentionAttenSplitBbn2s2Us2<IFAT>::CopyAntiquantParamsPerTokenHead(
+    GlobalTensor<ANTIQ_PARAMS_T> srcGm, uint64_t offset, uint32_t columnCount, uint32_t actualColumnCount) {
+    LocalTensor<ANTIQ_PARAMS_T> dstUb = inputQue1.AllocTensor<ANTIQ_PARAMS_T>();
+    DataCopy(dstUb, srcGm[offset], columnCount);
+    inputQue1.template EnQue(dstUb);
+    return;
+}
+
+template <typename IFAT>
 __aicore__ inline void IncreFlashAttentionAttenSplitBbn2s2Us2<IFAT>::CopyAntiquantParamsPerToken(
     GlobalTensor<ANTIQ_PARAMS_T> srcGm, uint64_t offset, uint32_t columnCount, uint32_t actualColumnCount) {
+  if (antiquantPerHeadFlag) {
+    return CopyAntiquantParamsPerTokenHead(srcGm, offset, columnCount, actualColumnCount);
+  }
   uint32_t paramsTypeElementSize = BYTE_BLOCK / sizeof(ANTIQ_PARAMS_T);
   DataCopyExtParams copyInParams;
   DataCopyPadExtParams<ANTIQ_PARAMS_T> copyInPadParams;

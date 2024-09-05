@@ -129,9 +129,9 @@
     
     - softmaxLseFlag（bool，计算输入）：是否输出softmax_lse，支持S轴外切（增加输出）。用户不特意指定时可传入默认值false。
     
-    - keyAntiquantMode（int64，计算输入）：key 的伪量化的方式，传入0时表示为per-channel（per-channel包含per-tensor），传入1时表示per-token。Q_S大于等于2时该参数无效，用户不特意指定时可传入默认值0，传入0和1之外的其他值会执行异常。需要与valueAntiquantMode 一致
+    - keyAntiquantMode（int64，计算输入）：key 的伪量化的方式，传入0时表示为per-channel（per-channel包含per-tensor），传入1时表示per-token。Q_S大于等于2时该参数无效，用户不特意指定时可传入默认值0，传入0、1、2和3之外的其他值会执行异常。需要与valueAntiquantMode 一致
     
-    - valueAntiquantMode（int64，计算输入）：value 的伪量化的方式，传入0时表示为per-channel（per-channel包含per-tensor），传入1时表示per-token。Q_S大于等于2时该参数无效，用户不特意指定时可传入默认值0，传入0和1之外的其他值会执行异常。需要与 keyAntiquantMode 一致
+    - valueAntiquantMode（int64，计算输入）：value 的伪量化的方式，传入0时表示为per-channel（per-channel包含per-tensor），传入1时表示per-token。Q_S大于等于2时该参数无效，用户不特意指定时可传入默认值0，传入0、1、2和3之外的其他值会执行异常。需要与 keyAntiquantMode 一致
     
     - attentionOut（aclTensor\*，计算输出）：Device侧的aclTensor，公式中的输出，数据类型支持FLOAT16、BFLOAT16、INT8。[数据格式](common/数据格式.md)支持ND。限制：当inputLayout为BNSD_BSND时，输入query的shape是BNSD，输出shape为BSND；其余情况该入参的shape需要与入参query的shape保持一致。
     
@@ -266,10 +266,12 @@
       - KeyAntiquantMode 和 valueAntiquantMode需要保持一致
       - KeyAntiquanScale 和 valueAntiquantScale要么都为空，要么都不为空;KeyAntiquantOffset 和 valueAntiquantOffset要么都为空，要么都不为空
       - KeyAntiquantScale 和valueAntiquantScale都不为空时，其shape需要保持一致;KeyAntiquanOffset 和 valueAntiquantOffset都不为空时，其shape需要保持一致
-    - 支持per-channel、per-tensor和per-token三种模式：
-      - per-channel模式:两个参数BNSD场景下shape为\(1, N, 1, D\)，BSND场景下shape为\(1, N, D\)，BSH场景下shape为\(1, H\)，N为numKeyValueHeads。参数数据类型和query数据类型相同。
+    - 支持per-channel、per-tensor、per-token、per-tensor叠加per-head和per-token叠加per-head五种模式，以下N均为numKeyValueHeads：
+      - per-channel模式:两个参数的shape可支持\(1, N, 1, D\)，\(1, N, D\)，\(1, H\)。参数数据类型和query数据类型相同。
       - per-tensor模式:两个参数的shape均为(1)，数据类型和query数据类型相同。
       - per-token模式:两个参数的shape均为\(1, B, S\), 数据类型固定为FLOAT32。
+      - per-tensor叠加per-head模式:两个参数的shape均为(N)，数据类型和query数据类型相同。
+      - per-token叠加per-head模式:两个参数的shape均为\(B, N, S\), 数据类型固定为FLOAT32。
     - 当伪量化参数 和 KV分离量化参数同时传入时，以KV分离量化参数为准。
   -   prefix相关参数约束：
       - keySharedPrefix和valueSharedPrefix要么都为空，要么都不为空

@@ -58,6 +58,7 @@ TILING_DATA_FIELD_DEF(uint32_t, kvPaddingFlag)
 TILING_DATA_FIELD_DEF(uint32_t, msdIterNum)
 TILING_DATA_FIELD_DEF(uint32_t, l2CacheOffFlag)
 TILING_DATA_FIELD_DEF(uint32_t, antiquantPerTensorFlag)
+TILING_DATA_FIELD_DEF(uint32_t, antiquantPerHeadFlag)
 TILING_DATA_FIELD_DEF(uint32_t, attenMaskFlag)
 TILING_DATA_FIELD_DEF(uint32_t, attenMaskSize)
 TILING_DATA_FIELD_DEF(uint32_t, softmaxLseFlag)
@@ -389,6 +390,7 @@ class IFATiling {
   ge::graphStatus CheckQuant2Shape(const gert::Shape& inputParaShape);
   ge::graphStatus ProcessQuant2Dtype();
   ge::graphStatus CheckKVAntiQuantPerToken(const gert::Shape& inputParaShape);
+  ge::graphStatus CheckKVAntiQuantPerHead(const gert::Shape &inputParaShape);
   ge::graphStatus CheckKVAntiQuantPerChannel(const gert::Shape& inputParaShape);
   ge::graphStatus CheckKVAntiQuantParaShapeLegal(const gert::Shape& inputParaShape);
   ge::graphStatus CheckAntiQuantParam(const gert::Tensor* antiquantScaleTensor,
@@ -463,6 +465,7 @@ class IFATiling {
   uint32_t msdIterNum_ = 1;
   uint32_t antiquantMode_ = 0;
   uint32_t antiquantPerTensorFlag_ = 0;
+  uint32_t antiquantPerHeadFlag_ = 0;
   uint32_t antiquantNum_ = 2;
 
   uint32_t headDim_ = 0;

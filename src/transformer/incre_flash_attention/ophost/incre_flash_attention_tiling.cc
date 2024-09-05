@@ -1068,6 +1068,33 @@ ge::graphStatus IFATiling::ProcessDequant2() {
   return ge::GRAPH_SUCCESS;
 }
 
+ge::graphStatus IFATiling::CheckKVAntiQuantPerHead(const gert::Shape &inputParaShape)
+{
+  if (antiquantMode_ == PER_TOKEN_MODE) { // per-token head
+    OPS_ERR_IF((inputParaShape.GetDimNum() != 3), // 3: Dim of BGS is 3
+               OPS_LOG_E(context_->opName, "The dim of antiquant should be 3 instead of the current %ld",
+                         inputParaShape.GetDimNum()),
+                         return ge::GRAPH_FAILED);
+    OPS_ERR_IF((inputParaShape.GetDim(0) != batchSize_),
+               OPS_LOG_E(context_->opName, "The 1st dim of antiquant should be %u instead of the current %ld",
+                         batchSize_, inputParaShape.GetDim(0)),
+                         return ge::GRAPH_FAILED);
+    OPS_ERR_IF((inputParaShape.GetDim(1) != numKvHeads_),
+               OPS_LOG_E(context_->opName, "The 2nd dim of antiquant should be %u instead of the current %ld",
+                         numKvHeads_, inputParaShape.GetDim(1)),
+                         return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+  } else { // per-tensor head
+    gert::Shape expectParamShape = gert::Shape({numKvHeads_});
+    OPS_ERR_IF((inputParaShape != expectParamShape),
+               OPS_LOG_E(context_->opName,
+                         "The shape of antiquant parameter[%ld] is not expected. Expect[%u] When per_tensor_head mode.",
+                         inputParaShape.GetDim(0), numKvHeads_),
+           return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+  }
+}
+
 ge::graphStatus IFATiling::CheckKVAntiQuantPerToken(const gert::Shape& inputParaShape) {
   if(inputParaShape.GetDimNum() == DIM_PER_TOKEN){
     OPS_ERR_IF((inputParaShape.GetDim(PER_TOKEN_N) != antiquantNum_),
@@ -1138,6 +1165,9 @@ ge::graphStatus IFATiling::CheckKVAntiQuantParaShapeLegal(const gert::Shape& inp
     antiquantNum_ = 1;
   }
   gert::Shape expectParamShapePerTensor = gert::Shape({antiquantNum_});
+  if (antiquantPerHeadFlag_) {
+    return CheckKVAntiQuantPerHead(inputParaShape);
+  }
   if(antiquantMode_ == PER_TOKEN_MODE){ //per-token
     return CheckKVAntiQuantPerToken(inputParaShape);
   }else if(inputParaShape.GetDimNum() == DIM_PER_TENSOR){ //per-tensor
@@ -1289,6 +1319,18 @@ ge::graphStatus IFATiling::ProcessAntiQuant() {
       return ge::GRAPH_FAILED;
     }
     antiquantMode_ = keyAntiquantMode;
+    OPS_LOG_D(context_->opName, "org antiquantMode value:%u", antiquantMode_);
+    OPS_ERR_IF((antiquantMode_ != 0) && (antiquantMode_ != 1) && (antiquantMode_ != 2) && (antiquantMode_ != 3),
+               OPS_LOG_E(context_->opName, "antiquantMode value:%u is invalid, it should be 0、1、2 or 3", antiquantMode_),
+               return ge::GRAPH_FAILED);
+    if (antiquantMode_ == 2) { // 2:per tensor head
+      antiquantMode_ = 0;
+      antiquantPerHeadFlag_ = 1;
+    }
+    if (antiquantMode_ == 3) { // 3:per token head
+      antiquantMode_ = 1;
+      antiquantPerHeadFlag_ = 1;
+    }
     if (CheckAntiQuantParam(keyAntiquantScaleTensor, keyAntiquantOffsetTensor, keyAntiquantScaleDesc,
                             keyAntiquantOffsetDesc) == ge::GRAPH_FAILED) {
       return ge::GRAPH_FAILED;
@@ -1914,6 +1956,7 @@ void IFATiling::FillTilingBaseParams() {
   tilingData_->baseParams.set_msdIterNum(msdIterNum_);
   tilingData_->baseParams.set_kvPaddingFlag(kvPaddingSizeFlag_ ? 1 : 0);
   tilingData_->baseParams.set_antiquantPerTensorFlag(antiquantPerTensorFlag_);
+  tilingData_->baseParams.set_antiquantPerHeadFlag(antiquantPerHeadFlag_);
   tilingData_->baseParams.set_attenMaskFlag(attenMaskFlag_ ? 1 : 0);
   tilingData_->baseParams.set_attenMaskSize(attenMaskSize_);
   tilingData_->baseParams.set_l2CacheOffFlag(l2CacheOffFlag_);
