@@ -44,3 +44,18 @@ body:
       description: 补充下其他您认为需要提供的信息
     validations:
       required: false
+  - type: dropdown
+    id: scope
+    attributes:
+      label: 所属算子
+      description: 该问题来自于哪个算子？如无法确定或为公共问题，请选择“其他”。
+      options:
+        - FA
+        - FAG
+        - IFA
+        - PFA
+        - FIA
+        - FFN
+        - 其他
+    validations:
+      required: true
