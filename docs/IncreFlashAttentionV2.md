@@ -132,6 +132,36 @@
 
   query、key、value输入为FLOAT16，输出为INT8的场景：入参quantScale2必填，quantOffset2可选，不能传入dequantScale1、quantScale1、dequantScale2（即为nullptr）参数。
 
+## 算子原型
+
+```c++
+REG_OP(IncreFlashAttention)
+    .INPUT(query, TensorType({DT_FLOAT16, DT_BF16, DT_INT8}))
+    .DYNAMIC_INPUT(key, TensorType({DT_FLOAT16, DT_BF16, DT_INT8}))
+    .DYNAMIC_INPUT(value, TensorType({DT_FLOAT16, DT_BF16, DT_INT8}))
+    .OPTIONAL_INPUT(pse_shift, TensorType({DT_FLOAT16, DT_BF16}))
+    .OPTIONAL_INPUT(atten_mask, TensorType({DT_BOOL, DT_INT8, DT_UINT8}))
+    .OPTIONAL_INPUT(actual_seq_lengths, TensorType({DT_INT64}))
+    .OPTIONAL_INPUT(dequant_scale1, TensorType({DT_UINT64, DT_FLOAT}))
+    .OPTIONAL_INPUT(quant_scale1, TensorType({DT_FLOAT}))
+    .OPTIONAL_INPUT(dequant_scale2, TensorType({DT_UINT64, DT_FLOAT}))
+    .OPTIONAL_INPUT(quant_scale2, TensorType({DT_FLOAT, DT_BF16}))
+    .OPTIONAL_INPUT(quant_offset2, TensorType({DT_FLOAT, DT_BF16}))
+    .OPTIONAL_INPUT(antiquant_scale, TensorType({DT_FLOAT16, DT_BF16}))
+    .OPTIONAL_INPUT(antiquant_offset, TensorType({DT_FLOAT16, DT_BF16}))
+    .OPTIONAL_INPUT(block_table, TensorType({DT_INT32}))
+    .OPTIONAL_INPUT(kv_padding_size, TensorType({DT_INT64}))
+    .OUTPUT(attention_out, TensorType({DT_FLOAT16, DT_BF16, DT_INT8}))
+    .REQUIRED_ATTR(num_heads, Int)
+    .ATTR(scale_value, Float, 1.0)
+    .ATTR(input_layout, String, "BSH")
+    .ATTR(num_key_value_heads, Int, 1)
+    .ATTR(block_size, Int, 0)
+    .ATTR(inner_precise, Int, 1)
+    .OP_END_FACTORY_REG(IncreFlashAttention)
+```
+参数解释请参见**算子执行接口**。
+
 ## 调用示例（以Atlas A2 训练系列产品为例）
 
 - PyTorch框架调用
