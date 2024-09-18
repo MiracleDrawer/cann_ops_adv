@@ -71,7 +71,7 @@ int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& 
     strides[i] = shape[i + 1] * strides[i + 1];
   }
  
-  // Call the aclCreateTensor interface to create aclSensor.
+  // Call the aclCreateTensor interface to create aclTensor.
   *tensor = aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, aclFormat::ACL_FORMAT_ND,
                             shape.data(), shape.size(), *deviceAddr);
   return 0;
