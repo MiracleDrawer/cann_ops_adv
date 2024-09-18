@@ -66,7 +66,7 @@ using namespace ffn_example;
 int main(int argc, char **argv)
 {
     if (argv == nullptr || argc < 2) { // 2: Input num, exeFile and testCase.
-        LOG_PRINT("Number of nput parameter error, except >= 2 but got %d inputs.\n", argc);
+        LOG_PRINT("Number of input parameter error, except >= 2 but got %d inputs.\n", argc);
         return 0;
     }
 
@@ -118,6 +118,7 @@ int main(int argc, char **argv)
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret);
               FreeResource(params, addrs, deviceId, &context, &stream); return ret);
 
+    // 5. Copy output from device to host and then save to file
     std::string outFile = testCase + "_y.bin";
     SaveOutResult<float>(outFile, yShape, &addrs.y);
 

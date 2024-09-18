@@ -297,9 +297,9 @@ bool FaCase::InitOriginTilingFunc()
     /* FlashAttentionScore FlashAttentionScoreGrad 需提供修改 TilingContext 功能 */
     /* FlashAttentionScoreGrad 需提供按指定优先级调用 Tiling 模板功能 */
     mFasOriginTilingFunc =
-        (gert::OpImplKernelRegistry::TilingKernelFunc)platform->LoadOpTilingSoSym("TilingFlashAttentionScore");
+        (gert::OpImplRegisterV2::TilingKernelFunc)platform->LoadOpTilingSoSym("TilingFlashAttentionScore");
     mFagOriginTilingFunc =
-        (gert::OpImplKernelRegistry::TilingKernelFunc)platform->LoadOpTilingSoSym("TilingFlashAttentionGradScore");
+        (gert::OpImplRegisterV2::TilingKernelFunc)platform->LoadOpTilingSoSym("TilingFlashAttentionGradScore");
     if (mFasOriginTilingFunc == nullptr || mFagOriginTilingFunc == nullptr) {
         LOG_ERR("Can't get origin tiling func, Fas(%p), Fag(%p)", mFasOriginTilingFunc, mFagOriginTilingFunc);
         return false;

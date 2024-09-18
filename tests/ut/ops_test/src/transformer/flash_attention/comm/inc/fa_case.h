@@ -62,8 +62,8 @@ public:
     /* 输入/输出 参数 */
     FaParam mParam;
 
-    gert::OpImplKernelRegistry::TilingKernelFunc mFasOriginTilingFunc = nullptr;
-    gert::OpImplKernelRegistry::TilingKernelFunc mFagOriginTilingFunc = nullptr;
+    gert::OpImplRegisterV2::TilingKernelFunc mFasOriginTilingFunc = nullptr;
+    gert::OpImplRegisterV2::TilingKernelFunc mFagOriginTilingFunc = nullptr;
     PreTilingRunCbf mPreTilingRunCbf = nullptr;
 
 public:
