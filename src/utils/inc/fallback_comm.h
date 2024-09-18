@@ -19,7 +19,6 @@
 #include "aclnn/aclnn_base.h"
 #include "exe_graph/runtime/op_execute_context.h"
 #include "exe_graph/runtime/tensor.h"
-#include "register/op_impl_kernel_registry.h"
 #include "register/op_impl_registry.h"
 #include "runtime/base.h"
 

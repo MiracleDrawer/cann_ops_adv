@@ -460,7 +460,7 @@ const auto Tc_Fag_Us1s2Bbn2gs1s2_BatchCase = ::testing::Values(
                           ),
     FagCaseUs1s2Bbn2gs1s2("Fag_Us1s2Bbn2gs1s2_Case_020", true,                    /* CaseName, Enable */
                           "",                                                     /* DebugInfo */
-                          OpInfo(ControlInfo(true, true),                         /* RunTiling, RunKernel */
+                          OpInfo(ControlInfo(true, RunKernelNotInPr),             /* RunTiling, RunKernel */
                                  ExpectInfo(true,                                 /* ExpectSuccess */
                                             10000000000111021434UL,               /* ExpectTilingKey */
                                             ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */

@@ -286,6 +286,11 @@ TILING_DATA_FIELD_DEF(int64_t, normalCoreLastLoopNBurstNum);
 TILING_DATA_FIELD_DEF(int64_t, tailCoreLastLoopNBurstNum);
 TILING_DATA_FIELD_DEF(int64_t, normalCoreNBurstNums);
 TILING_DATA_FIELD_DEF(int64_t, sfmgPreBeginAddr);
+TILING_DATA_FIELD_DEF(int64_t, b);
+TILING_DATA_FIELD_DEF(int64_t, n2);
+TILING_DATA_FIELD_DEF(int64_t, g);
+TILING_DATA_FIELD_DEF(int64_t, s1);
+TILING_DATA_FIELD_DEF(int64_t, d);
 END_TILING_DATA_DEF;
 REGISTER_TILING_DATA_CLASS(PreSfmgParamsOp, PreSfmgParams)
 

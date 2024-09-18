@@ -22,6 +22,7 @@ target_compile_options(_OpsTestUt_OpApi_Wno
             $<$<CXX_COMPILER_ID:GNU>:-Wno-format-signedness>
             -Wno-extra
             -Wno-redundant-decls
+            -Werror
 )
 
 # 缓存所有算子 UTest 场景 OpProto 动态库相关信息
@@ -41,6 +42,7 @@ target_compile_options(_OpsTestUt_OpTiling_Wno
             -Wno-shadow
             $<$<CXX_COMPILER_ID:GNU>:-Wno-format-signedness>
             -Wno-extra
+            -Werror
 )
 
 # 缓存当前算子 UTest 场景 OpKernel 目标
@@ -59,6 +61,7 @@ target_compile_options(_OpsTestUt_OpKernel_Wno
             -Wno-extra
             -Wno-float-conversion
             -Wno-parentheses
+            -Werror
 )
 
 # 缓存所有算子 UTest 场景 UTest用例 动态库相关信息
@@ -68,6 +71,7 @@ add_library(_OpsTestUt_UTestCaseStatic_Wno INTERFACE)
 target_compile_options(_OpsTestUt_UTestCaseStatic_Wno
         INTERFACE
             $<$<CXX_COMPILER_ID:Clang>:-Wno-vla>
+            -Werror
 )
 
 # GTest 版本兼容性保证
@@ -75,6 +79,7 @@ add_library(_OpsTestUt_GTest_Wno INTERFACE)
 target_compile_options(_OpsTestUt_GTest_Wno
         INTERFACE
             -Wno-undef
+            -Werror
 )
 
 ########################################################################################################################
@@ -589,12 +594,6 @@ function(OpsTest_Level1_AddUTestCaseStatic)
                     ${TMP_UTEST_PRIVATE_INCLUDES_EXT}
                     ${CMAKE_CURRENT_SOURCE_DIR}/utest
         )
-        if (TESTS_UT_OPS_TEST_CI_PR)
-            target_compile_definitions(${_Target_UTest}
-                    PRIVATE
-                        TESTS_UT_OPS_TEST_CI_PR
-            )
-        endif ()
         target_link_libraries(${_Target_UTest}
                 PRIVATE
                     ${_PrivateLinkLibraries}
@@ -627,12 +626,6 @@ function(OpsTest_Level1_AddUTestCaseStatic)
                     ${TMP_UTEST_ACLNN_PRIVATE_LINK_LIBRARIES_EXT}
                     ${_Target_UTest_Common}
         )
-        if (TESTS_UT_OPS_TEST_CI_PR)
-            target_compile_definitions(${_Target_UTest}
-                    PRIVATE
-                        TESTS_UT_OPS_TEST_CI_PR
-            )
-        endif ()
         set(_OpsTestUt_UTestAclnnCaseLibraries ${_OpsTestUt_UTestAclnnCaseLibraries} ${_Target_UTest_Aclnn} CACHE INTERNAL "" FORCE)
     endif ()
 endfunction()

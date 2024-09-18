@@ -63,7 +63,9 @@ const int64_t BALANCE_LOAD_LIST_SIZE = 8L;
 constexpr int64_t cof[BALANCE_LOAD_LIST_SIZE] = {256, 384, 512, 640, 768, 896, 960, 1024};
 const int64_t BMM1_BASICBLOCK_M_128 = 128L;
 const int64_t BMM1_BASICBLOCK_N_256 = 256L;
+const int64_t BMM1_BASICBLOCK_N_128 = 128L;
 const int64_t BMM1_BASICBLOCK_K_64 = 64L;
+const int64_t BMM1_BASICBLOCK_K_128 = 128L;
 const int64_t S2_NZTOND_SIZE_64 = 64L;
 const int64_t SPACE_NUM_2 = 2L;
 const int64_t SPACE_NUM_3 = 3L;
@@ -987,7 +989,7 @@ void FlashAttentionScoreTilingBase::GetActualSeqLenData(int64_t inputIdx, std::a
     }
     res[0] = value[0];
     actualLen++;
-    for (auto i = 1; i < actualSeqLenShape.GetDim(0); ++i) {
+    for (int64_t i = 1; i < actualSeqLenShape.GetDim(0); ++i) {
         res[i] = value[i] - value[i - 1];
         actualLen++;
     }
@@ -1260,7 +1262,7 @@ bool FlashAttentionScoreTilingBase::AnalyzeOptionalInput()
             }
         } else if (tilingData.inputParams.get_layoutType() == LAYOUT_TND) {
             int64_t accumS1S2 = 0;
-            for (auto i = 0; i < bSize; i++) {
+            for (int64_t i = 0; i < bSize; i++) {
                 accumS1S2 += (actualSeqLenData[i] * actualSeqLenKvData[i]);
             }
             if (pseBSize == accumS2 * n1Size) {
@@ -1397,7 +1399,7 @@ bool FlashAttentionScoreTilingBase::AnalyzeOptionalInput()
         }
         if (tilingData.inputParams.get_layoutType() == LAYOUT_TND) {
             int64_t accumS1S2 = 0;
-            for (auto i = 0; i < bSize; i++) {
+            for (int64_t i = 0; i < bSize; i++) {
                 accumS1S2 += (actualSeqLenData[i] * actualSeqLenKvData[i]);
             }
             shapeSize = accumS1S2 * n1Size;
@@ -1687,7 +1689,7 @@ ge::graphStatus FlashAttentionScoreTilingBase::PostTiling()
                                  inputParams.get_s1Size() * inputParams.get_s2Size();
         auto layoutType = tilingData.inputParams.get_layoutType();
         if (layoutType == LAYOUT_TND) {
-            for (auto i = 0; i < bSize; i++) {
+            for (int64_t i = 0; i < bSize; i++) {
                 dropTotalSize += (actualSeqLenData[i] * actualSeqLenKvData[i]);
             }
             shapeTotalSize = inputParams.get_n2Size() * inputParams.get_gSize() * dropTotalSize;
@@ -2416,17 +2418,11 @@ protected:
         size_t *workspaces = context_->GetWorkspaceSizes(1);
         int64_t bmm1Size = 0;
         int64_t bmm1AlignBytes = 0;
-        int64_t stage1AlignBytes = 0;
         int64_t s2SizeAlign16 = CeilDivision(s2Size, 16L) * 16L;
         bmm1Size = CeilDivision(coreParams.get_s1BaseSize() * s2SizeAlign16, 256L) * 256L;
         bmm1AlignBytes = bmm1Size * calcTypeSize * 2;
-        if (tilingKeyBmm1Format == CubeFormatEnum::NZ || inputDtypeBytes == DATA_TYPE_FP32) {
-            // 当bmm1输出为NZ格式时，bmm1和stage1的workspace不能复用
-            stage1AlignBytes = bmm1AlignBytes * inputDtypeBytes / DATA_TYPE_FP32;
-        } else {
-            // 当bmm1输出为ND格式时，bmm1和vector stage1用到的workspace是可以复用的。 所以只需要两份fp32的workspace
-            stage1AlignBytes = 0;
-        }
+        // bmm1和stage1的workspace不能复用
+        int64_t stage1AlignBytes = bmm1AlignBytes * inputDtypeBytes / DATA_TYPE_FP32;
 
         /* 计算bmm2需要用的workspace, 大小为CoreNum * s1BaseSize * alignedD (16对齐）,
          * bmm2计算完成后将数据输出在这块workspace上。
@@ -2435,10 +2431,11 @@ protected:
         workspaces[0] = static_cast<size_t>((bmm1AlignBytes + stage1AlignBytes + bmm2AlignBytes) *
                                             tilingData.multiCoreParams.get_coreNum()) +
                         WORK_SPACE_RESERVE_SIZE;
-	if (pseType == PSE_INNER_MUL_ADD_TYPE || pseType == PSE_INNER_MUL_ADD_SQRT_TYPE) {
+	    if (pseType == PSE_INNER_MUL_ADD_TYPE || pseType == PSE_INNER_MUL_ADD_SQRT_TYPE) {
             pseAlibiBaseS2 = alignedS2;
-            pseAlibiBaseS1 = std::min(s1BasicBlock, UB_BASIC_LIMIT_SIZE / pseAlibiBaseS2);
-            pseAlibiBaseS1 = std::max(pseAlibiBaseS1, UB_BASIC_LIMIT_SIZE / s1BasicBlock);
+            pseAlibiBaseS1 = std::min(static_cast<int64_t>(coreParams.get_s1BaseSize()),
+                                      UB_BASIC_LIMIT_SIZE / pseAlibiBaseS2);
+            pseAlibiBaseS1 = std::max(pseAlibiBaseS1, UB_BASIC_LIMIT_SIZE / coreParams.get_s1BaseSize());
         }
         return ge::GRAPH_SUCCESS;
     }
@@ -2810,6 +2807,11 @@ protected:
         if (bmm1.SetBufferSpace(aicoreParams_.l1Size, aicoreParams_.l0cSize) != 0) {
             return false;
         }
+        if (dSize > BMM1_BASICBLOCK_K_64 && dSize <= BMM1_BASICBLOCK_K_128 && inputDtypeBytes != DATA_TYPE_FP32) {
+            int64_t baseM = std::min(tmpS1BasicBlock, AlignUp(s1Size, FRACTAL_NUM));
+            bmm1.SetFixSplit(baseM, BMM1_BASICBLOCK_N_128, dSize);
+        }
+
         if (IsSpecialShape()) {
             if (bmm1.SetFixSplit(BMM1_BASICBLOCK_M_128, BMM1_BASICBLOCK_N_256, BMM1_BASICBLOCK_K_64) != 0) {
                 return false;
@@ -3644,7 +3646,7 @@ protected:
                                  inputParams.get_s1Size() * inputParams.get_s2Size();
         auto layoutType = tilingData.inputParams.get_layoutType();
         if (layoutType == LAYOUT_TND) {
-            for (auto i = 0; i < bSize; i++) {
+            for (int64_t i = 0; i < bSize; i++) {
                 dropTotalSize += (actualSeqLenData[i] * actualSeqLenKvData[i]);
             }
             shapeTotalSize = inputParams.get_n2Size() * inputParams.get_gSize() * dropTotalSize;

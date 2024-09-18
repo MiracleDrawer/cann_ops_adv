@@ -43,7 +43,7 @@ public:
     __aicore__ inline void NZ2ND(LocalTensor<float> &dstTensor, LocalTensor<float> &srcTensor, uint64_t sLen,
                                  uint64_t ubOffset, uint64_t srcUbOffset);
     __aicore__ inline void NZVecClc(GlobalTensor<float> srcGm, GlobalTensor<OUT_TYPE> dstGm, uint64_t dataSize,
-                                    GM_ADDR seqS, int64_t curG, int64_t &curS, bool needMuls);
+                                    GM_ADDR seqS, int64_t curG, int64_t &curS, bool needMuls, int64_t flag);
     __aicore__ inline void NZProcess();
     __aicore__ inline void ComputeDataCopyOffset(int64_t curG, int64_t &curS);
 
@@ -51,7 +51,14 @@ public:
     TPipe *pipe;
     TQue<QuePosition::VECIN, BUFFER_NUM> inQueue;
     TQue<QuePosition::VECOUT, BUFFER_NUM> outQueue;
-    TBuf<> tmpBuf;
+
+    // NZ buffer
+    TQue<QuePosition::VECIN, BUFFER_NUM> inQueuePing;
+    TQue<QuePosition::VECIN, BUFFER_NUM> inQueuePong;
+    TQue<QuePosition::VECOUT, BUFFER_NUM> outQueuePing;
+    TQue<QuePosition::VECOUT, BUFFER_NUM> outQueuePong;
+    TBuf<> tmpBufPing;
+    TBuf<> tmpBufPong;
 
     AscendC::GlobalTensor<OUT_TYPE> dqGm, dkGm, dvGm;
     // input
@@ -163,10 +170,16 @@ __aicore__ inline void FlashAttentionScoreGradPost<OUT_TYPE, TILING_TYPE, CAST_D
                                       tilingData->postTilingData.dvWorkSpaceOffset / sizeof(float));
     }
 
-    pipe->InitBuffer(inQueue, 1, ubBaseSize * 2 + nzReservedSize);
-    pipe->InitBuffer(outQueue, 1, ubBaseSize);
     if constexpr (INPUT_FORMAT == NZ) {
-        pipe->InitBuffer(tmpBuf, ubBaseSize * 2);
+        pipe->InitBuffer(inQueuePing, 1, ubBaseSize * 2 + nzReservedSize);
+        pipe->InitBuffer(inQueuePong, 1, ubBaseSize * 2 + nzReservedSize);
+        pipe->InitBuffer(outQueuePing, 1, ubBaseSize);
+        pipe->InitBuffer(outQueuePong, 1, ubBaseSize);
+        pipe->InitBuffer(tmpBufPing, ubBaseSize * 2);
+        pipe->InitBuffer(tmpBufPong, ubBaseSize * 2);
+    } else {
+        pipe->InitBuffer(inQueue, 1, ubBaseSize * 2);
+        pipe->InitBuffer(outQueue, 1, ubBaseSize);
     }
 }
 
@@ -268,11 +281,32 @@ template <typename OUT_TYPE, typename TILING_TYPE, const bool CAST_DV, const uin
           const uint32_t INPUT_FORMAT>
 __aicore__ inline void FlashAttentionScoreGradPost<OUT_TYPE, TILING_TYPE, CAST_DV, LAYOUT, INPUT_FORMAT>::NZVecClc(
     GlobalTensor<float> srcGm, GlobalTensor<OUT_TYPE> dstGm, uint64_t dataSize, GM_ADDR seqS, int64_t curG,
-    int64_t &curS, bool needMuls)
+    int64_t &curS, bool needMuls, int64_t flag)
 {
-    LocalTensor<float> vecIn = inQueue.template AllocTensor<float>();
-    LocalTensor<float> tmpTensor = tmpBuf.template Get<float>();
-    LocalTensor<OUT_TYPE> vecOut = outQueue.template AllocTensor<OUT_TYPE>();
+    if (dataSize == 0) {
+        return;
+    }
+
+    TQue<QuePosition::VECIN, BUFFER_NUM> inQueueCommon;
+    TQue<QuePosition::VECOUT, BUFFER_NUM> outQueueCommon;
+    TBuf<> tmpBufCommon;
+    event_t curEventId;
+    if (flag) {
+        inQueueCommon = inQueuePing;
+        outQueueCommon = outQueuePing;
+        tmpBufCommon = tmpBufPing;
+        curEventId = EVENT_ID6;
+    } else {
+        inQueueCommon = inQueuePong;
+        outQueueCommon = outQueuePong;
+        tmpBufCommon = tmpBufPong;
+        curEventId = EVENT_ID7;
+    }
+
+    LocalTensor<float> vecIn = inQueueCommon.template AllocTensor<float>();
+    LocalTensor<float> tmpTensor = tmpBufCommon.template Get<float>();
+    LocalTensor<OUT_TYPE> vecOut = outQueueCommon.template AllocTensor<OUT_TYPE>();
+
     uint32_t sClcSize = dataSize / d;
 
     uint64_t sLen = (sIdx + sClcSize) > curS ? (curS - sIdx) : sClcSize;
@@ -293,8 +327,8 @@ __aicore__ inline void FlashAttentionScoreGradPost<OUT_TYPE, TILING_TYPE, CAST_D
         DataCopyPad(vecIn[inUbOffset], srcGm[copyInSrcOffset], intriParams, {false, 0, 0, 0});
         sClcSize = sClcSize - sLen;
 
-        inQueue.EnQue(vecIn);
-        inQueue.template DeQue<float>();
+        inQueueCommon.EnQue(vecIn);
+        inQueueCommon.template DeQue<float>();
 
         if constexpr (!AscendC::IsSameType<OUT_TYPE, float>::value) {
             NZ2ND(tmpTensor, vecIn, sLen, ubOffset, inUbOffset);
@@ -303,7 +337,7 @@ __aicore__ inline void FlashAttentionScoreGradPost<OUT_TYPE, TILING_TYPE, CAST_D
         }
 
         if (sClcSize <= 0) {
-            inQueue.FreeTensor(vecIn);
+            inQueueCommon.FreeTensor(vecIn);
         }
 
         pipe_barrier(PIPE_V);
@@ -325,8 +359,8 @@ __aicore__ inline void FlashAttentionScoreGradPost<OUT_TYPE, TILING_TYPE, CAST_D
             pipe_barrier(PIPE_V);
         }
 
-        outQueue.EnQue(vecOut);
-        outQueue.template DeQue<OUT_TYPE>();
+        outQueueCommon.EnQue(vecOut);
+        outQueueCommon.template DeQue<OUT_TYPE>();
 
         if constexpr (LAYOUT == TND) {
             DataCopyPad(dstGm[copyOutDstOffset], vecOut[ubOffset],
@@ -369,12 +403,11 @@ __aicore__ inline void FlashAttentionScoreGradPost<OUT_TYPE, TILING_TYPE, CAST_D
         if ((sLen > 0) && (inUbOffset + dataLen + dAlign / C0_SIZE * cal_block_num) * sizeof(float) >
                               ubBaseSize * 2 + nzReservedSize) {
             inUbOffset = 0;
-            event_t curEventId = EVENT_ID7;
             set_flag(PIPE_V, PIPE_MTE2, curEventId);
             wait_flag(PIPE_V, PIPE_MTE2, curEventId);
         }
     }
-    outQueue.FreeTensor(vecOut);
+    outQueueCommon.FreeTensor(vecOut);
 }
 
 template <typename OUT_TYPE, typename TILING_TYPE, const bool CAST_DV, const uint32_t LAYOUT,
@@ -388,11 +421,14 @@ __aicore__ inline void FlashAttentionScoreGradPost<OUT_TYPE, TILING_TYPE, CAST_D
     }
 
     InitIndex(qBegin, g, s1, actual_seq_qlen_addr);
-    for (uint64_t i = qBegin; i < qEnd; i = i + qPostBaseNum) {
+
+    for (uint64_t i = qBegin; i < qEnd; i = i + 2 * qPostBaseNum) {
         uint64_t dataSize = i + qPostBaseNum < qPostBlockTotal ? qPostBaseNum : qPostTailNum;
-        NZVecClc(dqWorkSpaceGm, dqGm, dataSize, actual_seq_qlen_addr, g, s1, true);
+        NZVecClc(dqWorkSpaceGm, dqGm, dataSize, actual_seq_qlen_addr, g, s1, true, 0);
+        uint64_t dataSize1 = i + 2 * qPostBaseNum < qPostBlockTotal ? qPostBaseNum : qPostTailNum;
+        dataSize1 = i + qPostBaseNum >= qPostBlockTotal ? 0 : dataSize1;
+        NZVecClc(dqWorkSpaceGm, dqGm, dataSize1, actual_seq_qlen_addr, g, s1, true, 1);
     }
-    pipe_barrier(PIPE_ALL);
 
     // init k
     uint64_t kvBegin = cBlockIdx * kvPostBlockFactor * kvPostBaseNum;
@@ -401,19 +437,26 @@ __aicore__ inline void FlashAttentionScoreGradPost<OUT_TYPE, TILING_TYPE, CAST_D
         kvEnd = kvPostBlockTotal;
     }
     InitIndex(kvBegin, 1, s2, actual_seq_kvlen_addr);
-    for (uint64_t i = kvBegin; i < kvEnd; i = i + kvPostBaseNum) {
+    for (uint64_t i = kvBegin; i < kvEnd; i = i + 2 * kvPostBaseNum) {
         uint64_t dataSize = i + kvPostBaseNum < kvPostBlockTotal ? kvPostBaseNum : kvPostTailNum;
-        NZVecClc(dkWorkSpaceGm, dkGm, dataSize, actual_seq_kvlen_addr, 1, s2, true);
+        NZVecClc(dkWorkSpaceGm, dkGm, dataSize, actual_seq_kvlen_addr, 1, s2, true, 0);
+        uint64_t dataSize1 = i + 2 * kvPostBaseNum < kvPostBlockTotal ? kvPostBaseNum : kvPostTailNum;
+        dataSize1 = i + kvPostBaseNum >= kvPostBlockTotal ? 0 : dataSize1;
+        NZVecClc(dkWorkSpaceGm, dkGm, dataSize1, actual_seq_kvlen_addr, 1, s2, true, 1);
     }
-    pipe_barrier(PIPE_ALL);
 
     // init v
-    InitIndex(kvBegin, 1, s2, actual_seq_kvlen_addr);
-    for (uint64_t i = kvBegin; i < kvEnd; i = i + kvPostBaseNum) {
-        uint64_t dataSize = i + kvPostBaseNum < kvPostBlockTotal ? kvPostBaseNum : kvPostTailNum;
-        NZVecClc(dvWorkSpaceGm, dvGm, dataSize, actual_seq_kvlen_addr, 1, s2, false);
+    if constexpr (CAST_DV) {
+        InitIndex(kvBegin, 1, s2, actual_seq_kvlen_addr);
+        for (uint64_t i = kvBegin; i < kvEnd; i = i + 2 * kvPostBaseNum) {
+            uint64_t dataSize = i + kvPostBaseNum < kvPostBlockTotal ? kvPostBaseNum : kvPostTailNum;
+            NZVecClc(dvWorkSpaceGm, dvGm, dataSize, actual_seq_kvlen_addr, 1, s2, false, 0);
+            uint64_t dataSize1 = i + 2 * kvPostBaseNum < kvPostBlockTotal ? kvPostBaseNum : kvPostTailNum;
+            dataSize1 = i + kvPostBaseNum >= kvPostBlockTotal ? 0 : dataSize1;
+            NZVecClc(dvWorkSpaceGm, dvGm, dataSize1, actual_seq_kvlen_addr, 1, s2, false, 1);
+        }
+        pipe_barrier(PIPE_ALL);
     }
-    pipe_barrier(PIPE_ALL);
 }
 
 template <typename OUT_TYPE, typename TILING_TYPE, const bool CAST_DV, const uint32_t LAYOUT,

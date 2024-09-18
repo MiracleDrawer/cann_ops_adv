@@ -19,15 +19,6 @@
 #include "fa_case.h"
 #include "aclnn_fa_case.h"
 
-#ifdef TESTS_UT_OPS_TEST_CI_PR
-/**
- * 用于控制个别用例在 PR 门禁场景不执行 Kernel
- */
-constexpr bool FaRunKernelCtrlFlag = false;
-#else
-constexpr bool FaRunKernelCtrlFlag = true;
-#endif
-
 using FaParam = ops::adv::tests::fa::FaParam;
 using PseShapeType = ops::adv::tests::fa::FaParam::PseShapeType;
 using DropMaskShapeType = ops::adv::tests::fa::FaParam::DropMaskShapeType;

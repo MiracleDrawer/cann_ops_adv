@@ -40,6 +40,7 @@ constexpr uint32_t BITNUM = 8;
 constexpr int64_t GM_ALIGN = 512;
 constexpr uint32_t MAX_STRIDE_LIMIT = 65535;
 constexpr uint32_t MM_RATIO_4 = 4;
+constexpr uint32_t MM_RATIO_8 = 8;
 constexpr uint32_t PSE_ALIBI_S1_SIZE = 1024;
 constexpr uint32_t PSE_ALIBI_S2_LIMIT_SIZE = 1024;
 constexpr uint32_t PSE_DIM_NUM_1 = 1;
@@ -49,6 +50,12 @@ constexpr uint32_t VEC_REPEAT_LIMIT = 255;
 constexpr uint32_t BAND_MODE = 3;
 constexpr uint32_t POST_COEX_NODE = 3;
 constexpr uint32_t BUFFER_NUM = 1;
+constexpr int64_t S_LEN_64 = 64;
+constexpr int64_t S_LEN_512 = 512;
+constexpr int64_t S_LEN_1024 = 1024;
+constexpr int64_t FP16_BLOCK_NUMS = 16;
+constexpr uint64_t B4_L2_CACHESIZE = 96 * 1024 * 1024;
+
 const char* templateNameBn2 = "FlashAttentionScoreGradTilingS1s2Bn2";
 const std::vector<gert::Shape> MODULE1_TEMPLATE_SUPPORTED_SHAPE = {
     // 5d shape [B, N,S1,S2,D]
@@ -66,10 +73,8 @@ enum KernelBranch {
 
 bool FlashAttentionScoreGradTilingS1s2Bn2::IsCapable()
 {
-    int64_t nNums = td_.opInfo.get_B() * td_.opInfo.get_N2();
-    if (nNums < static_cast<int64_t>(aicoreParams_.blockDim)) {
-        OPS_LOG_I(context_, "FlashAttentionScoreGradTilingS1s2Bn2 not support this case: nNums: %ld < coreNums: %lu",
-                  nNums, aicoreParams_.blockDim);
+    if (td_.opInfo.get_S1() >= 1024 || td_.opInfo.get_S2() >= 1024) {
+        OPS_LOG_I(context_, "maxS1 or maxS2 is less than 1024, FlashAttentionScoreGradTilingS1s2Bn2 not support.");
         return false;
     }
     return true;
@@ -78,10 +83,24 @@ bool FlashAttentionScoreGradTilingS1s2Bn2::IsCapable()
 bool FlashAttentionScoreGradTilingDeterministic::IsCapable()
 {
     OPS_LOG_D(context_, "Get deterministic flag is %d", context_->GetDeterministic());
-    if (context_->GetDeterministic() == 1) {
+    if (context_->GetDeterministic() != 1) {
+        return false;
+    }
+
+    // 支持fp32 确定性计算，走该模板
+    OPS_ERR_IF(context_->GetInputDesc(QUERY) == nullptr,
+               OPS_REPORT_VECTOR_INNER_ERR(context_, "InputDesc of query is nullptr."),
+               return false);
+    if (context_->GetInputDesc(QUERY)->GetDataType() == ge::DT_FLOAT) {
         return true;
     }
-    return false;
+
+    if (td_.opInfo.get_S1() >= 1024 || td_.opInfo.get_S2() >= 1024) {
+        OPS_LOG_I(context_, "maxS1 or maxS2 is less than 1024, FlashAttentionScoreGradTilingS1s2Bn2 not support.");
+        return false;
+    }
+
+    return true;
 }
 
 uint64_t FlashAttentionScoreGradTilingS1s2Bn2::GetTilingKey() const
@@ -104,7 +123,7 @@ uint64_t FlashAttentionScoreGradTilingS1s2Bn2::GetTilingKey() const
     if ((tmpData_.queryType == ge::DT_FLOAT)) {
         inDtype = DtypeEnum::FLOAT32;
     }
-    if ((tmpData_.s2 % (GM_ALIGN / B32)) != 0 && tmpData_.queryType != ge::DT_FLOAT) {
+    if (tmpData_.queryType != ge::DT_FLOAT) {
         // 非cacheline对齐场景使能NZ优化
         mmOutFormat = CubeFormatEnum::NZ;
     }
@@ -123,10 +142,9 @@ uint64_t FlashAttentionScoreGradTilingS1s2Bn2::GetTilingKey() const
         mmOutFormat = CubeFormatEnum::ND;
     }
 
-    auto mm345IsNZOut = tmpData_.queryType != ge::DT_FLOAT && !isTnd && (tmpData_.d == 72 || tmpData_.d == 88)
-        ? OptionEnum::ENABLE : OptionEnum::DISABLE;
+    auto mm345NZOut = tmpData_.isMM345NZOut ? OptionEnum::ENABLE : OptionEnum::DISABLE;
     tilingKey = GET_TILINGKEY(AxisEnum::S2, AxisEnum::S1, AxisEnum::N2, inDtype, layout, SparseEnum::ALL, mmConfig,
-                mmOutFormat, tmpData_.pse_cfg, tmpData_.atten_mask_cfg, tmpData_.drop_out_cfg, mm345IsNZOut);
+                mmOutFormat, tmpData_.pse_cfg, tmpData_.atten_mask_cfg, tmpData_.drop_out_cfg, mm345NZOut);
 
     OPS_LOG_I(context_, "FAGTiling S1s2Bn2 DoTiling success, tilingkey is %lu.", tilingKey);
     return tilingKey;
@@ -147,24 +165,26 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::GetPlatformInfo()
         aicoreParams_.l0aSize = compileInfoPtr->l0aSize;
         aicoreParams_.l0bSize = compileInfoPtr->l0bSize;
         aicoreParams_.l0cSize = compileInfoPtr->l0cSize;
+        l2CacheSize = compileInfoPtr->l2CacheSize; // AiCoreParams使用的是cann仓的结构体，l2CacheSize暂时定义成类成员变量
     } else {
         auto ascendcPlatform = platform_ascendc::PlatformAscendC(platformInfoPtr);
         aicoreParams_.blockDim = ascendcPlatform.GetCoreNumAiv();
         aicoreParams_.aicNum = ascendcPlatform.GetCoreNumAic();
         ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::UB, aicoreParams_.ubSize);
         ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L1, aicoreParams_.l1Size);
+        ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L2, l2CacheSize);
         ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_A, aicoreParams_.l0aSize);
         ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_B, aicoreParams_.l0bSize);
         ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_C, aicoreParams_.l0cSize);
     }
 
     OPS_ERR_IF((aicoreParams_.blockDim == 0) || (aicoreParams_.aicNum == 0),
-                OPS_REPORT_VECTOR_INNER_ERR(context_, "num of coreNum(aivNum) is %ld, num of aicNum is %ld.",
+                OPS_REPORT_VECTOR_INNER_ERR(context_, "num of coreNum(aivNum) is %lu, num of aicNum is %lu.",
                 aicoreParams_.blockDim, aicoreParams_.aicNum),
                 return ge::GRAPH_FAILED);
 
-    OPS_ERR_IF(aicoreParams_.ubSize <= 0,
-                OPS_REPORT_VECTOR_INNER_ERR(context_, "ubSize is invalid."),
+    OPS_ERR_IF(aicoreParams_.ubSize <= 0 || l2CacheSize <= 0,
+                OPS_REPORT_VECTOR_INNER_ERR(context_, "ubSize or l2CacheSize is invalid."),
                 return ge::GRAPH_FAILED);
 
     return ge::GRAPH_SUCCESS;
@@ -178,7 +198,6 @@ void FlashAttentionScoreGradTilingS1s2Bn2::DecideBranch()
     tmpData_.mask = MASK_FLOAT_VALUE;
     tmpData_.queryType = static_cast<uint32_t>(context_->GetInputDesc(QUERY)->GetDataType());
 
-    // 新需求默认走高精度，2023/9/26 by zhangguangjun
     tmpData_.calcMode = HIGH_PRECISION_0;
     OPS_LOG_D(context_, "calcMode is %d", tmpData_.calcMode);
 
@@ -195,7 +214,6 @@ void FlashAttentionScoreGradTilingS1s2Bn2::DecideBranch()
         tmpData_.branch = BRANCH_BF16;
     }
 }
-
 
 ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::SetMaskShapeType(const gert::Shape &storageShape,
                                                                        const uint32_t maskShapeDims)
@@ -505,7 +523,7 @@ bool FlashAttentionScoreGradTilingS1s2Bn2::ProcessPrefix()
         return false;
     }
     auto shapeSize = prefixNTensor->GetShapeSize();
-    for (auto i = 0; i < shapeSize; i++) {
+    for (int64_t i = 0; i < shapeSize; i++) {
         tmpData_.prefixN.push_back(value[i]);
     }
 
@@ -729,6 +747,20 @@ void FlashAttentionScoreGradTilingS1s2Bn2::NMDStrategy()
         tmpData_.b * tmpData_.n2 * tmpData_.d > MAX_STRIDE_LIMIT) {
         return;
     }
+
+    // D>64时，调整S2满配比及mm基本块
+    if (td_.opInfo.get_D() > BASE_LEN_64) {
+        if (td_.opInfo.get_S2() < S_LEN_512) {
+            // 减少S1方向循环次数，调大mm基本块
+            baseMmm = std::min(BASE_LEN_256, AlignData(static_cast<uint32_t>(td_.opInfo.get_S1()), FRACTAL_NUM));
+            baseNmm = std::min(BASE_LEN_128, AlignData(static_cast<uint32_t>(td_.opInfo.get_S2()), FRACTAL_NUM));
+            needSetFixSplit = true;
+        } else if (td_.opInfo.get_S2() > S_LEN_512 && td_.opInfo.get_S2() < S_LEN_1024 &&
+                   l2CacheSize > B4_L2_CACHESIZE) { // B4带宽及L2降了一半，不使能这个优化
+            mmRatio = MM_RATIO_8; // S2方向满配比，减少S2方向数据重复搬运
+        }
+    }
+
     // 优先S2方向配比，S2方向不够时，S1方向配比，但保证S1和S2方向的配比不超过MM_RATIO
     s1Ratio = 1;
     s2Ratio = CeilCommon(td_.opInfo.get_S2(), baseNmm);
@@ -1097,21 +1129,22 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::DoCastTiling()
     }
     uint32_t typeSize = tmpData_.queryType == ge::DT_FLOAT ? B32 : B16;
     uint32_t usedCoreNum = td_.opInfo.get_castUsedCoreNum();
-    constexpr uint32_t POST_NZ_COEX_NODE = 5;
-    constexpr uint32_t BLOCK_SIZE = 32;
-    constexpr uint32_t POST_NZ_RESERVED_N = 1;
-    auto mm345IsNZOut = tmpData_.queryType != ge::DT_FLOAT &&
-        td_.opInfo.get_layout() != static_cast<uint32_t>(InputLayout::TND) && (tmpData_.d == 72 || tmpData_.d == 88);
+    constexpr uint32_t postNzCoexNode = 10;
+    constexpr uint32_t blockSize = 32;
+    constexpr uint32_t postNzReservedN = 1;
+    tmpData_.isMM345NZOut = tmpData_.queryType != ge::DT_FLOAT &&
+        td_.opInfo.get_layout() != static_cast<uint32_t>(InputLayout::TND) &&
+        (tmpData_.d == 72 || tmpData_.d == 80 ||  tmpData_.d == 88 || tmpData_.d == 96); //mm345NZ出 72, 80, 88, 96
     uint32_t postUbBaseSize = 0;
     uint32_t qPostBaseNum = 0;
     int64_t nzReservedSize = 0;
-    if (!mm345IsNZOut) {
+    if (!tmpData_.isMM345NZOut) {
         postUbBaseSize = (aicoreParams_.ubSize) / POST_COEX_NODE / BUFFER_NUM / BASE_LEN_256 * BASE_LEN_256;
         qPostBaseNum = postUbBaseSize / typeSize;
     } else {
-        int64_t curPostCoexNode = POST_NZ_COEX_NODE;
-        nzReservedSize = dAlign / 16 * BLOCK_SIZE * POST_NZ_RESERVED_N; // 16为一个单元长度
-        postUbBaseSize = (aicoreParams_.ubSize - nzReservedSize) / curPostCoexNode / BUFFER_NUM /
+        int64_t curPostCoexNode = postNzCoexNode;
+        nzReservedSize = dAlign / 16 * blockSize * postNzReservedN; // 16为一个单元长度
+        postUbBaseSize = (aicoreParams_.ubSize - 2 * nzReservedSize) / curPostCoexNode / BUFFER_NUM / // 开DB预留2份nzReservedSize
                              BASE_LEN_256 * BASE_LEN_256;
         qPostBaseNum = postUbBaseSize / typeSize / dAlign * td_.opInfo.get_D();
     }
@@ -1304,13 +1337,13 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::GetWorkspaceSize()
         tmpData_.pseAlibiBaseS2 = PSE_ALIBI_S2_LIMIT_SIZE;
         int64_t s2Tail = td_.opInfo.get_S2() % PSE_ALIBI_S2_LIMIT_SIZE;
         if (s2Tail != 0) {
-            tmpData_.pseAlibiBaseS1 = std::min(static_cast<int64_t>(baseMmm),
+            tmpData_.pseAlibiBaseS1 = std::min(static_cast<int64_t>(BASE_LEN_128),
                                                UB_BASIC_LIMIT_SIZE / AlignUp(s2Tail, FRACTAL_NUM));
         } else {
-            tmpData_.pseAlibiBaseS1 = std::min(static_cast<int64_t>(baseMmm),
+            tmpData_.pseAlibiBaseS1 = std::min(static_cast<int64_t>(BASE_LEN_128),
                                                UB_BASIC_LIMIT_SIZE / tmpData_.pseAlibiBaseS2);
         }
-        tmpData_.pseAlibiBaseS1 = std::max(tmpData_.pseAlibiBaseS1, UB_BASIC_LIMIT_SIZE / baseMmm);
+        tmpData_.pseAlibiBaseS1 = std::max(tmpData_.pseAlibiBaseS1, UB_BASIC_LIMIT_SIZE / BASE_LEN_128);
         int64_t pseAlibiBytes = AlignUp(tmpData_.pseAlibiBaseS2 * tmpData_.pseAlibiBaseS1 * 2, GM_ALIGN) *
                                 td_.opInfo.get_usedCoreNum();
         workspaces[0] += pseAlibiBytes;
@@ -1804,6 +1837,20 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::SetBmm4TilingData(uint32_t
     mm4.SetShape(singleN, td_.opInfo.get_D(), singleM);
     mm4.SetOrgShape(m, n, ka, kb);
     mm4.SetBias(false);
+
+    int64_t dAlign = (td_.opInfo.get_D() + FP16_BLOCK_NUMS - 1) / FP16_BLOCK_NUMS * FP16_BLOCK_NUMS;
+    int64_t minBaseN = std::min(BASE_LEN_128, static_cast<uint32_t>(dAlign));
+    if (tmpData_.isMM345NZOut) {
+        minBaseN = std::min(BASE_LEN_256, static_cast<uint32_t>(dAlign));
+        mm4.SetFixSplit(-1, minBaseN, -1);
+    }
+
+    if (needSetFixSplit) {
+        int64_t s2Align = (td_.opInfo.get_S2() + FRACTAL_NUM - 1) / FRACTAL_NUM * FRACTAL_NUM;
+        int64_t minBaseM = std::min(BASE_LEN_256, static_cast<uint32_t>(s2Align));
+        mm4.SetFixSplit(minBaseM, minBaseN, -1);
+    }
+
     mm4.SetBufferSpace(l1SizeRemain, aicoreParams_.l0cSize);
     OPS_ERR_IF((mm4.GetTiling(td_.mm4TilingData) != 0),
                 OPS_LOG_W(context_, "FlashAttentionScoreGradTilingS1s2Bn2 mm4 GetTiling Failed."),

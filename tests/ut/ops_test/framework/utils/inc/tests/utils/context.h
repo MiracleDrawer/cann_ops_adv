@@ -146,7 +146,11 @@ protected:
     bool InitTilingJsonStr();
     bool ParseTilingResult();
 
-    static bool CheckKernelResultStr(std::string &kernelLog);
+    typedef bool (*CheckKernelResultCbf)(std::string &kernelLog);
+    bool CheckKernelResult(bool &ret, std::string &caseName, std::string &path, const char *type,
+                           CheckKernelResultCbf cbf, bool detail = true);
+    static bool CheckModelKernelResultStr(std::string &kernelLog);
+    static bool CheckFrameworkKernelResultStr(std::string &kernelLog);
 
     template <class T> bool DetectField(T &field, const char *fPrefix, const char *fSuffix)
     {

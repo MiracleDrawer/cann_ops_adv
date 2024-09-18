@@ -131,25 +131,31 @@ public:
     __aicore__ inline void Process();
 
     using aType = MatmulType<TPosition::GM, CubeFormat::ND, T1>;
+    using aTypeMM34 = MatmulType<TPosition::GM, MM_OUT_FORMAT, T1>;
     using bType = MatmulType<TPosition::GM, CubeFormat::ND, T1>;
     using aTypeUB = MatmulType<TPosition::VECCALC, CubeFormat::ND, T1>;
     using bTypeUB = MatmulType<TPosition::VECCALC, CubeFormat::ND, T1>;
-    using aTypeTranspose = MatmulType<TPosition::GM, CubeFormat::ND, T1, true>;
+    using aTypeTranspose = MatmulType<TPosition::GM, MM_OUT_FORMAT, T1, true>;
     using bTypeTranspose = MatmulType<TPosition::GM, CubeFormat::ND, T1, true>;
     using aTypeUBTranspose = MatmulType<TPosition::VECCALC, CubeFormat::ND, T1, true>;
     using bTypeUBTranspose = MatmulType<TPosition::VECCALC, CubeFormat::ND, T1, true>;
 
     using cType = MatmulType<TPosition::GM, MM2_OUT_FORMAT, float>;
-    using cTypeUB = MatmulType<TPosition::VECCALC, CubeFormat::ND_ALIGN, T2>;
-    using cTypeMM = MatmulType<TPosition::GM, MM_OUT_FORMAT, T2>;
+    using cTypeMMNZ = MatmulType<TPosition::GM, CubeFormat::NZ, T2>;
+    using cTypeMMAlign = MatmulType<TPosition::GM, CubeFormat::ND_ALIGN, T2>;
     using biasType = MatmulType<TPosition::GM, CubeFormat::ND, float>;
 
-    Matmul<aType, bTypeTranspose, cTypeMM, biasType, MM_CFG> mm1;
+    using modeTypemm12 = typename AscendC::Conditional<
+        (MM_OUT_FORMAT == CubeFormat::NZ),
+        Matmul<aType, bTypeTranspose, cTypeMMNZ, biasType, MM_CFG>,
+        Matmul<aType, bTypeTranspose, cTypeMMAlign, biasType, MM_CFG>>::type;
+
+    modeTypemm12 mm1; //mm12
 
     using modeTypeDq = typename AscendC::Conditional<
         (MM_OUT_FORMAT == CubeFormat::NZ && MM2_OUT_FORMAT == CubeFormat::NZ),
-        Matmul<aType, bType, cType, biasType, MM_CFG, MatmulCallBackFunc<DataCopyOutLocal>>,
-        Matmul<aType, bType, cType, biasType, MM_CFG>>::type;
+        Matmul<aTypeMM34, bType, cType, biasType, MM_CFG, MatmulCallBackFunc<DataCopyOutLocal>>,
+        Matmul<aTypeMM34, bType, cType, biasType, MM_CFG>>::type;
 
     modeTypeDq mm3_1; //dq
 
@@ -183,13 +189,13 @@ protected:
                                        const int64_t org_m);
     __aicore__ inline void SendMatmulDV(const uint32_t real_n, const uint32_t align_n, const uint32_t s1_inner,
                                         const int64_t a_in_addr, const int64_t b_in_addr, const int64_t out_addr,
-                                        const bool is_sync);
+                                        const bool is_sync, const uint8_t kvAtomic);
     __aicore__ inline void SendMatmulDQ(const uint32_t real_n, const uint32_t align_n, const uint32_t s1_inner,
                                         const int64_t a_in_addr, const int64_t b_in_addr, const int64_t out_addr,
-                                        const bool is_sync);
+                                        const bool is_sync, const uint8_t qAtomic);
     __aicore__ inline void SendMatmulDK(const uint32_t real_n, const uint32_t align_n, const uint32_t s1_inner,
                                         const int64_t a_in_addr, const int64_t b_in_addr, const int64_t out_addr,
-                                        const bool is_sync);
+                                        const bool is_sync, const uint8_t kvAtomic);
     __aicore__ inline void MTE2_ATMask(LocalTensor<uint8_t> &attenMaskTensor, int64_t &attenMaskOffset,
                                        PingPongEmitInsn &insn);
     __aicore__ inline void MTE2_SFT(LocalTensor<T2> &sumTensor, LocalTensor<T2> &maxTensor, int64_t &sumMaxOffset,
@@ -226,8 +232,8 @@ protected:
                                             PingPongEmitInsn &insn);
     __aicore__ inline void AssureUsefulDataBySingleN();
 
-    __aicore__ inline void S2Ratio();
-    __aicore__ inline void S1Ratio(int64_t s2_o_o);
+    __aicore__ inline void S2Ratio(const int64_t gIdx);
+    __aicore__ inline void S1Ratio(int64_t s2_o_o, const int64_t gIdx);
     __aicore__ inline bool CalcUsefulDataByS2();
     __aicore__ inline void VectorByCS1(int64_t mm1Addr, int64_t mm2Addr, int64_t mm3Addr, int64_t mm4Addr);
     __aicore__ inline void VectorByS1S2(int64_t mm1Addr, int64_t mm2Addr, int64_t mm3Addr, int64_t mm4Addr);
@@ -235,7 +241,8 @@ protected:
     __aicore__ inline void MTE2ForMM2(LocalTensor<T2> &mm2TensorCurr, int64_t &mm2Offset, PingPongEmitInsn &insn);
     __aicore__ inline void MTE2ForMM1(LocalTensor<T2> &mm1TensorCurr, int64_t &mm1Offset, PingPongEmitInsn &insn);
     __aicore__ inline void NZ2ND(LocalTensor<T2> &ndTensor, LocalTensor<T2> &nzTensor, PingPongEmitInsn &insn);
-    __aicore__ inline void NZCopyIn(int64_t mmAddr, Matmul<aType, bTypeTranspose, cTypeMM, biasType, MM_CFG> &mm,
+    __aicore__ inline void ND2NZ(LocalTensor<T1> &nzTensor, LocalTensor<T1> &ndTensor, PingPongEmitInsn &insn);
+    __aicore__ inline void NZCopyIn(int64_t mmAddr, Matmul<aType, bTypeTranspose, cTypeMMNZ, biasType, MM_CFG> &mm,
                                     GlobalTensor<T2> &mmWspGm, LocalTensor<T2> &mmTensorCurr, PingPongEmitInsn &insn);
     __aicore__ inline void UpdateLoopParams(int64_t i);
     __aicore__ inline void MallocNodes();
@@ -406,6 +413,7 @@ protected:
     uint32_t usedSingleNNum{0};
     uint32_t realProcessN{0};
     uint32_t b16AlignProcessN{0};
+    uint32_t alignProcessM{0};
     uint32_t b32AlignProcessN{0};
     int64_t mm1WorkspaceAddr{0};
     int64_t mm2WorkspaceAddr{0};
@@ -424,6 +432,9 @@ protected:
     int64_t s1_addr_nzout{0};
     int64_t s2_addr_nzout{0};
     // 记录前一次变量
+    uint32_t lastGIdx{0};
+    uint32_t lastS1OO{0};
+    uint32_t lastS2OO{0};
     uint32_t lastProcessM{0};
     uint32_t lastRealProcessN{0};
     uint32_t b16LastRealAlignProcessN{0};
@@ -560,7 +571,9 @@ FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MAS
 
     InitCastWorkspace(workspace);
 
-    AtomicClean();
+    if (isSparse == 1) {
+        AtomicClean();
+    }
 
     InitUB(pipe_in);
 
@@ -785,7 +798,7 @@ FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MAS
     TPipe *pipe_in)
 {
     pipe = pipe_in;
-    pipe->InitBuffer(vecQue, 181 * 1024);
+    pipe->InitBuffer(vecQue, 183 * 1024);
     pipe->InitBuffer(softmaxGradOutQue, sft.singleM * BLOCK); // 8K
 
     // hold on tensors
@@ -925,16 +938,23 @@ FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MAS
     // send shape is [rp.vS1Inner, rp.vS2Inner]
     // need consider DB
     DataCopyParams intriParams;
-    if (b16AlignProcessN == insn.s2InnerAlign) {
-        intriParams.blockCount = 1;
-        intriParams.blockLen = insn.s1Inner * insn.s2InnerAlign * sizeof(T1);
-        intriParams.srcStride = 0;
-        intriParams.dstStride = 0;
+    if constexpr (MM_OUT_FORMAT == CubeFormat::NZ) {
+        intriParams.blockCount = insn.s2InnerAlign / C0_SIZE;
+        intriParams.blockLen = insn.s1Inner * C0_SIZE * sizeof(T1);
+        intriParams.srcStride = 1;
+        intriParams.dstStride = (alignProcessM - insn.s1Inner) * C0_SIZE * sizeof(T1);
     } else {
-        intriParams.blockCount = insn.s1Inner;
-        intriParams.blockLen = insn.s2InnerAlign * sizeof(T1);
-        intriParams.srcStride = 0;
-        intriParams.dstStride = (b16AlignProcessN - insn.s2InnerAlign) * sizeof(T1);
+        if (b16AlignProcessN == insn.s2InnerAlign) {
+            intriParams.blockCount = 1;
+            intriParams.blockLen = insn.s1Inner * insn.s2InnerAlign * sizeof(T1);
+            intriParams.srcStride = 0;
+            intriParams.dstStride = 0;
+        } else {
+            intriParams.blockCount = insn.s1Inner;
+            intriParams.blockLen = insn.s2InnerAlign * sizeof(T1);
+            intriParams.srcStride = 0;
+            intriParams.dstStride = (b16AlignProcessN - insn.s2InnerAlign) * sizeof(T1);
+        }
     }
     DataCopyPad(dstGm, srcTensor, intriParams);
 }
@@ -988,7 +1008,7 @@ FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MAS
                                LAYOUT, MM2_OUT_FORMAT>::SendMatmulDV(const uint32_t real_n, const uint32_t align_n,
                                                      const uint32_t s1_inner, const int64_t a_in_addr,
                                                      const int64_t b_in_addr, const int64_t out_addr,
-                                                     const bool is_sync)
+                                                     const bool is_sync, const uint8_t kvAtomic)
 {
     /*
     BNGSD:
@@ -999,19 +1019,23 @@ FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MAS
       For B, n = D, k = S1
       For C, m = S2, n = D
     */
+    int64_t s1Size = dimS1;
+    if constexpr (MM_OUT_FORMAT == CubeFormat::NZ) {
+        s1Size = alignProcessM;
+    }
     if (mmDVScalar != align_n) {
         mmDVScalar = align_n;
         if constexpr (LAYOUT == BNGSD) {
-            mm4.SetOrgShape(align_n, dimD, dimS1, dimS1);
+            mm4.SetOrgShape(align_n, dimD, s1Size, dimS1);
             if constexpr (MM2_OUT_FORMAT == CubeFormat::NZ) {
                 mm4.SetSelfDefineData(dimS2);
             }
         } else if constexpr (LAYOUT == BSNGD) {
             if constexpr (MM2_OUT_FORMAT == CubeFormat::NZ) {
-                mm4.SetOrgShape(align_n, dimD * dimN2 * dimG, dimS1, dimS1, dimD);
+                mm4.SetOrgShape(align_n, dimD * dimN2 * dimG, s1Size, dimS1, dimD);
                 mm4.SetSelfDefineData(dimS2);
             } else {
-                mm4.SetOrgShape(align_n, dimD * dimN2 * dimG, dimS1, dimS1, dimD * dimN2);
+                mm4.SetOrgShape(align_n, dimD * dimN2 * dimG, s1Size, dimS1, dimD * dimN2);
             }
         } else if constexpr (LAYOUT == TND) {
             if constexpr (MM2_OUT_FORMAT == CubeFormat::NZ) {
@@ -1022,41 +1046,28 @@ FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MAS
             }
         } else {
             if constexpr (MM2_OUT_FORMAT == CubeFormat::NZ) {
-                mm4.SetOrgShape(align_n, dimD * dimN2 * dimG * dimB, dimS1, dimS1, dimD);
+                mm4.SetOrgShape(align_n, dimD * dimN2 * dimG * dimB, s1Size, dimS1, dimD);
                 mm4.SetSelfDefineData(dimS2);
             } else {
-                mm4.SetOrgShape(align_n, dimD * dimN2 * dimG * dimB, dimS1, dimS1, dimD * dimN2 * dimB);
+                mm4.SetOrgShape(align_n, dimD * dimN2 * dimG * dimB, s1Size, dimS1, dimD * dimN2 * dimB);
             }
         }
     }
 
-    bool careWrite = false;
-    if constexpr (LAYOUT == BNGSD) {
-        careWrite = (out_addr + align_n * dimD) * sizeof(T2) > dvWorkspaceLen;
-    } else if constexpr (LAYOUT == BSNGD || LAYOUT == TND) {
-        careWrite = (out_addr + align_n * dimN2 * dimD) * sizeof(T2) > dvWorkspaceLen;
-    } else {
-        careWrite = (out_addr + align_n * dimB * dimN2 * dimD) * sizeof(T2) > dvWorkspaceLen;
-    }
-
-    if constexpr (IsSameType<T1, float>::value) {
-        mm4.SetTail(real_n, -1, s1_inner);
-    } else {
-        mm4.SetTail(careWrite ? real_n : align_n, -1, s1_inner);
-    }
+    mm4.SetTail(real_n, -1, s1_inner);
     mm4.SetTensorA(mm4InputWorkspaceGm[a_in_addr], true);
     mm4.SetTensorB(dyGm[b_in_addr]);
     if (is_sync) {
         if constexpr (!IsSameType<T1, float>::value) {
-            mm4.template IterateAll<true>(dvWorkspaceGm[out_addr], true);
+            mm4.template IterateAll<true>(dvWorkspaceGm[out_addr], kvAtomic);
         } else {
-            mm4.template IterateAll<true>(dvGm[out_addr], true);
+            mm4.template IterateAll<true>(dvGm[out_addr], kvAtomic);
         }
     } else {
         if constexpr (!IsSameType<T1, float>::value) {
-            mm4.template IterateAll<false>(dvWorkspaceGm[out_addr], true);
+            mm4.template IterateAll<false>(dvWorkspaceGm[out_addr], kvAtomic);
         } else {
-            mm4.template IterateAll<false>(dvGm[out_addr], true);
+            mm4.template IterateAll<false>(dvGm[out_addr], kvAtomic);
         }
     }
     mm4.End();
@@ -1070,7 +1081,7 @@ FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MAS
                                LAYOUT, MM2_OUT_FORMAT>::SendMatmulDQ(const uint32_t real_n, const uint32_t align_n,
                                                      const uint32_t s1_inner, const int64_t a_in_addr,
                                                      const int64_t b_in_addr, const int64_t out_addr,
-                                                     const bool is_sync)
+                                                     const bool is_sync, const uint8_t qAtomic)
 {
     /*
     BSH:
@@ -1081,18 +1092,22 @@ FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MAS
       For B, n = N2 * D, k = S2
       For C, m = S1, n = N1 * D
     */
+    int64_t s1Size = dimS1;
+    if constexpr (MM_OUT_FORMAT == CubeFormat::NZ) {
+        s1Size = alignProcessM;
+    }
     if (mmDQScalar != align_n) {
         mmDQScalar = align_n;
         if constexpr (MM_OUT_FORMAT == CubeFormat::NZ && MM2_OUT_FORMAT == CubeFormat::NZ) {
             mm3_1.SetSelfDefineData(dimS1);
         }
         if constexpr (LAYOUT == BNGSD) {
-            mm3_1.SetOrgShape(dimS1, dimD, align_n, align_n);
+            mm3_1.SetOrgShape(s1Size, dimD, align_n, align_n);
         } else if constexpr (LAYOUT == BSNGD) {
             if constexpr (MM2_OUT_FORMAT == CubeFormat::NZ) {
-                mm3_1.SetOrgShape(dimS1, dimD * dimN2, align_n, align_n, dimD);
+                mm3_1.SetOrgShape(s1Size, dimD * dimN2, align_n, align_n, dimD);
             } else {
-                mm3_1.SetOrgShape(dimS1, dimD * dimN2, align_n, align_n, dimD * dimN2 * dimG);
+                mm3_1.SetOrgShape(s1Size, dimD * dimN2, align_n, align_n, dimD * dimN2 * dimG);
             }
 
         } else if constexpr (LAYOUT == TND) {
@@ -1103,9 +1118,9 @@ FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MAS
             }
         } else {
             if constexpr (MM2_OUT_FORMAT == CubeFormat::NZ) {
-                mm3_1.SetOrgShape(dimS1, dimD * dimN2 * dimB, align_n, align_n, dimD);
+                mm3_1.SetOrgShape(s1Size, dimD * dimN2 * dimB, align_n, align_n, dimD);
             } else {
-                mm3_1.SetOrgShape(dimS1, dimD * dimN2 * dimB, align_n, align_n, dimD * dimN2 * dimG * dimB);
+                mm3_1.SetOrgShape(s1Size, dimD * dimN2 * dimB, align_n, align_n, dimD * dimN2 * dimG * dimB);
             }
         }
     }
@@ -1123,9 +1138,9 @@ FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MAS
     mm3_1.SetTensorA(mm3InputWorkspaceGm[a_in_addr]);
     mm3_1.SetTensorB(keyGm[b_in_addr]);
     if (is_sync) {
-        mm3_1.template IterateAll<true>(dqWorkspaceGm[out_addr], true);
+        mm3_1.template IterateAll<true>(dqWorkspaceGm[out_addr], qAtomic);
     } else {
-        mm3_1.template IterateAll<false>(dqWorkspaceGm[out_addr], true);
+        mm3_1.template IterateAll<false>(dqWorkspaceGm[out_addr], qAtomic);
     }
     mm3_1.End();
 }
@@ -1138,14 +1153,14 @@ FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MAS
                                LAYOUT, MM2_OUT_FORMAT>::SendMatmulDK(const uint32_t real_n, const uint32_t align_n,
                                                      const uint32_t s1_inner, const int64_t a_in_addr,
                                                      const int64_t b_in_addr, const int64_t out_addr,
-                                                     const bool is_sync)
+                                                     const bool is_sync, const uint8_t kvAtomic)
 {
     mm4.SetTensorA(mm3InputWorkspaceGm[a_in_addr], true);
     mm4.SetTensorB(queryGm[b_in_addr]);
     if (is_sync) {
-        mm4.template IterateAll<true>(dkWorkspaceGm[out_addr], true);
+        mm4.template IterateAll<true>(dkWorkspaceGm[out_addr], kvAtomic);
     } else {
-        mm4.template IterateAll<false>(dkWorkspaceGm[out_addr], true);
+        mm4.template IterateAll<false>(dkWorkspaceGm[out_addr], kvAtomic);
     }
     mm4.End();
 }
@@ -1991,8 +2006,45 @@ template <typename T1, typename T2, const MatmulConfig &MM_CFG, const CubeFormat
           const CubeFormat MM2_OUT_FORMAT>
 __aicore__ inline void
 FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MASK_CFG, DROPOUT_CFG, LAYOUT,
+    MM2_OUT_FORMAT>::ND2NZ(
+    LocalTensor<T1> &nzTensor, LocalTensor<T1> &ndTensor, PingPongEmitInsn &insn)
+{
+    /*
+    Func:
+    1. Matmul output format is ND
+    2. UB->UB，将ND分形数据转换为NZ，[C1，C0, N]->[N, C1，C0]
+    3. 限制：rp.vS1Inner <= 255, 代码没有写repeat>255的分支
+    */
+    CopyRepeatParams nd2nzParams;
+    nd2nzParams.dstStride = insn.s1Inner * C0_SIZE / dataCopyBlockNum + 1;
+    nd2nzParams.srcStride = C0_SIZE / dataCopyBlockNum;
+    nd2nzParams.dstRepeatSize = C0_SIZE / dataCopyBlockNum;
+    nd2nzParams.srcRepeatSize = insn.s2InnerAlign / dataCopyBlockNum;
+
+    uint16_t c1_repeat = insn.s2InnerAlign / C0_SIZE / VEC_REPEAT;
+    uint16_t c1_remain = insn.s2InnerAlign / C0_SIZE % VEC_REPEAT;
+
+    auto nzTensorTmp = nzTensor.template ReinterpretCast<half>();
+    auto ndTensorTmp = ndTensor.template ReinterpretCast<half>();
+
+    for (uint16_t j = 0; j < c1_repeat; ++j) {
+        Copy(nzTensorTmp[j * 8 * (insn.s1Inner + 1 ) * C0_SIZE], ndTensorTmp[j * 128], VEC_REPEAT * dataCopyBlockNum,
+            insn.s1Inner, nd2nzParams);
+    }
+
+    if (c1_remain > 0) {
+        Copy(nzTensorTmp[c1_repeat * 8 * (insn.s1Inner + 1) * C0_SIZE], ndTensorTmp[c1_repeat * 128],
+             dataCopyBlockNum * c1_remain, insn.s1Inner, nd2nzParams);
+    }
+}
+
+template <typename T1, typename T2, const MatmulConfig &MM_CFG, const CubeFormat MM_OUT_FORMAT, const uint64_t PSE_CFG,
+          const uint64_t ATTEN_MASK_CFG, const uint64_t DROPOUT_CFG, const uint32_t LAYOUT,
+          const CubeFormat MM2_OUT_FORMAT>
+__aicore__ inline void
+FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MASK_CFG, DROPOUT_CFG, LAYOUT,
     MM2_OUT_FORMAT>::NZCopyIn(
-    int64_t mmAddr, Matmul<aType, bTypeTranspose, cTypeMM, biasType, MM_CFG> &mm, GlobalTensor<T2> &mmWspGm,
+    int64_t mmAddr, Matmul<aType, bTypeTranspose, cTypeMMNZ, biasType, MM_CFG> &mm, GlobalTensor<T2> &mmWspGm,
     LocalTensor<T2> &mmTensorCurr, PingPongEmitInsn &insn)
 {
     /*
@@ -2034,24 +2086,24 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FOR
     // Ping Nodes [32K~104K]
     b8Node1 = vecQue.GetWithOffset<uint8_t>(9 * 1024, 33 * 1024);                  // 0.25 + 1(1来源于NZ)
     b8Node2 = vecQue.GetWithOffset<uint8_t>(9 * 1024, 42 * 1024);                  // 0.25
-    b16Node2 = vecQue.GetWithOffset<T1>(16 * 1024 / sizeof(T1), 42 * 1024);        // 0.5
-    b32Node3 = vecQue.GetWithOffset<T2>(4 * 1024 / sizeof(T2), 58 * 1024);         // 0.125
-    b32Node4 = vecQue.GetWithOffset<T2>(4 * 1024 / sizeof(T2), 62 * 1024);         // 0.125
-    b8Node5 = vecQue.GetWithOffset<uint8_t>(8 * 1024, 66 * 1024);                  // 0.25
-    b32Node6 = vecQue.GetWithOffset<T2>(33 * 1024 / sizeof(T2), 74 * 1024);        // 1
+    b16Node2 = vecQue.GetWithOffset<T1>(17 * 1024 / sizeof(T1), 42 * 1024);        // 0.5 + 1(1来源于NZ)
+    b32Node3 = vecQue.GetWithOffset<T2>(4 * 1024 / sizeof(T2), 59 * 1024);         // 0.125
+    b32Node4 = vecQue.GetWithOffset<T2>(4 * 1024 / sizeof(T2), 63 * 1024);         // 0.125
+    b8Node5 = vecQue.GetWithOffset<uint8_t>(8 * 1024, 67 * 1024);                  // 0.25
+    b32Node6 = vecQue.GetWithOffset<T2>(33 * 1024 / sizeof(T2), 75 * 1024);        // 1
     b32PingFuseNode = vecQue.GetWithOffset<T2>(33 * 1024 / sizeof(T2), 33 * 1024); // reused 1234
     b8PingFuseNode = vecQue.GetWithOffset<uint8_t>(33 * 1024, 33 * 1024);          // reused 1234
 
     // Pong Nodes [104~176K]
-    b8Node7 = vecQue.GetWithOffset<uint8_t>(9 * 1024, 107 * 1024); // 0.25 + 1(1来源于NZ)
-    b8Node8 = vecQue.GetWithOffset<uint8_t>(9 * 1024, 116 * 1024);
-    b16Node8 = vecQue.GetWithOffset<T1>(16 * 1024 / sizeof(T1), 116 * 1024);
-    b32Node9 = vecQue.GetWithOffset<T2>(4 * 1024 / sizeof(T2), 132 * 1024);
-    b32Node10 = vecQue.GetWithOffset<T2>(4 * 1024 / sizeof(T2), 136 * 1024);
-    b8Node11 = vecQue.GetWithOffset<uint8_t>(8 * 1024, 140 * 1024);
-    b32Node12 = vecQue.GetWithOffset<T2>(33 * 1024 / sizeof(T2), 148 * 1024);
-    b32PongFuseNode = vecQue.GetWithOffset<T2>(33 * 1024 / sizeof(T2), 107 * 1024); // reused 78910
-    b8PongFuseNode = vecQue.GetWithOffset<uint8_t>(33 * 1024, 107 * 1024);          // reused 78910
+    b8Node7 = vecQue.GetWithOffset<uint8_t>(9 * 1024, 108 * 1024); // 0.25 + 1(1来源于NZ)
+    b8Node8 = vecQue.GetWithOffset<uint8_t>(9 * 1024, 117 * 1024);
+    b16Node8 = vecQue.GetWithOffset<T1>(17 * 1024 / sizeof(T1), 117 * 1024); // 0.5 + 1(1来源于NZ)
+    b32Node9 = vecQue.GetWithOffset<T2>(4 * 1024 / sizeof(T2), 134 * 1024);
+    b32Node10 = vecQue.GetWithOffset<T2>(4 * 1024 / sizeof(T2), 138 * 1024);
+    b8Node11 = vecQue.GetWithOffset<uint8_t>(8 * 1024, 142 * 1024);
+    b32Node12 = vecQue.GetWithOffset<T2>(33 * 1024 / sizeof(T2), 150 * 1024);
+    b32PongFuseNode = vecQue.GetWithOffset<T2>(33 * 1024 / sizeof(T2), 108 * 1024); // reused 78910
+    b8PongFuseNode = vecQue.GetWithOffset<uint8_t>(33 * 1024, 108 * 1024);          // reused 78910
 }
 
 template <typename T1, typename T2, const MatmulConfig &MM_CFG, const CubeFormat MM_OUT_FORMAT, const uint64_t PSE_CFG,
@@ -2341,6 +2393,13 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FOR
                             emitInsn.s2InnerAlign / dataCopyBlockNum);
             }
 
+            if constexpr (MM_OUT_FORMAT == CubeFormat::NZ) {
+                pipe_barrier(PIPE_V);
+                DataCopy(b16Node0, pseTensor, emitInsn.s1Inner * emitInsn.s2InnerAlign);
+                pipe_barrier(PIPE_V);
+                ND2NZ(pseTensor, b16Node0, emitInsn);
+            }
+
             // [MTE3]
             set_flag(PIPE_V, PIPE_MTE3, pipeID);
             wait_flag(PIPE_V, PIPE_MTE3, pipeID);
@@ -2482,6 +2541,13 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FOR
             }
         }
 
+        if constexpr (MM_OUT_FORMAT == CubeFormat::NZ) {
+            pipe_barrier(PIPE_V);
+            DataCopy(b16Node0, pseTensor, emitInsn.s1Inner * emitInsn.s2InnerAlign);
+            pipe_barrier(PIPE_V);
+            ND2NZ(pseTensor, b16Node0, emitInsn);
+        }
+
         // [MTE3]
         set_flag(PIPE_V, PIPE_MTE3, pipeID);
         wait_flag(PIPE_V, PIPE_MTE3, pipeID);
@@ -2573,10 +2639,18 @@ FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MAS
         mm2PingAddr = mm2Addr + static_cast<int64_t>(rp.vPingLoopS1) * vec.baseM * b32AlignProcessN +
                       static_cast<int64_t>(rp.vPingLoopS2) * vec.baseN;
     }
-    mm3PingAddr = mm3Addr + static_cast<int64_t>(rp.vPingLoopS1) * vec.baseM * b16AlignProcessN +
-                  static_cast<int64_t>(rp.vPingLoopS2) * vec.baseN;
-    mm4PingAddr = mm4Addr + static_cast<int64_t>(rp.vPingLoopS1) * vec.baseM * b16AlignProcessN +
-                  static_cast<int64_t>(rp.vPingLoopS2) * vec.baseN;
+
+    if constexpr (MM_OUT_FORMAT == CubeFormat::NZ) {
+        mm3PingAddr = mm3Addr + static_cast<int64_t>(rp.vPingLoopS1) * vec.baseM * C0_SIZE +
+                      static_cast<int64_t>(rp.vPingLoopS2) * alignProcessM * vec.baseN;
+        mm4PingAddr = mm4Addr + static_cast<int64_t>(rp.vPingLoopS1) * vec.baseM * C0_SIZE +
+                      static_cast<int64_t>(rp.vPingLoopS2) * alignProcessM * vec.baseN;
+    } else {
+        mm3PingAddr = mm3Addr + static_cast<int64_t>(rp.vPingLoopS1) * vec.baseM * b16AlignProcessN +
+                    static_cast<int64_t>(rp.vPingLoopS2) * vec.baseN;
+        mm4PingAddr = mm4Addr + static_cast<int64_t>(rp.vPingLoopS1) * vec.baseM * b16AlignProcessN +
+                    static_cast<int64_t>(rp.vPingLoopS2) * vec.baseN;
+    }
 }
 
 template <typename T1, typename T2, const MatmulConfig &MM_CFG, const CubeFormat MM_OUT_FORMAT, const uint64_t PSE_CFG,
@@ -2648,12 +2722,19 @@ FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MAS
         mm2PongAddr = mm2Addr + static_cast<int64_t>(rp.vPongLoopS1) * vec.baseM * b32AlignProcessN +
                       static_cast<int64_t>(rp.vPongLoopS2) * vec.baseN;
     }
-    mm3PongAddr = mm3Addr + static_cast<int64_t>(rp.vPongLoopS1) * vec.baseM * b16AlignProcessN +
-                  static_cast<int64_t>(rp.vPongLoopS2) * vec.baseN;
-    mm4PongAddr = mm4Addr + static_cast<int64_t>(rp.vPongLoopS1) * vec.baseM * b16AlignProcessN +
-                  static_cast<int64_t>(rp.vPongLoopS2) * vec.baseN;
-}
 
+    if constexpr (MM_OUT_FORMAT == CubeFormat::NZ) {
+        mm3PongAddr = mm3Addr + static_cast<int64_t>(rp.vPongLoopS1) * vec.baseM * C0_SIZE +
+                      static_cast<int64_t>(rp.vPongLoopS2) * alignProcessM * vec.baseN;
+        mm4PongAddr = mm4Addr + static_cast<int64_t>(rp.vPongLoopS1) * vec.baseM * C0_SIZE +
+                      static_cast<int64_t>(rp.vPongLoopS2) * alignProcessM * vec.baseN;
+    } else {
+        mm3PongAddr = mm3Addr + static_cast<int64_t>(rp.vPongLoopS1) * vec.baseM * b16AlignProcessN +
+                    static_cast<int64_t>(rp.vPongLoopS2) * vec.baseN;
+        mm4PongAddr = mm4Addr + static_cast<int64_t>(rp.vPongLoopS1) * vec.baseM * b16AlignProcessN +
+                    static_cast<int64_t>(rp.vPongLoopS2) * vec.baseN;
+    }
+}
 
 template <typename T1, typename T2, const MatmulConfig &MM_CFG, const CubeFormat MM_OUT_FORMAT, const uint64_t PSE_CFG,
           const uint64_t ATTEN_MASK_CFG, const uint64_t DROPOUT_CFG, const uint32_t LAYOUT,
@@ -2690,8 +2771,13 @@ FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MAS
             mm1Addr += sft.singleM * b32AlignProcessN;
             mm2Addr += sft.singleM * b32AlignProcessN;
         }
-        mm3Addr += sft.singleM * b16AlignProcessN;
-        mm4Addr += sft.singleM * b16AlignProcessN;
+        if constexpr (MM_OUT_FORMAT == CubeFormat::NZ) {
+            mm3Addr += sft.singleM * C0_SIZE;
+            mm4Addr += sft.singleM * C0_SIZE;
+        } else {
+            mm3Addr += sft.singleM * b16AlignProcessN;
+            mm4Addr += sft.singleM * b16AlignProcessN;
+        }
         pipe_barrier(PIPE_ALL);
     }
 }
@@ -2768,6 +2854,7 @@ __aicore__ inline bool FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FOR
                                                       DROPOUT_CFG, LAYOUT, MM2_OUT_FORMAT>::CalcUsefulDataByS2()
 {
     // 计算S2配比中, 有效的vec.baseN数量(默认S1方向全部有效).
+    alignProcessM = (rp.processM + vec.singleM - 1) / vec.singleM * vec.singleM;
     if (isSparse != 1) {
         realProcessN = rp.processN;
         b32AlignProcessN = (realProcessN + calcBlockNum - 1) / calcBlockNum * calcBlockNum;
@@ -2806,9 +2893,10 @@ template <typename T1, typename T2, const MatmulConfig &MM_CFG, const CubeFormat
           const CubeFormat MM2_OUT_FORMAT>
 __aicore__ inline void
 FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MASK_CFG, DROPOUT_CFG, LAYOUT,
-    MM2_OUT_FORMAT>::S1Ratio(
-    int64_t s2_o_o)
+    MM2_OUT_FORMAT>::S1Ratio(int64_t s2_o_o, const int64_t gIdx)
 {
+    uint8_t kvAtomic = 1;
+    uint8_t qAtomic = 1;
     // For S2 To S1
     rp.processM = vec.singleM;
     lp.s1OuterInnerNum = (rp.processM + vec.baseM - 1) / vec.baseM;
@@ -2867,12 +2955,14 @@ FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MAS
 
         // 发射上一轮 mm3 mm4
         if (currentLoop > 0) {
+            kvAtomic = lastGIdx == 0 && lastS1OO == 0 ? 0 : 1; // first GS1, no atomic for kv
+            qAtomic = lastS2OO == 0 ? 0 : 1; // first S2, no atomic for q
             SendMatmulDV(lastRealProcessN, b16LastRealAlignProcessN, lastProcessM, lastMM4InputWorkspaceAddr,
-                         last_mm3_4_tensor_g_s1_addr, last_mm3_4_out_1_s2_addr, false);
+                         last_mm3_4_tensor_g_s1_addr, last_mm3_4_out_1_s2_addr, false, kvAtomic);
             SendMatmulDQ(lastRealProcessN, b16LastRealAlignProcessN, lastProcessM, lastMM3InputWorkspaceAddr,
-                         last_mm3_4_tensor_1_s2_addr, last_mm3_4_out_g_s1_addr, false);
+                         last_mm3_4_tensor_1_s2_addr, last_mm3_4_out_g_s1_addr, false, qAtomic);
             SendMatmulDK(lastRealProcessN, b16LastRealAlignProcessN, lastProcessM, lastMM3InputWorkspaceAddr,
-                         last_mm3_4_tensor_g_s1_addr, last_mm3_4_out_1_s2_addr, false);
+                         last_mm3_4_tensor_g_s1_addr, last_mm3_4_out_1_s2_addr, false, kvAtomic);
         }
 
         // 发射本轮 vec
@@ -2892,18 +2982,23 @@ FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MAS
         lastRealProcessN = realProcessN;
         b16LastRealAlignProcessN = b16AlignProcessN;
         lastProcessM = rp.processM;
+        lastS1OO = s1_o_o;
+        lastS2OO = s2_o_o;
+        lastGIdx = gIdx;
         currentLoop++; // 记录生效的绝对次数
     }
 
     // 当前核的最后一次
     bool is_last = isLastBN && isLastG && isLastSingleM && isLastSingleN && (lastProcessM > 0);
     if (is_last) {
+        kvAtomic = lastGIdx == 0 && lastS1OO == 0 ? 0 : 1; // first GS1, no atomic for kv
+        qAtomic = lastS2OO == 0 ? 0 : 1; // first S2, no atomic for q
         SendMatmulDV(realProcessN, b16AlignProcessN, lastProcessM, mm4InputWorkspaceAddr, mm3_4_tensor_g_s1_addr,
-                     mm3_4_out_1_s2_addr, true);
+                     mm3_4_out_1_s2_addr, true, kvAtomic);
         SendMatmulDQ(realProcessN, b16AlignProcessN, lastProcessM, mm3InputWorkspaceAddr, mm3_4_tensor_1_s2_addr,
-                     mm3_4_out_g_s1_addr, true);
+                     mm3_4_out_g_s1_addr, true, qAtomic);
         SendMatmulDK(realProcessN, b16AlignProcessN, lastProcessM, mm3InputWorkspaceAddr, mm3_4_tensor_g_s1_addr,
-                     mm3_4_out_1_s2_addr, true);
+                     mm3_4_out_1_s2_addr, true, kvAtomic);
     }
 }
 
@@ -2912,7 +3007,7 @@ template <typename T1, typename T2, const MatmulConfig &MM_CFG, const CubeFormat
           const CubeFormat MM2_OUT_FORMAT>
 __aicore__ inline void
 FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MASK_CFG, DROPOUT_CFG, LAYOUT,
-    MM2_OUT_FORMAT>::S2Ratio()
+    MM2_OUT_FORMAT>::S2Ratio(const int64_t gIdx)
 {
     // Process S2 firstly
     rp.processN = vec.singleN;
@@ -2923,7 +3018,7 @@ FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MAS
             rp.processN = vec.singleNTail;
             lp.s2OuterInnerNum = (rp.processN + vec.baseN - 1) / vec.baseN;
         }
-        S1Ratio(s2_o_o);
+        S1Ratio(s2_o_o, gIdx);
     }
 }
 
@@ -3007,7 +3102,7 @@ FlashAttentionScoreGradS1s2Bn2<T1, T2, MM_CFG, MM_OUT_FORMAT, PSE_CFG, ATTEN_MAS
             for (int64_t gi = 0; gi < dimG; gi++) {
                 gIndex = gi;
                 isLastG = gi == dimG - 1 ? true : false;
-                S2Ratio();
+                S2Ratio(gi);
             }
         }
     }

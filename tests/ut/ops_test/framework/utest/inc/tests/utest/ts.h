@@ -22,6 +22,15 @@
 #include "tests/utils/op_info.h"
 #include "tests/utils/platform.h"
 
+#ifdef TESTS_UT_OPS_TEST_CI_PR
+/**
+ * 用于控制个别用例在 PR 门禁场景不执行 Kernel
+ */
+constexpr bool RunKernelNotInPr = false;
+#else
+constexpr bool RunKernelNotInPr = true;
+#endif
+
 using Case = ops::adv::tests::utils::Case;
 using Tensor = ops::adv::tests::utils::Tensor;
 using OpInfo = ops::adv::tests::utils::OpInfo;

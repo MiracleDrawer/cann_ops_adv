@@ -34,6 +34,12 @@ constexpr int64_t FP16_BYTES_NUM = 2;
 constexpr int64_t FP16_BLOCK_ELES = 16;
 constexpr int64_t FP32_BLOCK_ELES = 8;
 constexpr int64_t BLOCK_BYTE = 32;
+constexpr int64_t C0_SIZE = 16;
+constexpr int64_t VEC_REPEAT = 8;
+constexpr int64_t NZ_S_MIN = 4;
+constexpr uint32_t POST_NZ_COEX_NODE = 10;
+constexpr uint32_t BLOCK_SIZE = 32;
+constexpr uint32_t POST_NZ_RESERVED_N = 1;
 constexpr int64_t PER_SUB_RANGE = 8;
 constexpr int64_t CV_RATIO = 2;
 constexpr int64_t BEST_BASIC_BLOCK_SIZE = 64 * 128 * 4;
@@ -75,8 +81,11 @@ struct TempParamsUngs1s2Bb {
     uint32_t attenMaskCompressMode;
     int64_t attenMaskS1Size = 0;
     int64_t attenMaskS2Size = 0;
+    bool mmPreIsNZOut;
+    bool mmNextIsNZOut;
     int64_t b;
     int64_t n;
+    int64_t sQ;
     int64_t d;
 };
 
@@ -102,23 +111,23 @@ public:
         uint64_t normalTilingKey = 0;
         uint64_t specMMTilingKey = 0;
         uint64_t tilingKey = 0;
-
+        auto dtype = DtypeEnum::FLOAT16;
         if (basicParams.dataType == static_cast<uint32_t>(ge::DT_FLOAT16)) {
-            normalTilingKey = GET_TILINGKEY(AxisEnum::NONE, AxisEnum::NONE, AxisEnum::B, DtypeEnum::FLOAT16_PRECISION,
-                                            basicParams.layout, SparseEnum::NONE);
-            specMMTilingKey = GET_B_TILINGKEY(AxisEnum::NONE, AxisEnum::NONE, AxisEnum::B, DtypeEnum::FLOAT16_PRECISION,
-                                              basicParams.layout, SparseEnum::NONE, MatmulConfig::NORMAL_CONFIG);
+            dtype = DtypeEnum::FLOAT16_PRECISION;
         } else if (basicParams.dataType == static_cast<uint32_t>(ge::DT_BF16)) {
-            normalTilingKey = GET_TILINGKEY(AxisEnum::NONE, AxisEnum::NONE, AxisEnum::B, DtypeEnum::BFLOAT16,
-                                            basicParams.layout, SparseEnum::NONE);
-            specMMTilingKey = GET_B_TILINGKEY(AxisEnum::NONE, AxisEnum::NONE, AxisEnum::B, DtypeEnum::BFLOAT16,
-                                              basicParams.layout, SparseEnum::NONE, MatmulConfig::NORMAL_CONFIG);
+            dtype = DtypeEnum::BFLOAT16;
         } else {
-            normalTilingKey = GET_TILINGKEY(AxisEnum::NONE, AxisEnum::NONE, AxisEnum::B, DtypeEnum::FLOAT32,
-                                            basicParams.layout, SparseEnum::NONE);
-            specMMTilingKey = GET_B_TILINGKEY(AxisEnum::NONE, AxisEnum::NONE, AxisEnum::B, DtypeEnum::FLOAT32,
-                                              basicParams.layout, SparseEnum::NONE, MatmulConfig::NORMAL_CONFIG);
+            dtype = DtypeEnum::FLOAT32;
         }
+
+        auto mmPreIsNZOut = basicParams.mmPreIsNZOut ? OptionEnum::ENABLE : OptionEnum::DISABLE;
+        auto mmNextIsNZOut = basicParams.mmNextIsNZOut ? OptionEnum::ENABLE : OptionEnum::DISABLE;
+        auto unique = OptionEnum::DISABLE;
+
+        normalTilingKey = GET_TILINGKEY(AxisEnum::NONE, AxisEnum::NONE, AxisEnum::B, dtype,
+                                        basicParams.layout, SparseEnum::NONE, unique, mmPreIsNZOut, mmNextIsNZOut);
+        specMMTilingKey = GET_B_TILINGKEY(AxisEnum::NONE, AxisEnum::NONE, AxisEnum::B, dtype,
+                                          basicParams.layout, SparseEnum::NONE, MatmulConfig::NORMAL_CONFIG, mmPreIsNZOut, mmNextIsNZOut);
 
         tilingKey = normalTilingKey;
         if (basicParams.layout == static_cast<uint32_t>(InputLayout::SBH) &&
@@ -189,7 +198,7 @@ public:
         }
 
         OPS_ERR_IF((aicoreParams_.blockDim == 0) || (aicoreParams_.aicNum == 0),
-                    OPS_REPORT_VECTOR_INNER_ERR(context_, "num of coreNum(aivNum) is %ld, num of aicNum is %ld.",
+                    OPS_REPORT_VECTOR_INNER_ERR(context_, "num of coreNum(aivNum) is %lu, num of aicNum is %lu.",
                     aicoreParams_.blockDim, aicoreParams_.aicNum),
                     return ge::GRAPH_FAILED);
 
@@ -366,6 +375,7 @@ public:
         }
         basicParams.b = td_.opInfo.get_b();
         basicParams.n = td_.opInfo.get_n() * td_.opInfo.get_g();
+        basicParams.sQ = td_.opInfo.get_sQ();
         basicParams.d = td_.opInfo.get_d();
 
         auto ret = CheckDtypeValid(context_);
@@ -512,6 +522,14 @@ public:
                       "Ungs1s2Bb bmm TensorA+B size:%ld out of range L1 size:%ld!", largest + secondLargest,
                       L1_BYTE_SIZE);
             return false;
+        }
+
+        // s大于等于4性能才有收益
+        basicParams.mmPreIsNZOut = td_.opInfo.get_sQ() >= 4 ? true : false;
+        // 如果是nz，对于s2每一个分形需要多8个数据
+        if (basicParams.mmPreIsNZOut) {
+            vecClc1Size += bIn * td_.opInfo.get_n() * td_.opInfo.get_g()
+                           * sKVAlign / C0_SIZE * VEC_REPEAT * sizeof(float);
         }
         td_.singleCoreParams.set_innerTmpBufSize(vecClc1Size);
         td_.singleCoreParams.set_vecQueIn1Size(vecInQue1Size);
@@ -731,21 +749,36 @@ public:
     ge::graphStatus DoMulsTiling()
     {
         OPS_LOG_D(context_, "Do muls tiling begin.");
+        int64_t dAlign = (td_.opInfo.get_d() + 15) / 16 * 16;
         int64_t allNumQuery =
-            td_.opInfo.get_b() * td_.opInfo.get_n() * td_.opInfo.get_g() * td_.opInfo.get_sQ() * td_.opInfo.get_d();
-        int64_t allNumKv = td_.opInfo.get_b() * td_.opInfo.get_n() * td_.opInfo.get_sKV() * td_.opInfo.get_d();
+            td_.opInfo.get_b() * td_.opInfo.get_n() * td_.opInfo.get_g() * td_.opInfo.get_sQ() * dAlign;
+        int64_t allNumKv = td_.opInfo.get_b() * td_.opInfo.get_n() * td_.opInfo.get_sKV() * dAlign;
 
         uint32_t usedCoreNum = td_.splitCoreParams.get_usedCoreNum();
         if (usedCoreNum == 0) {
             return ge::GRAPH_PARAM_INVALID;
         }
 
-        uint32_t postUbBaseSize = (aicoreParams_.ubSize) / POST_COEX_NODE / BUFFER_NUM / BASE_LEN_256 * BASE_LEN_256;
-        uint32_t qPostBaseNum = postUbBaseSize / FP16_BYTES_NUM;
+        basicParams.mmNextIsNZOut = (td_.opInfo.get_sQ() >= NZ_S_MIN
+                              && td_.opInfo.get_inputLayout() == static_cast<uint32_t>(InputLayout::BNSD))
+                              ? true : false;
+        uint32_t postUbBaseSize = 0;
+        uint32_t qPostBaseNum = 0;
+        uint32_t nzReservedSize = 0;
+        if (!basicParams.mmNextIsNZOut) {
+            postUbBaseSize = (aicoreParams_.ubSize) / POST_COEX_NODE / BUFFER_NUM / BASE_LEN_256 * BASE_LEN_256;
+            qPostBaseNum = postUbBaseSize / FP16_BYTES_NUM;
+        } else {
+            int64_t curPostCoexNode = POST_NZ_COEX_NODE;
+            nzReservedSize = dAlign / C0_SIZE * BLOCK_SIZE * POST_NZ_RESERVED_N;
+            postUbBaseSize = (aicoreParams_.ubSize - 2 * nzReservedSize) / curPostCoexNode / BUFFER_NUM /  // 开DB预留2份nzReservedSize
+                                 BASE_LEN_256 * BASE_LEN_256;
+            qPostBaseNum = postUbBaseSize / FP16_BYTES_NUM / dAlign * td_.opInfo.get_d();
+        }
         OPS_ERR_IF(qPostBaseNum == 0,
                    OPS_LOG_W(context_, "qPostBaseNum is 0."),
                    return ge::GRAPH_PARAM_INVALID);
-        int64_t qPostBlockTotal = allNumQuery;
+        int64_t qPostBlockTotal = allNumQuery / dAlign * td_.opInfo.get_d();
         int64_t qSizeAlign =
             (qPostBlockTotal + BASE_LEN_256 - 1) / WORKSPACE_ALIGN_SIZE * WORKSPACE_ALIGN_SIZE * FP16_BYTES_NUM;
         int64_t qPostTailNumTmp = qPostBlockTotal % qPostBaseNum;
@@ -753,11 +786,11 @@ public:
         int64_t qPostBlockOuterTotal = (qPostBlockTotal + qPostBaseNum - 1) / qPostBaseNum;
         int64_t qPostBlockFactor = (qPostBlockOuterTotal + usedCoreNum - 1) / usedCoreNum;
 
-        int64_t kvPostBaseNum = postUbBaseSize / FP16_BYTES_NUM;
+        int64_t kvPostBaseNum = qPostBaseNum;
         OPS_ERR_IF(kvPostBaseNum == 0,
                    OPS_LOG_W(context_, "kvPostBaseNum is 0."),
                    return ge::GRAPH_PARAM_INVALID);
-        int64_t kvPostBlockTotal = allNumKv;
+        int64_t kvPostBlockTotal = allNumKv / dAlign * td_.opInfo.get_d();;
         int64_t kvSizeAlign = (kvPostBlockTotal + WORKSPACE_ALIGN_SIZE - 1) / WORKSPACE_ALIGN_SIZE *
                               WORKSPACE_ALIGN_SIZE * FP16_BYTES_NUM;
         int64_t kvPostTailNumTmp = kvPostBlockTotal % kvPostBaseNum;
@@ -779,21 +812,25 @@ public:
         td_.postTilingData.set_kvPostBaseNum(kvPostBaseNum);
         td_.postTilingData.set_kvPostTailNum(kvPostTailNum);
         td_.postTilingData.set_kvSizeAlign(kvSizeAlign);
-        td_.postTilingData.set_nzReservedSize(0);
+        td_.postTilingData.set_nzReservedSize(nzReservedSize);
+
+        td_.postTilingData.set_b(td_.opInfo.get_b());
+        td_.postTilingData.set_n2(td_.opInfo.get_n());
+        td_.postTilingData.set_g(td_.opInfo.get_g());
+        td_.postTilingData.set_s1(td_.opInfo.get_sQ());
+        td_.postTilingData.set_s2(td_.opInfo.get_sKV());
+        td_.postTilingData.set_d(td_.opInfo.get_d());
 
         int64_t allNumDropGm = td_.opInfo.get_b() * td_.opInfo.get_n() * td_.opInfo.get_g() * td_.opInfo.get_sQ() *
                                td_.opInfo.get_sKVAlign();
         int64_t allNumMulGm = td_.opInfo.get_b() * td_.opInfo.get_n() * td_.opInfo.get_g() * td_.opInfo.get_sQ() *
                               td_.opInfo.get_sKVAlign();
 
-        td_.opInfo.set_dropGmWorkspaceLen(CeilCommon(allNumDropGm * FP16_BYTES_NUM, WORKSPACE_ALIGN_SIZE) *
+        // CV并行实现，需要申请双倍的bmm345的输入空间
+        td_.opInfo.set_dropGmWorkspaceLen(2 * CeilCommon(allNumDropGm * FP16_BYTES_NUM, WORKSPACE_ALIGN_SIZE) *
                                           WORKSPACE_ALIGN_SIZE);
-        td_.opInfo.set_mulGmWorkspaceLen(CeilCommon(allNumMulGm * FP16_BYTES_NUM, WORKSPACE_ALIGN_SIZE) *
+        td_.opInfo.set_mulGmWorkspaceLen(2 * CeilCommon(allNumMulGm * FP16_BYTES_NUM, WORKSPACE_ALIGN_SIZE) *
                                          WORKSPACE_ALIGN_SIZE);
-        td_.opInfo.set_dqWorkspaceLen(CeilCommon(allNumQuery * FP32_BYTES_NUM, BLOCK_BYTE) * BLOCK_BYTE);
-        td_.opInfo.set_dkWorkspaceLen(CeilCommon(allNumKv * FP32_BYTES_NUM, BLOCK_BYTE) * BLOCK_BYTE);
-        td_.opInfo.set_dropGmWorkspaceLen(CeilCommon(allNumDropGm * FP16_BYTES_NUM, BLOCK_BYTE) * BLOCK_BYTE);
-        td_.opInfo.set_mulGmWorkspaceLen(CeilCommon(allNumMulGm * FP16_BYTES_NUM, BLOCK_BYTE) * BLOCK_BYTE);
 
         td_.opInfo.set_dqWorkspaceLen(CeilCommon(allNumQuery * FP32_BYTES_NUM, WORKSPACE_ALIGN_SIZE) *
                                       WORKSPACE_ALIGN_SIZE);

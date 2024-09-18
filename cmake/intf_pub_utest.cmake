@@ -56,6 +56,7 @@ target_compile_options(intf_pub_utest
             $<$<CXX_COMPILER_ID:GNU>:-Wreturn-local-addr> -Wextra
             -Wredundant-decls -Wfloat-conversion
             $<$<CXX_COMPILER_ID:Clang>:-Wno-tautological-unsigned-enum-zero-compare>
+            -Werror
 )
 target_include_directories(intf_pub_utest
         INTERFACE
@@ -67,6 +68,12 @@ target_include_directories(intf_pub_utest
             ${ASCEND_CANN_PACKAGE_PATH}/include/experiment/runtime
             ${ASCEND_CANN_PACKAGE_PATH}/include/experiment/msprof
 )
+if (TESTS_UT_OPS_TEST_CI_PR)
+    target_compile_definitions(intf_pub_utest
+            INTERFACE
+                TESTS_UT_OPS_TEST_CI_PR
+    )
+endif ()
 target_link_directories(intf_pub_utest
         INTERFACE
             ${ASCEND_CANN_PACKAGE_PATH}/lib64

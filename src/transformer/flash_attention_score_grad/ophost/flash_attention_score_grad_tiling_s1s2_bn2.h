@@ -54,6 +54,7 @@ struct TempParamsS1s2Bn2 {
     PseConfig pse_cfg = PseConfig::NO_PSE;
     AttenMaskConfig atten_mask_cfg = AttenMaskConfig::NO_ATTEN_MASK;
     DropOutConfig drop_out_cfg = DropOutConfig::NO_DROP_OUT;
+    bool isMM345NZOut = false;
 };
 
 class FlashAttentionScoreGradTilingS1s2Bn2 : public TilingBaseClass {
@@ -126,10 +127,12 @@ private:
     uint32_t s2Ratio{0};
     uint32_t mmRatio{0};
     bool needSplitD{false};
+    bool needSetFixSplit{false};
     uint32_t attenMaskCompressMode{0};
     int64_t attenMaskS1Size{0};
     int64_t attenMaskS2Size{0};
     SparseMode sparseMode = NO_MASK;
+    uint64_t l2CacheSize{0};
 };
 
 class FlashAttentionScoreGradTilingDeterministic : public FlashAttentionScoreGradTilingS1s2Bn2 {

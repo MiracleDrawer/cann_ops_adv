@@ -38,8 +38,6 @@ public:
     GlobalTensor<uint8_t> drop_maskGm;
 
     const TILING_TYPE *TilingData;
-    constexpr static uint32_t SYNC_GLOBAL_WORKSPACE_SIZE = 16 * 1024;
-    constexpr static uint32_t ADDR_ALIGN_SIZE = 512;
     constexpr static uint32_t HELP_LEN = 256;
     constexpr static uint32_t BIT8 = 8;
     constexpr static uint32_t NUMBER_8 = 8;
@@ -100,14 +98,12 @@ __aicore__ inline void FlashAttentionScoreGradPre<T1, T2, TILING_TYPE, INIT_OUTP
         kvPreBlockTail = TilingData->preTilingData.kvPreBlockTail;
         kvSizeAlign = TilingData->postTilingData.kvSizeAlign;
 
-        int64_t workspaceOffsets = SYNC_GLOBAL_WORKSPACE_SIZE;
-        dqWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace + workspaceOffsets / sizeof(T2));
-        workspaceOffsets = (workspaceOffsets + ((int64_t)qSizeAlign) * sizeof(float) + ADDR_ALIGN_SIZE) /
-                           ADDR_ALIGN_SIZE * ADDR_ALIGN_SIZE;
-        dkWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace + workspaceOffsets / sizeof(T2));
-        workspaceOffsets = (workspaceOffsets + ((int64_t)kvSizeAlign) * sizeof(float) + ADDR_ALIGN_SIZE) /
-                           ADDR_ALIGN_SIZE * ADDR_ALIGN_SIZE;
-        dvWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace + workspaceOffsets / sizeof(T2));
+        dqWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+                                  TilingData->postTilingData.dqWorkSpaceOffset / sizeof(float));
+        dkWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+                                  TilingData->postTilingData.dkWorkSpaceOffset / sizeof(float));
+        dvWorkSpaceGm.SetGlobalBuffer((__gm__ float *)workspace +
+                                  TilingData->postTilingData.dvWorkSpaceOffset / sizeof(float));
 
         initdqSize = cBlockIdx == qPreBlockTotal - 1 ? qPreBlockTail : qPreBlockFactor;
         dqOffset = ((int64_t)cBlockIdx) * qPreBlockFactor;

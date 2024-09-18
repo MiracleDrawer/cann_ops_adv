@@ -37,6 +37,7 @@ target_sources(optiling PRIVATE
         flash_attention_score_grad_tiling_ngs1s2_bn.cpp
         flash_attention_score_grad_tiling_s1s2_bn2.cpp
         flash_attention_score_grad_tiling_s1s2_bn2gs1s2.cpp
+        flash_attention_score_grad_tiling_s1s2_bn2gs1s2_sab.cpp
         flash_attention_score_grad_tiling_unpadded_attension.cpp
 )
 

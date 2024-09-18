@@ -303,7 +303,7 @@ const auto Tc_Fag_PseInnerGenerate_Case = ::testing::Values(
             ),
     FagCase("Fag_PseInnerGenerate_Case_012", true,                  /* CaseName, Enable */
             "",                                                     /* DebugInfo */
-            OpInfo(ControlInfo(true, false, true),                  /* RunTiling, RunKernel, Deterministic */
+            OpInfo(ControlInfo(true, RunKernelNotInPr, true),       /* RunTiling, RunKernel, Deterministic */
                    ExpectInfo(true,                                 /* ExpectSuccess */
                               ExpectInfo::kInvalidTilingKey,        /* ExpectTilingKey */
                               ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */

@@ -8,6 +8,7 @@
  * See LICENSE in the root of the software repository for the full text of the License.
  */
 
+#include "aclnn_flash_attention_score_grad.h"
 #include "flash_attention_score_grad.h"
 #include "aclnn/aclnn_base.h"
 #include "aclnn_kernels/cast.h"
@@ -27,6 +28,7 @@
 #include "opdev/shape_utils.h"
 #include "opdev/tensor_view_utils.h"
 #include "opdev/fast_vector.h"
+#include "runtime/context.h"
 
 using namespace op;
 #ifdef __cplusplus
@@ -79,14 +81,74 @@ static constexpr int64_t MAX_LAYOUT_SIZE = 5;
 static constexpr int64_t PSE_TYPE_V1 = 1; // add and mul
 static const int64_t HEAD_DIM_72 = 72;
 static const int64_t HEAD_DIM_88 = 88;
-static const int64_t SEQ_LEN_1024 = 1024;
+static const int64_t SEQ_LEN_4096 = 4096;
 static constexpr size_t MIN_DIM = 3;
+static const int64_t TND_MAX_S2 = 1024;
+static const int64_t TND_MAX_S1_SUM = 160 * 1024;
+static const int64_t TND_MAX_DDIM = 96;
 
 bool CheckIsNeedPad(const FagInShapeInfo &fagShape)
 {
-    if ((fagShape.dDim == HEAD_DIM_72 || fagShape.dDim == HEAD_DIM_88) && fagShape.s1Dim < SEQ_LEN_1024 &&
-         fagShape.s2Dim < SEQ_LEN_1024 &&  fagShape.inputLayoutStr != "BNSD" && fagShape.inputLayoutStr != "TND" &&
+    if ((fagShape.dDim == HEAD_DIM_72 || fagShape.dDim == HEAD_DIM_88) && fagShape.s1Dim <= SEQ_LEN_4096 &&
+         fagShape.s2Dim <= SEQ_LEN_4096 &&  fagShape.inputLayoutStr != "BNSD" && fagShape.inputLayoutStr != "TND" &&
          fagShape.n1Dim == fagShape.n2Dim && fagShape.needTranspose == false) {
+        OP_LOGD("Scenarios that do not require pad processing");
+        return false;
+    }
+    return true;
+}
+
+static int64_t GetSumIntArrayMaxValue(const aclIntArray *intArrayValue) {
+    // 获取targetLengthsList中的最大值
+    int64_t maxLength = 0;
+    int64_t tmpMaxLength = 0;
+    if (intArrayValue->Size() == 1) {
+      maxLength = static_cast<int64_t>((*intArrayValue)[0]);
+      return maxLength;
+    }
+    maxLength = static_cast<int64_t>((*intArrayValue)[0]);
+    for (size_t i = 1; i < intArrayValue->Size(); i++) {
+        tmpMaxLength = static_cast<int64_t>((*intArrayValue)[i]) - static_cast<int64_t>((*intArrayValue)[i - 1]);
+        if (tmpMaxLength > maxLength) {
+            maxLength = tmpMaxLength;
+        }
+    }
+    return maxLength;
+}
+
+bool CheckTndIsNeedPad(const FagInShapeInfo &fagShape, const aclIntArray *actualSeqQLenOptional,
+                       const aclIntArray *actualSeqKvLenOptional, int64_t dDim)
+{
+    int64_t sKvLenMax = 0;
+    int64_t sQLenSum = 0;
+    int64_t deterministicValue = 0;
+    rtError_t retRts = rtCtxGetSysParamOpt(SYS_OPT_DETERMINISTIC, &deterministicValue);
+    if (retRts != RT_ERROR_NONE) {
+        OP_LOGW("Fag aclnn unable to get system param determinstic.");
+        // 如果determinstic参数获取失败，则不主动去除pad
+        return true;
+    }
+    OP_LOGD("Fag aclnn deterministic is = %ld.", deterministicValue);
+    // TND并且是非确定性计算
+    if (fagShape.inputLayoutStr == "TND" && deterministicValue == 0 &&
+        actualSeqQLenOptional != nullptr && actualSeqKvLenOptional != nullptr) {
+        if (actualSeqQLenOptional->Size() == actualSeqKvLenOptional->Size()) {
+            sKvLenMax = GetSumIntArrayMaxValue(actualSeqKvLenOptional);
+            sQLenSum = actualSeqQLenOptional->Size() >= 1 ?
+                       static_cast<int64_t>((*actualSeqQLenOptional)[actualSeqQLenOptional->Size() - 1]) : 0;
+        }
+    }
+    if (sKvLenMax == 0 || sQLenSum == 0) {
+        // 走原来逻辑是否pad
+        OP_LOGD("Fag aclnn TND case sKvLenMax(%ld) or sQLenSum(%ld) is 0.", sKvLenMax, sQLenSum);
+        return true;
+    }
+
+    OP_LOGD("Fag aclnn TND case deterministic: %ld, s2 max: %ld, dDim: %ld, s1 sum: %ld.", deterministicValue,
+            sKvLenMax, dDim, sQLenSum);
+    if ((sKvLenMax <= TND_MAX_S2) && (dDim < TND_MAX_DDIM) && (sQLenSum < TND_MAX_S1_SUM)) {
+        // 去除pad
+        OP_LOGD("Fag aclnn TND case do not do pad dimD operation.");
         return false;
     }
     return true;
@@ -113,7 +175,9 @@ static aclnnStatus InvalidTensorDimCheck(const aclTensor *query, const aclTensor
 }
 
 static aclnnStatus GetInputShapeInfo(const aclTensor *query, const aclTensor *key, int64_t headNum,
-                                     const char *inputLayout, FagInShapeInfo &fagShape)
+                                     const char *inputLayout, FagInShapeInfo &fagShape,
+                                     const aclIntArray *actualSeqQLenOptional,
+                                     const aclIntArray *actualSeqKvLenOptional)
 {
     auto queryShape = query->GetViewShape();
     auto kvShape = key->GetViewShape();
@@ -144,6 +208,8 @@ static aclnnStatus GetInputShapeInfo(const aclTensor *query, const aclTensor *ke
         return ACLNN_ERR_PARAM_INVALID;
     }
 
+    fagShape.querySDimStrideSize = 0;
+    fagShape.kvSDimStrideSize = 0;
     if (fagShape.inputLayoutStr == "BSND") { // stride is N * D
         fagShape.querySDimStrideSize = fagShape.n1Dim * fagShape.dDim;
         fagShape.kvSDimStrideSize = fagShape.n2Dim * fagShape.dDim;
@@ -156,19 +222,40 @@ static aclnnStatus GetInputShapeInfo(const aclTensor *query, const aclTensor *ke
     }
 
     fagShape.alignDim = (fagShape.dDim < ALIGN_D_DIM_SIZE) ? SPARE_ALIGN_D_DIM_SIZE : ALIGN_D_DIM_SIZE;
+    auto dDimAlignSize = (fagShape.dDim + fagShape.alignDim - 1) / fagShape.alignDim * fagShape.alignDim;
 
     // 判断是否需要PAD和transpose, 同时判断是否为如下特殊场景 (SBH下，只需要PAD不需要transpose)
     fagShape.needPadDimD =
         (fagShape.dDim % fagShape.alignDim != 0 && queryShape.GetShapeSize() != 0 && kvShape.GetShapeSize() != 0) ?
             true :
             false;
+
+    // 计算是否超过65535时，应该使用对齐以后的D值
+    if (fagShape.needPadDimD) {
+        if (fagShape.inputLayoutStr == "BSND") { // stride is N * D
+            fagShape.querySDimStrideSize = fagShape.n1Dim * dDimAlignSize;
+            fagShape.kvSDimStrideSize = fagShape.n2Dim * dDimAlignSize;
+        } else if (fagShape.inputLayoutStr == "BSH") {           // stride is H
+            fagShape.querySDimStrideSize = fagShape.dDim == 0 ? 0 :
+                (queryShape.GetDim(2) / fagShape.dDim * dDimAlignSize); // 2:dv
+            fagShape.kvSDimStrideSize = fagShape.dDim == 0 ? 0 :
+                (kvShape.GetDim(2) / fagShape.dDim * dDimAlignSize);       // 2:dv
+        } else if (fagShape.inputLayoutStr == "SBH") {           // stride is B * H
+            int64_t queryBHSize = fagShape.s1Dim == 0 ? 0 : (queryDimSize / fagShape.s1Dim);
+            int64_t kvBHSize = fagShape.s2Dim == 0 ? 0 : (kvDimSize / fagShape.s2Dim);
+            fagShape.querySDimStrideSize = fagShape.dDim == 0 ? 0 : (queryBHSize / fagShape.dDim * dDimAlignSize);
+            fagShape.kvSDimStrideSize = fagShape.dDim == 0 ? 0 : (kvBHSize / fagShape.dDim * dDimAlignSize);
+        }
+    }
+
     bool needTranspose =
         queryShape.GetShapeSize() != 0 && kvShape.GetShapeSize() != 0 &&
         (fagShape.inputLayoutStr != "BNSD" && fagShape.inputLayoutStr != "TND" &&
          (fagShape.querySDimStrideSize > MAX_BSN_DIMS_SIZE || fagShape.kvSDimStrideSize > MAX_BSN_DIMS_SIZE));
     fagShape.needTranspose = needTranspose;
 
-    if (!CheckIsNeedPad(fagShape)) {
+    if (!CheckIsNeedPad(fagShape) ||
+        !CheckTndIsNeedPad(fagShape, actualSeqQLenOptional, actualSeqKvLenOptional, fagShape.dDim)) {
         fagShape.needPadDimD = false;
     }
 
@@ -345,6 +432,9 @@ static void GetInputAndOutputBackwordReshapeArrayForSBH(const aclTensor *query, 
         return;
     }
 
+    if (query == nullptr || key == nullptr) {
+        return;
+    }
     auto queryShape = query->GetViewShape();
     auto keyShape = key->GetViewShape();
     FVector<int64_t> queryReshapeList;
@@ -446,8 +536,10 @@ static aclnnStatus PaddingInputTensorDdim(const aclTensor **query, const aclTens
                                           FagInShapeInfo fagShape, aclOpExecutor *executor)
 {
     if (!(fagShape.needPadDimD)) {
+        OP_LOGD("Fag aclnn case do not do pad dimD operation.");
         return ACLNN_SUCCESS;
     }
+    OP_LOGD("Fag aclnn case do pad dimD operation.");
 
     // padding
     // query
@@ -697,7 +789,7 @@ static aclnnStatus FlashAttentionScoreGradGetWorkspace(
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
     // 获取基本参数
     FagInShapeInfo fagShape;
-    ret = GetInputShapeInfo(query, key, headNum, inputLayout, fagShape);
+    ret = GetInputShapeInfo(query, key, headNum, inputLayout, fagShape, actualSeqQLenOptional, actualSeqKvLenOptional);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
     // 输入连续性转换
@@ -911,7 +1003,7 @@ static aclnnStatus FlashAttentionScoreGradV2GetWorkspace(
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
     // 获取基本参数
     FagInShapeInfo fagShape;
-    ret = GetInputShapeInfo(query, key, headNum, inputLayout, fagShape);
+    ret = GetInputShapeInfo(query, key, headNum, inputLayout, fagShape, actualSeqQLenOptional, actualSeqKvLenOptional);
     CHECK_RET(ret == ACLNN_SUCCESS, ret);
 
     // 输入连续性转换

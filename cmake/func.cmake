@@ -310,6 +310,7 @@ function(add_bin_compile_target)
     set(BIN_OUT_DIR      ${_OUT_DIR}/bin)
     set(GEN_OUT_DIR      ${_OUT_DIR}/gen)
     set(SRC_OUT_DIR      ${_OUT_DIR}/src)
+    file(MAKE_DIRECTORY  ${BIN_OUT_DIR})
 
     foreach(_op_info ${BINARY_OP_INFO})
         get_filename_component(_op_name "${_op_info}" NAME)
@@ -347,7 +348,6 @@ function(add_bin_compile_target)
             set(OP_SRC_OUT_DIR  ${SRC_OUT_DIR}/${op_file})
             set(OP_BIN_OUT_DIR  ${BIN_OUT_DIR}/${op_file})
             file(MAKE_DIRECTORY ${OP_SRC_OUT_DIR})
-            file(MAKE_DIRECTORY ${OP_BIN_OUT_DIR})
 
             add_ops_src_copy(
                     TARGET_NAME
@@ -386,6 +386,14 @@ function(add_bin_compile_target)
 
             add_custom_target(${OP_TARGET_NAME}_py_copy
                     DEPENDS ${DYNAMIC_PY_FILE}
+            )
+
+            add_custom_command(OUTPUT ${OP_BIN_OUT_DIR}
+                    COMMAND mkdir -p ${OP_BIN_OUT_DIR}
+            )
+
+            add_custom_target(${OP_TARGET_NAME}_mkdir
+                    DEPENDS ${OP_BIN_OUT_DIR}
             )
 
             install(DIRECTORY ${OP_BIN_OUT_DIR}
@@ -463,7 +471,7 @@ function(add_bin_compile_target)
             if (ENABLE_OPS_HOST)
                 add_dependencies(${OP_TARGET_NAME}_${op_index} optiling generate_ops_info)
             endif ()
-            add_dependencies(${OP_TARGET_NAME}_${op_index} ${OP_TARGET_NAME}_src_copy ${OP_TARGET_NAME}_py_copy)
+            add_dependencies(${OP_TARGET_NAME}_${op_index} ${OP_TARGET_NAME}_src_copy ${OP_TARGET_NAME}_py_copy ${OP_TARGET_NAME}_mkdir)
             add_dependencies(${OP_TARGET_NAME} ${OP_TARGET_NAME}_${op_index})
         endif ()
     endforeach()

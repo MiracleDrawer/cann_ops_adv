@@ -58,6 +58,14 @@ struct SplitS1dExtraInfo {
     bool lastNotPair;
 };
 
+struct Nz2NdInfo {
+    int64_t ndFirstAxisRealSize;
+    int64_t ndFirstAxisBaseSize;
+    int64_t ndFirstAxisLoopSize;
+    int64_t ndLastAxis;
+    int64_t loopIdx;
+};
+
 // INPUT_T - means data type for input
 // T       - means data type when calc
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
@@ -83,11 +91,23 @@ public:
     matmul::Matmul<a1Type, b1Type, c1Type, bias1Type, GetMmCfg(enableL1Reuse)> bmm1;
 
     // define batchmatmul
-    using a2Type = MatmulType<TPosition::GM, CubeFormat::ND, INPUT_T>;
+    using a2TypeND = MatmulType<TPosition::GM, CubeFormat::ND, INPUT_T>;
+    using a2Type = MatmulType<TPosition::GM, bmm1Format, INPUT_T>;
     using b2Type = MatmulType<bmm2Source, bmm2SourceFormat, INPUT_T, false, LayoutMode::NONE, enableL1Reuse>;
     using bias2Type = MatmulType<TPosition::GM, CubeFormat::ND, float>;
     using c2Type = MatmulType<TPosition::GM, CubeFormat::ND, float>;
-    matmul::Matmul<a2Type, b2Type, c2Type, bias2Type, GetMmCfg(enableL1Reuse)> bmm2;
+    using modeTypemm2 = typename AscendC::Conditional<
+          (IsSameType<T, INPUT_T>::value == true),
+          matmul::Matmul<a2TypeND, b2Type, c2Type, bias2Type, GetMmCfg(enableL1Reuse)>,
+          matmul::Matmul<a2Type, b2Type, c2Type, bias2Type, GetMmCfg(enableL1Reuse)>>::type;
+    modeTypemm2 bmm2;
+
+    using c2NzType = MatmulType<TPosition::GM, CubeFormat::NZ, float>;
+    using modeTypemm2Nz = typename AscendC::Conditional<
+          (IsSameType<T, INPUT_T>::value == true),
+          matmul::Matmul<a2TypeND, b2Type, c2NzType, bias2Type, GetMmCfg(enableL1Reuse)>,
+          matmul::Matmul<a2Type, b2Type, c2NzType, bias2Type, GetMmCfg(enableL1Reuse)>>::type;
+    modeTypemm2Nz bmm2Nz;
 
 protected:
     __aicore__ inline void InitInput(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
@@ -97,8 +117,11 @@ protected:
                                      __gm__ uint8_t *attentionOut, __gm__ uint8_t *workspace,
                                      const FlashAttentionScoreGeneralTilingData *__restrict tiling, TPipe *tPipe);
     __aicore__ inline void WaitBmm1Result();
-    __aicore__ inline void WaitBmm2Result();
-    __aicore__ inline void IterateBmm2(SplitS1dExtraInfo &extraInfo);
+    template <typename T2, typename T3, const MatmulConfig &MM_CFG>
+    __aicore__ inline void WaitBmm2Result(matmul::Matmul<T2, b2Type, T3, bias2Type, MM_CFG> &bmm2);
+    template <typename T2, typename T3, const MatmulConfig &MM_CFG>
+    __aicore__ inline void IterateBmm2(SplitS1dExtraInfo &extraInfo,
+                                       matmul::Matmul<T2, b2Type, T3, bias2Type, MM_CFG> &bmm2);
     __aicore__ inline void SetExtraInfo(SplitS1dExtraInfo &extraInfo, int64_t taskId, int64_t s2LoopCount,
                                         int64_t s2LoopLimit, int64_t multiCoreInnerIdx, bool lastNotPair);
     __aicore__ inline void SetTiling(const FlashAttentionScoreGeneralTilingData *__restrict tilingData);
@@ -120,7 +143,10 @@ protected:
     __aicore__ inline void CopyInAttenMask(SplitS1dExtraInfo &extraInfo, int64_t loopIdx, int64_t maskOffset);
     __aicore__ inline int64_t ComputeAttenMaskOffset(SplitS1dExtraInfo &extraInfo, int64_t loopIdx);
     __aicore__ inline int64_t ComputeOffsetForNoCompress(SplitS1dExtraInfo &extraInfo, int64_t loopIdx);
-    __aicore__ inline void NzToNd(SplitS1dExtraInfo &extraInfo, LocalTensor<T> &bmm1ResUb, int64_t loopIdx);
+    __aicore__ inline void NzToNd(Nz2NdInfo &nz2NdInfo, const GlobalTensor<T> &bmmResGm,
+                                  LocalTensor<T> &tempUb, LocalTensor<T> &bmmResUb);
+    __aicore__ inline void NdToNz(SplitS1dExtraInfo &extraInfo, LocalTensor<INPUT_T> &nzResUb,
+                                  LocalTensor<INPUT_T> &vec1ResUb, int64_t loopIdx);
     __aicore__ inline void GetBmm1Result(SplitS1dExtraInfo &extraInfo, LocalTensor<T> &bmm1ResUb, int64_t loopIdx);
     __aicore__ inline void ComputeAttenMask(SplitS1dExtraInfo &extraInfo, LocalTensor<T> &bmm1ResUb,
                                             const uint8_t maskType);
@@ -155,7 +181,8 @@ protected:
 
     int64_t bmm2BOffsetLast = 0;
     int64_t bmm2N2OffsetLast = 0;
-    int64_t lastS1RealSize = 0;
+    int64_t lastVec1S1RealSize = 0;
+    int64_t lastVec2S1RealSize = 0;
 
     // 资源分配
     TBuf<> maskTBufPing;  // 11K
@@ -331,9 +358,8 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<
     int64_t stage1WorkspaceOffset = 0;
     int64_t s2SizeAlign16 = CeilDiv(this->tilingData->inputParams.s2Size, 16) * 16;
     mmNRatioOffset = CeilDiv(s1BaseSize * s2SizeAlign16, 256) * 256 * sizeof(T);
-    if constexpr (bmm1Format == CubeFormat::NZ) {
-        stage1WorkspaceOffset = mmNRatioOffset;
-    }
+    stage1WorkspaceOffset = mmNRatioOffset;
+
     // FP32下的稀疏场景bmm1与stage1的workspace不复用
     if constexpr (IsSameType<INPUT_T, float>::value) {
         stage1WorkspaceOffset = mmNRatioOffset * sizeof(INPUT_T) / 2;
@@ -349,19 +375,10 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<
     this->mm1Res[0].SetGlobalBuffer((__gm__ T *)(workspace + totalOffset));
     this->mm1Res[1].SetGlobalBuffer((__gm__ T *)(workspace + totalOffset + mmNRatioOffset));
     // stage1Result， 占用mmNRatioOffset空间
-    if constexpr (bmm1Format == CubeFormat::NZ) {
-        this->stage1Res[0].SetGlobalBuffer((__gm__ INPUT_T *)(workspace + totalOffset + 2 * mmNRatioOffset));
-        this->stage1Res[1].SetGlobalBuffer(
+    this->stage1Res[0].SetGlobalBuffer((__gm__ INPUT_T *)(workspace + totalOffset + 2 * mmNRatioOffset));
+    this->stage1Res[1].SetGlobalBuffer(
             (__gm__ INPUT_T *)(workspace + totalOffset + 2 * mmNRatioOffset + stage1WorkspaceOffset / 2));
-    } else {
-        this->stage1Res[0].SetGlobalBuffer((__gm__ INPUT_T *)(workspace + totalOffset));
-        this->stage1Res[1].SetGlobalBuffer((__gm__ INPUT_T *)(workspace + totalOffset + mmNRatioOffset));
-    }
-    if constexpr (IsSameType<INPUT_T, float>::value) {
-        this->stage1Res[0].SetGlobalBuffer((__gm__ INPUT_T *)(workspace + totalOffset + 2 * mmNRatioOffset));
-        this->stage1Res[1].SetGlobalBuffer(
-            (__gm__ INPUT_T *)(workspace + totalOffset + 2 * mmNRatioOffset + stage1WorkspaceOffset / 2));
-    }
+
     // bmm2Result, 占用s1BaseSize * D的空间
     this->mm2Res[0].SetGlobalBuffer((__gm__ T *)(workspace + totalOffset + mmNRatioOffset * 2 + stage1WorkspaceOffset));
     this->mm2Res[1].SetGlobalBuffer(
@@ -457,8 +474,8 @@ FlashAttentionScoreS1Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INP
     this->pipe->InitBuffer(this->stage1PongBuf, 9216 * sizeof(T)); // i.a 36k
     this->pipe->InitBuffer(this->commonTBuf, 8192 * sizeof(T));    // t.b 32k
 
-    // 8 * 1024 * 2 = 16k，存放vec1 Cast成fp16之后的结果
-    this->pipe->InitBuffer(this->vecOut, 16384);
+    // 8 * 1024 * 2 = 16k，存放vec1 Cast成fp16之后的结果, 支持NdToNz后需要增加2K防止bank冲突
+    this->pipe->InitBuffer(this->vecOut, 18432);
     // 根据UB剩余空间大小，分配sum和max各8k，无ping pong，exp额外占用32B，共16KB + 32B
     this->pipe->InitBuffer(this->softmaxSumBuf, this->softmaxBufSize * this->blockBytes);
     this->pipe->InitBuffer(this->softmaxMaxBuf, this->softmaxBufSize * this->blockBytes);
@@ -750,14 +767,10 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<
     int64_t attenOutOffset = dSize;
     if constexpr (layOutType == LayOutTypeEnum::LAYOUT_BSH) {
         attenOutOffset = this->n2GD;
-        dstStride =
-            (this->tilingData->inputParams.n2Size * this->tilingData->inputParams.gSize - 1) * dSize * sizeof(INPUT_T);
+        dstStride = (this->n2G - 1) * dataCopyParams.blockLen;
     } else if constexpr (layOutType == LayOutTypeEnum::LAYOUT_SBH) {
         attenOutOffset = this->bN2GD;
-        dstStride = (this->tilingData->inputParams.bSize * this->tilingData->inputParams.n2Size *
-                         this->tilingData->inputParams.gSize -
-                     1) *
-                    dSize * sizeof(INPUT_T);
+        dstStride = (this->bN2G - 1) * dataCopyParams.blockLen;
     }
 
     // dataCopyParams.dstStride类型定义uint16_t，65535是其最大值
@@ -844,22 +857,16 @@ FlashAttentionScoreS1Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INP
         if (likely(this->dSizeAlign16 == this->dSize)) {
             DataCopy(bmm2ResPingUb, this->mm2Res[extraInfo.taskIdMod2][mm2ResOffset], divCastCalcSize);
         } else {
-            DataCopyParams dataCopyParams;
-            DataCopyPadParams dataCopyPadParams;
-            dataCopyParams.blockCount = extraInfo.vec2S1BaseSize;
-            dataCopyParams.dstStride = 0;
-            dataCopyParams.srcStride = 0;
-            dataCopyParams.blockLen = this->dSize * 4;
-            dataCopyPadParams.rightPadding = this->dSizeAlign16 - this->dSize;
-            dataCopyPadParams.paddingValue = 0;
-            if (dataCopyPadParams.rightPadding > blockSize) {
-                // 8对齐场景，内部vector需要16对齐，我们在data copy的时候需要手动补0
-                dataCopyPadParams.rightPadding -= blockSize;
-                dataCopyParams.dstStride = 1;
-                Duplicate<T>(bmm2ResPingUb[dAlign8], 0, blockSize, extraInfo.vec2S1BaseSize, 0,
-                             this->dSizeAlign16 * sizeof(T) / blockBytes);
-            }
-            DataCopyPad(bmm2ResPingUb, this->mm2Res[extraInfo.taskIdMod2][mm2ResOffset], dataCopyParams, dataCopyPadParams);
+            Nz2NdInfo nz2NdInfo;
+            nz2NdInfo.ndFirstAxisRealSize = extraInfo.s1RealSize;
+            nz2NdInfo.ndFirstAxisBaseSize = extraInfo.vec2S1BaseSize;
+            nz2NdInfo.ndFirstAxisLoopSize = s1RealSizeInLoop;
+            nz2NdInfo.ndLastAxis = this->dSizeAlign16;
+            nz2NdInfo.loopIdx = vec2S1Idx;
+            event_t eventIdVToMTE2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE2));
+            SetFlag<HardEvent::V_MTE2>(eventIdVToMTE2);
+            WaitFlag<HardEvent::V_MTE2>(eventIdVToMTE2);
+            NzToNd(nz2NdInfo, this->mm2Res[extraInfo.taskIdMod2], bmm2ResPongUb, bmm2ResPingUb);
             divCastCalcSize = divCastCalcSize1;
         }
 
@@ -961,12 +968,20 @@ FlashAttentionScoreS1Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INP
         }
 
         if (taskId > 1) {
-            WaitBmm2Result();
+            if (likely(this->dSizeAlign16 == this->dSize)) {
+                WaitBmm2Result(this->bmm2);
+            } else {
+                WaitBmm2Result(this->bmm2Nz);
+            }
         }
 
         if (taskId > 0 && notLast) {
             WaitFlag<HardEvent::MTE3_MTE2>(eventIdMte3ToMte2);
-            this->IterateBmm2(extraInfo[(taskId + 2) % 3]);
+            if (likely(this->dSizeAlign16 == this->dSize)) {
+                this->IterateBmm2(extraInfo[(taskId + 2) % 3], this->bmm2);
+            } else {
+                this->IterateBmm2(extraInfo[(taskId + 2) % 3], this->bmm2Nz);
+            }
         }
 
         if (taskId > 1) {
@@ -974,7 +989,7 @@ FlashAttentionScoreS1Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INP
         }
         ++taskId;
     }
-};
+}
 
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
           typename T, bool isBasicBlock, CubeFormat bmm1Format, TPosition bmm2Source, CubeFormat bmm2SourceFormat,
@@ -1074,9 +1089,9 @@ __aicore__ inline void
 FlashAttentionScoreS1Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
                             bmm2Source, bmm2SourceFormat, enableL1Reuse>::IterateBmm1(SplitS1dExtraInfo &extraInfo)
 {
-    if (extraInfo.s1RealSize != lastS1RealSize || this->tilingData->inputParams.sparseType > 0) {
+    if (extraInfo.s1RealSize != lastVec1S1RealSize || this->tilingData->inputParams.sparseType > 0) {
         this->bmm1.SetOrgShape(extraInfo.s1RealSize, mm1Kb, mm1Ka, mm1Kb, extraInfo.s2RealSize);
-        lastS1RealSize = extraInfo.s1RealSize;
+        lastVec1S1RealSize = extraInfo.s1RealSize;
     }
     this->Bmm1SetTensorA(extraInfo);
     this->SetBmm1TensorB(extraInfo);
@@ -1361,14 +1376,22 @@ FlashAttentionScoreS1Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INP
         }
         pipe_barrier(PIPE_V);
         if constexpr (!IsSameType<T, INPUT_T>::value) {
-            LocalTensor<INPUT_T> stage1CastTensor = this->vecOut.template Get<INPUT_T>();
-            Cast(stage1CastTensor, stage1PingTensor, RoundMode::CAST_ROUND,
-                 extraInfo.vecS1TailSize * extraInfo.s2RealSizeAlign16);
-            SetFlag<HardEvent::V_MTE3>(eventIdVToMte3);
-            WaitFlag<HardEvent::V_MTE3>(eventIdVToMte3);
-            DataCopy(this->stage1Res[extraInfo.taskIdMod2][loopIdx * extraInfo.s1BaseTimesS2Align16], stage1CastTensor,
+            if constexpr (bmm1Format == CubeFormat::NZ) {
+                LocalTensor<INPUT_T> stage1NzTensor = this->vecOut.template Get<INPUT_T>();
+                LocalTensor<INPUT_T> stage1CastTensor = this->stage1PingBuf.template Get<INPUT_T>();
+                Cast(stage1CastTensor, stage1PingTensor, RoundMode::CAST_ROUND,
                      extraInfo.vecS1TailSize * extraInfo.s2RealSizeAlign16);
-            pipe_barrier(PIPE_V);
+                NdToNz(extraInfo, stage1NzTensor, stage1CastTensor, loopIdx);
+            } else {
+                LocalTensor<INPUT_T> stage1CastTensor = this->vecOut.template Get<INPUT_T>();
+                Cast(stage1CastTensor, stage1PingTensor, RoundMode::CAST_ROUND,
+                     extraInfo.vecS1TailSize * extraInfo.s2RealSizeAlign16);
+                SetFlag<HardEvent::V_MTE3>(eventIdVToMte3);
+                WaitFlag<HardEvent::V_MTE3>(eventIdVToMte3);
+                DataCopy(this->stage1Res[extraInfo.taskIdMod2][loopIdx * extraInfo.s1BaseTimesS2Align16],
+                         stage1CastTensor, extraInfo.vecS1TailSize * extraInfo.s2RealSizeAlign16);
+                pipe_barrier(PIPE_V);
+            }
         } else {
             SetFlag<HardEvent::V_MTE3>(eventIdVToMte3);
             WaitFlag<HardEvent::V_MTE3>(eventIdVToMte3);
@@ -1505,69 +1528,131 @@ template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool ha
           bool enableL1Reuse>
 __aicore__ inline void
 FlashAttentionScoreS1Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
-                            bmm2Source, bmm2SourceFormat, enableL1Reuse>::NzToNd(SplitS1dExtraInfo &extraInfo,
-                                                                                 LocalTensor<T> &bmm1ResUb,
-                                                                                 int64_t loopIdx)
+                            bmm2Source, bmm2SourceFormat, enableL1Reuse>::NzToNd(Nz2NdInfo &nz2NdInfo,
+                                                                                 const GlobalTensor<T> &bmmResGm,
+                                                                                 LocalTensor<T> &tempUb,
+                                                                                 LocalTensor<T> &bmmResUb)
 {
     // 1.将bmm1结果由GM搬至UB，每块数据在UB上间隔1个block，防止BANK冲突
-    LocalTensor<T> temp = this->stage1PongBuf.template Get<T>(); // i.a 32k
     DataCopyParams dataCopyParams;
-    int64_t s21 = CeilDiv(extraInfo.s2RealSizeAlign16, 16L);
-    dataCopyParams.blockCount = s21;
-    dataCopyParams.blockLen = extraInfo.vecS1TailSize * 2;                           // block
-    dataCopyParams.srcStride = (extraInfo.s1RealSize - extraInfo.vecS1TailSize) * 2; // block
+    int64_t nzFirstAxis = CeilDiv(nz2NdInfo.ndLastAxis, 16L);
+    dataCopyParams.blockCount = nzFirstAxis;
+    dataCopyParams.blockLen = nz2NdInfo.ndFirstAxisLoopSize * 2;
+    dataCopyParams.srcStride = (nz2NdInfo.ndFirstAxisRealSize - nz2NdInfo.ndFirstAxisLoopSize) * 2;
     dataCopyParams.dstStride = 1;
-    int64_t bmm1ResOffset = loopIdx * extraInfo.vecS1BaseSize * 16;
+    int64_t bmmResOffset = nz2NdInfo.loopIdx * nz2NdInfo.ndFirstAxisBaseSize * 16;
+    int64_t innerLoop = nzFirstAxis / 8L;
+    int64_t innerRemain = nzFirstAxis % 8L;
 
-    int64_t s2InnerLoop = s21 / 8L;
-    int64_t s2InnerRemain = s21 % 8L;
     CopyRepeatParams repeatParams;
-    repeatParams.srcStride = extraInfo.vecS1TailSize * 2 + 1;
+    repeatParams.srcStride = nz2NdInfo.ndFirstAxisLoopSize * 2 + 1;
     repeatParams.dstStride = 2;
     repeatParams.srcRepeatSize = 2;
-    repeatParams.dstRepeatSize = extraInfo.s2RealSizeAlign16 / 8;
-    int32_t s1OuterLoop = extraInfo.vecS1TailSize / this->repeatMaxTimes;
-    int32_t s1OuterRemain = extraInfo.vecS1TailSize % this->repeatMaxTimes;
-    int32_t s1OuterBmm1Offset = this->repeatMaxTimes * extraInfo.s2RealSizeAlign16;
-    int32_t s1OuterTempOffset = this->repeatMaxTimes * 16;
-    int64_t offsetJ = 128 * extraInfo.vecS1TailSize + 64;
-    DataCopy(temp, this->mm1Res[extraInfo.taskIdMod2][bmm1ResOffset], dataCopyParams);
+    repeatParams.dstRepeatSize = nz2NdInfo.ndLastAxis / 8;
+    int32_t outerLoop = nz2NdInfo.ndFirstAxisLoopSize / this->repeatMaxTimes;
+    int32_t outerRemain = nz2NdInfo.ndFirstAxisLoopSize % this->repeatMaxTimes;
+    int32_t outerBmmOffset = this->repeatMaxTimes * nz2NdInfo.ndLastAxis;
+    int32_t outerTempOffset = this->repeatMaxTimes * 16;
+    int64_t offsetJ = 128 * nz2NdInfo.ndFirstAxisLoopSize + 64;
+    DataCopy(tempUb, bmmResGm[bmmResOffset], dataCopyParams);
 
     // 2.使用vcopy进行transpose，[S2/16, vec1S1Base * 16 + 8] -> [vec1S1Base, S2/16 , 16]
     event_t eventIdMte2ToV = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_V));
     SetFlag<HardEvent::MTE2_V>(eventIdMte2ToV);
     WaitFlag<HardEvent::MTE2_V>(eventIdMte2ToV);
-    for (int64_t outerIndex = 0; outerIndex < s1OuterLoop; ++outerIndex) {
+    for (int64_t outerIndex = 0; outerIndex < outerLoop; ++outerIndex) {
         for (int64_t i = 0; i < 2; ++i) {
-            for (int64_t j = 0; j < s2InnerLoop; ++j) {
-                Copy(bmm1ResUb[outerIndex * s1OuterBmm1Offset + j * 128 + i * 8],
-                     temp[outerIndex * s1OuterTempOffset + j * offsetJ + i * 8], this->repeatMaxSize,
+            for (int64_t j = 0; j < innerLoop; ++j) {
+                Copy(bmmResUb[outerIndex * outerBmmOffset + j * 128 + i * 8],
+                     tempUb[outerIndex * outerTempOffset + j * offsetJ + i * 8], this->repeatMaxSize,
                      this->repeatMaxTimes, repeatParams);
             }
-            if (likely(s2InnerRemain)) {
-                Copy(bmm1ResUb[outerIndex * s1OuterBmm1Offset + s2InnerLoop * 128 + i * 8],
-                     temp[outerIndex * s1OuterTempOffset + s2InnerLoop * offsetJ + i * 8], s2InnerRemain * 8,
+            if (likely(innerRemain)) {
+                Copy(bmmResUb[outerIndex * outerBmmOffset + innerLoop * 128 + i * 8],
+                     tempUb[outerIndex * outerTempOffset + innerLoop * offsetJ + i * 8], innerRemain * 8,
                      this->repeatMaxTimes, repeatParams);
             }
         }
     }
-    if (likely(s1OuterRemain)) {
+    if (likely(outerRemain)) {
         for (int64_t i = 0; i < 2; ++i) {
-            for (int64_t j = 0; j < s2InnerLoop; ++j) {
-                Copy(bmm1ResUb[s1OuterLoop * s1OuterBmm1Offset + j * 128 + i * 8],
-                     temp[s1OuterLoop * s1OuterTempOffset + j * offsetJ + i * 8], this->repeatMaxSize, s1OuterRemain,
+            for (int64_t j = 0; j < innerLoop; ++j) {
+                Copy(bmmResUb[outerLoop * outerBmmOffset + j * 128 + i * 8],
+                     tempUb[outerLoop * outerTempOffset + j * offsetJ + i * 8], this->repeatMaxSize, outerRemain,
                      repeatParams);
             }
-            if (likely(s2InnerRemain)) {
-                Copy(bmm1ResUb[s1OuterLoop * s1OuterBmm1Offset + s2InnerLoop * 128 + i * 8],
-                     temp[s1OuterLoop * s1OuterTempOffset + s2InnerLoop * offsetJ + i * 8], s2InnerRemain * 8,
-                     s1OuterRemain, repeatParams);
+            if (likely(innerRemain)) {
+                Copy(bmmResUb[outerLoop * outerBmmOffset + innerLoop * 128 + i * 8],
+                     tempUb[outerLoop * outerTempOffset + innerLoop * offsetJ + i * 8], innerRemain * 8,
+                     outerRemain, repeatParams);
             }
         }
     }
-    uint32_t bmm1ResUbShape[] = {static_cast<uint32_t>(extraInfo.vecS1TailSize),
-                                 static_cast<uint32_t>(extraInfo.s2RealSizeAlign16)};
-    bmm1ResUb.SetShapeInfo(ShapeInfo(2, bmm1ResUbShape, DataFormat::ND));
+    uint32_t bmm1ResUbShape[] = {static_cast<uint32_t>(nz2NdInfo.ndFirstAxisLoopSize),
+                                 static_cast<uint32_t>(nz2NdInfo.ndLastAxis)};
+    bmmResUb.SetShapeInfo(ShapeInfo(2, bmm1ResUbShape, DataFormat::ND));
+}
+
+template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
+          typename T, bool isBasicBlock, CubeFormat bmm1Format, TPosition bmm2Source, CubeFormat bmm2SourceFormat,
+          bool enableL1Reuse>
+__aicore__ inline void FlashAttentionScoreS1Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T,
+        isBasicBlock, bmm1Format, bmm2Source, bmm2SourceFormat, enableL1Reuse>::NdToNz(SplitS1dExtraInfo &extraInfo,
+        LocalTensor<INPUT_T> &nzResUb, LocalTensor<INPUT_T> &vec1ResUb, int64_t loopIdx)
+{
+    auto nzResUbTmp = nzResUb.template ReinterpretCast<half>();
+    auto vec1ResUbTmp = vec1ResUb.template ReinterpretCast<half>();
+    int64_t s21 = CeilDiv(extraInfo.s2RealSizeAlign16, 16L);
+    int64_t s2InnerLoop = s21 / 8L;
+    int64_t s2InnerRemain = s21 % 8L;
+    int64_t repeatMaxSize16 = this->repeatMaxBytes / sizeof(INPUT_T);
+    CopyRepeatParams repeatParams;
+    repeatParams.srcStride = 1;
+    repeatParams.dstStride = extraInfo.vecS1TailSize + 1; // 防止bank冲突，所以+1
+    repeatParams.srcRepeatSize = extraInfo.s2RealSizeAlign16 / 16;
+    repeatParams.dstRepeatSize = 1;
+    int32_t s1OuterLoop = extraInfo.vecS1TailSize / this->repeatMaxTimes;
+    int32_t s1OuterRemain = extraInfo.vecS1TailSize % this->repeatMaxTimes;
+    int32_t s1OuterBmm1Offset = this->repeatMaxTimes * extraInfo.s2RealSizeAlign16;
+    int32_t s1OuterTempOffset = this->repeatMaxTimes * 16;
+    int64_t vecS1BaseSizeTime16 = extraInfo.vecS1BaseSize * 16;
+    int64_t offsetJ = 8 * extraInfo.vecS1TailSize * 16 + 128;
+    pipe_barrier(PIPE_V);
+    for (int64_t outerIndex = 0; outerIndex < s1OuterLoop; ++ outerIndex) {
+        for (int64_t j = 0; j < s2InnerLoop; ++j) {
+            Copy(nzResUbTmp[outerIndex * s1OuterTempOffset + j * offsetJ],
+                 vec1ResUbTmp[outerIndex * s1OuterBmm1Offset + j * 128],
+                 repeatMaxSize16, this->repeatMaxTimes, repeatParams);
+        }
+        if (s2InnerRemain) {
+            Copy(nzResUbTmp[outerIndex * s1OuterTempOffset + s2InnerLoop * offsetJ],
+                 vec1ResUbTmp[outerIndex * s1OuterBmm1Offset + s2InnerLoop * 128],
+                 s2InnerRemain * 16, this->repeatMaxTimes, repeatParams);
+        }
+    }
+
+    if (s1OuterRemain) {
+        for (int64_t j = 0; j < s2InnerLoop; ++j) {
+            Copy(nzResUbTmp[s1OuterLoop * s1OuterTempOffset + j * offsetJ],
+                 vec1ResUbTmp[s1OuterLoop * s1OuterBmm1Offset + j * 128],
+                 repeatMaxSize16, s1OuterRemain, repeatParams);
+        }
+        if (s2InnerRemain) {
+            Copy(nzResUbTmp[s1OuterLoop * s1OuterTempOffset + s2InnerLoop * offsetJ],
+                 vec1ResUbTmp[s1OuterLoop * s1OuterBmm1Offset + s2InnerLoop * 128],
+                 s2InnerRemain * 16, s1OuterRemain, repeatParams);
+        }
+    }
+
+    event_t eventIdVToMte3 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE3));
+    SetFlag<HardEvent::V_MTE3>(eventIdVToMte3);
+    WaitFlag<HardEvent::V_MTE3>(eventIdVToMte3);
+    DataCopyParams dataCopyParams;
+    dataCopyParams.blockCount = s21;
+    dataCopyParams.blockLen = extraInfo.vecS1TailSize;
+    dataCopyParams.srcStride = 1;
+    dataCopyParams.dstStride = this->Align(extraInfo.s1RealSize) - extraInfo.vecS1TailSize;
+    DataCopy(this->stage1Res[extraInfo.taskIdMod2][loopIdx * vecS1BaseSizeTime16], nzResUb, dataCopyParams);
 }
 
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
@@ -1580,7 +1665,14 @@ FlashAttentionScoreS1Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INP
                                                                                         int64_t loopIdx)
 {
     if constexpr (bmm1Format == CubeFormat::NZ) {
-        NzToNd(extraInfo, bmm1ResUb, loopIdx);
+        Nz2NdInfo nz2NdInfo;
+        nz2NdInfo.ndFirstAxisRealSize = extraInfo.s1RealSize;
+        nz2NdInfo.ndFirstAxisBaseSize = extraInfo.vecS1BaseSize;
+        nz2NdInfo.ndFirstAxisLoopSize = extraInfo.vecS1TailSize;
+        nz2NdInfo.ndLastAxis = extraInfo.s2RealSizeAlign16;
+        nz2NdInfo.loopIdx = loopIdx;
+        LocalTensor<T> tempUb = this->stage1PongBuf.template Get<T>();
+        NzToNd(nz2NdInfo, this->mm1Res[extraInfo.taskIdMod2], tempUb, bmm1ResUb);
         return;
     } else {
         if (extraInfo.s2RealSizeAlign16 == extraInfo.s2RealSize) {
@@ -1681,12 +1773,23 @@ FlashAttentionScoreS1Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INP
 
     LocalTensor<uint8_t> apiTmpBuffer = this->commonTBuf.template Get<uint8_t>();
     pipe_barrier(PIPE_V);
+
     if (IsBasicBlockInSoftMax(extraInfo.vecS1TailSize, extraInfo.s2RealSize)) {
-        SoftmaxFlashV2<T, false, true, true>(srcTensor, sumUb, maxUb, srcTensor, expUb, sumUb, maxUb, apiTmpBuffer,
-                                             this->tilingData->softmaxFlashTilingData);
+        SoftMaxTiling newTiling = AscendC::SoftMaxFlashV2TilingFuncImpl(extraInfo.vecS1TailSize,
+                                                                        extraInfo.s2RealSizeAlign16, sizeof(T),
+                                                                        sizeof(T),
+                                                                        apiTmpBuffer.GetSize() / sizeof(T),
+                                                                        false, true);
+        SoftmaxFlashV2<T, false, true, true, false, SOFTMAX_DEFAULT_CFG>(srcTensor, sumUb, maxUb, srcTensor, expUb,
+                                                                         sumUb, maxUb, apiTmpBuffer, newTiling);
     } else {
-        SoftmaxFlashV2<T, false, true, false>(srcTensor, sumUb, maxUb, srcTensor, expUb, sumUb, maxUb, apiTmpBuffer,
-                                              this->tilingData->softmaxFlashTilingData);
+        SoftMaxTiling newTiling = AscendC::SoftMaxFlashV2TilingFuncImpl(extraInfo.vecS1TailSize,
+                                                                        extraInfo.s2RealSizeAlign16, sizeof(T),
+                                                                        sizeof(T),
+                                                                        apiTmpBuffer.GetSize() / sizeof(T),
+                                                                        false, false);
+        SoftmaxFlashV2<T, false, true, false, false, SOFTMAX_DEFAULT_CFG>(srcTensor, sumUb, maxUb, srcTensor, expUb,
+                                                                          sumUb, maxUb, apiTmpBuffer, newTiling);
     }
 
     if constexpr (implMode == ImplModeEnum::AA_INVALID_LINE_HIGH_PRECISION) {
@@ -1745,20 +1848,24 @@ FlashAttentionScoreS1Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INP
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
           typename T, bool isBasicBlock, CubeFormat bmm1Format, TPosition bmm2Source, CubeFormat bmm2SourceFormat,
           bool enableL1Reuse>
+template <typename T2, typename T3, const MatmulConfig &MM_CFG>
 __aicore__ inline void
 FlashAttentionScoreS1Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
-                            bmm2Source, bmm2SourceFormat, enableL1Reuse>::WaitBmm2Result()
+                            bmm2Source, bmm2SourceFormat, enableL1Reuse>::WaitBmm2Result(
+                                                            matmul::Matmul<T2, b2Type, T3, bias2Type, MM_CFG> &bmm2)
 {
-    this->bmm2.WaitIterateAll();
-    this->bmm2.End();
+    bmm2.WaitIterateAll();
+    bmm2.End();
 }
 
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
           typename T, bool isBasicBlock, CubeFormat bmm1Format, TPosition bmm2Source, CubeFormat bmm2SourceFormat,
           bool enableL1Reuse>
+template <typename T2, typename T3, const MatmulConfig &MM_CFG>
 __aicore__ inline void
 FlashAttentionScoreS1Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
-                            bmm2Source, bmm2SourceFormat, enableL1Reuse>::IterateBmm2(SplitS1dExtraInfo &extraInfo)
+                            bmm2Source, bmm2SourceFormat, enableL1Reuse>::IterateBmm2(SplitS1dExtraInfo &extraInfo,
+                            matmul::Matmul<T2, b2Type, T3, bias2Type, MM_CFG> &bmm2)
 {
     int64_t bOffset = 0;
     int64_t n2Offset = 0;
@@ -1781,10 +1888,11 @@ FlashAttentionScoreS1Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INP
         s2Offset = extraInfo.s2StartIdx * dSize;
     }
     int64_t vCoreOffset = bOffset + n2Offset + s2Offset;
-    if (extraInfo.taskId == 0 || this->tilingData->inputParams.sparseType > 0) {
-        this->bmm2.SetOrgShape(this->tilingData->inputParams.s1Size, mm2Kb, extraInfo.s2RealSizeAlign16, mm2Kb, dSize);
+    if (extraInfo.s1RealSize != lastVec2S1RealSize || this->tilingData->inputParams.sparseType > 0) {
+        bmm2.SetOrgShape(extraInfo.s1RealSize, mm2Kb, extraInfo.s2RealSizeAlign16, mm2Kb, dSize);
+        lastVec2S1RealSize = extraInfo.s1RealSize;
     }
-    this->bmm2.SetTensorA(this->stage1Res[extraInfo.taskIdMod2]);
+    bmm2.SetTensorA(this->stage1Res[extraInfo.taskIdMod2]);
 
     if constexpr (bmm2Source == TPosition::TSCM) {
         valueScmTensor = valueScm.AllocTensor<INPUT_T>();
@@ -1795,20 +1903,20 @@ FlashAttentionScoreS1Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INP
                      srcDValue);
         }
         int64_t vCoreOffsetL1 = s2Offset;
-        this->bmm2.SetTensorB(valueScmTensor[vCoreOffsetL1]);
-        this->bmm2.SetTail(extraInfo.s1RealSize, this->tilingData->inputParams.dSize, extraInfo.s2RealSize);
+        bmm2.SetTensorB(valueScmTensor[vCoreOffsetL1]);
+        bmm2.SetTail(extraInfo.s1RealSize, this->tilingData->inputParams.dSize, extraInfo.s2RealSize);
         valueScm.FreeTensor(valueScmTensor);
     } else {
-        this->bmm2.SetTensorB(this->valueGm[vCoreOffset]);
+        bmm2.SetTensorB(this->valueGm[vCoreOffset]);
     }
 
     // 通过extraInfo.s2RealSize来限制一次计算的大小
-    this->bmm2.SetTail(extraInfo.s1RealSize, this->tilingData->inputParams.dSize, extraInfo.s2RealSize);
+    bmm2.SetTail(extraInfo.s1RealSize, this->tilingData->inputParams.dSize, extraInfo.s2RealSize);
     if constexpr (enableL1Reuse) {
-        this->bmm2.template IterateAll<false>(this->mm2Res[extraInfo.taskIdMod2], false, false, true,
+        bmm2.template IterateAll<false>(this->mm2Res[extraInfo.taskIdMod2], false, false, true,
                                               extraInfo.lastNotPair);
     } else {
-        this->bmm2.template IterateAll<false>(this->mm2Res[extraInfo.taskIdMod2], false, false, true);
+        bmm2.template IterateAll<false>(this->mm2Res[extraInfo.taskIdMod2], false, false, true);
     }
 }
 

@@ -133,47 +133,49 @@ bool Context::RunKernelProcess(std::string &caseName)
     LOG_DBG("[BGN] Run %s:%s Kernel async, TilingKey=%lu, BlockDim=%ld", opName_.c_str(), caseName.c_str(), tilingKey_,
             tilingBlockDim_);
 
-    /* 重定向 std err/out/log 到同一个文件 */
-    std::string filePath = std::string(platform_->GetExeAbsPath()) + "/" + opName_ + "_" + caseName + "_kernel.log";
-    std::ofstream oFileHdl(filePath);
-    std::streambuf *stdErr = std::cerr.rdbuf(oFileHdl.rdbuf());
-    std::streambuf *stdLog = std::clog.rdbuf(oFileHdl.rdbuf());
-    std::streambuf *stdOut = std::cout.rdbuf(oFileHdl.rdbuf());
+#ifdef TESTS_UT_OPS_TEST_CI_PR // 为便于定位, 仅在PR场景进行重定向
+    /**
+     * 重定向标准输入输出流
+     *
+     *  - Model 部分通过 stdout 输出流输出日志;
+     *  - Ascend C 框架部分通过 std::cerr/std::clog/std::cout 输出流输出日志;
+     *
+     * 此处通过重定向上述输出流到文件, 以获取输出内容并做检查, 进而感知到 Kernel 执行的异常.
+     */
+    std::string mod = "Model";
+    std::string fmk = "Framework";
+    std::string casePath = std::string(platform_->GetExeAbsPath()) + "/" + opName_ + "_" + caseName;
 
+    /* Model 部分, 重定向 stdout 到文件 */
+    auto stdoutFileHdl = dup(1); // 保存原有输出流句柄
+    std::string modelFilePath = casePath + "_kernel_" + mod + ".log";
+    std::ofstream modelFileHdl(modelFilePath);
+    freopen(modelFilePath.c_str(), "w", stdout);
+
+    /* Ascend C 框架部分, 重定向 std::cerr/std::clog/std::cout 到同一个文件 */
+    std::string fmkFilePath = casePath + "_kernel_" + fmk + ".log";
+    std::ofstream fmkFileHdl(fmkFilePath);
+    std::streambuf *stdErr = std::cerr.rdbuf(fmkFileHdl.rdbuf());
+    std::streambuf *stdLog = std::clog.rdbuf(fmkFileHdl.rdbuf());
+    std::streambuf *stdOut = std::cout.rdbuf(fmkFileHdl.rdbuf());
+#endif
     /* 调用回调函数, 触发具体算子 Kernel 执行 */
     ICPU_SET_TILING_KEY(tilingKey_);
     auto ret = kernelRunCbf_(kernelMainFunc_, tilingKey_, tilingBlockDim_, inputs_, outputs_, workspacePtr_,
                              tilingData_.data());
-
-    /* 恢复 std err/out/log */
+#ifdef TESTS_UT_OPS_TEST_CI_PR // 为便于定位, 仅在PR场景进行重定向
+    /* 恢复重定向 */
     std::cout.rdbuf(stdOut);
     std::clog.rdbuf(stdLog);
     std::cerr.rdbuf(stdErr);
-    oFileHdl.close();
+    fmkFileHdl.close();
+    modelFileHdl.close();
+    dup2(stdoutFileHdl, 1);
 
-    /* Kernel 执行日志结果获取 */
-    std::ifstream iFile;
-    iFile.open(filePath, std::ios::in);
-    if (!iFile.is_open()) {
-        LOG_ERR("[%s:%s] Can't open KernelRstLogFile(%s).", opName_.c_str(), caseName.c_str(), filePath.c_str());
-        return false;
-    }
-    std::stringstream iFileStrStream;
-    iFileStrStream << iFile.rdbuf();
-    std::string iFileStr(iFileStrStream.str());
-    iFile.close();
-
-    /* Kernel 执行日志结果校验 */
-    ret = ret && CheckKernelResultStr(iFileStr);
-
-    if (std::remove(filePath.c_str()) != 0) {
-        LOG_ERR("[%s:%s] Can't remove KernelRstLogFile(%s)", opName_.c_str(), caseName.c_str(), filePath.c_str());
-    }
-    if (!ret) {
-        LOG_ERR("[%s:%s] Run kernel failed, details:\n%s\n", opName_.c_str(), caseName.c_str(), iFileStr.c_str());
-    } else {
-        fprintf(stdout, "Run kernel finish, details:\n%s", iFileStr.c_str());
-    }
+    /* 执行日志结果获取与结果校验 */
+    ret = ret && this->CheckKernelResult(ret, caseName, modelFilePath, mod.c_str(), CheckModelKernelResultStr, false);
+    ret = ret && this->CheckKernelResult(ret, caseName, fmkFilePath, fmk.c_str(), CheckFrameworkKernelResultStr, false);
+#endif
     return ret;
 }
 
@@ -299,7 +301,45 @@ bool Context::ParseTilingResult()
     return true;
 }
 
-bool Context::CheckKernelResultStr(std::string &kernelLog)
+bool Context::CheckKernelResult(bool &ret, std::string &caseName, std::string &path, const char *type,
+                                CheckKernelResultCbf cbf, bool detail)
+{
+    std::ifstream iFile;
+    iFile.open(path, std::ios::in);
+    if (!iFile.is_open()) {
+        LOG_ERR("[%s:%s] Can't open %s KernelRstLogFile(%s)", opName_.c_str(), caseName.c_str(), type, path.c_str());
+        return false;
+    }
+
+    std::stringstream iFileStrStream;
+    iFileStrStream << iFile.rdbuf();
+    std::string iFileStr(iFileStrStream.str());
+    iFile.close();
+
+    /* 校验失败时, 为便于定位, 不移除日志 */
+    ret = ret && cbf(iFileStr);
+    if (!ret) {
+        LOG_ERR("[%s:%s] Run kernel failed, %s details:\n%s\n", opName_.c_str(), caseName.c_str(), type,
+                iFileStr.c_str());
+        return false;
+    }
+    if (std::remove(path.c_str()) != 0) {
+        LOG_ERR("[%s:%s] Can't remove %s KernelRstLogFile(%s)", opName_.c_str(), caseName.c_str(), type, path.c_str());
+    }
+    if (detail) {
+        fprintf(stdout, "Run kernel finish, %s details:\n%s", type, iFileStr.c_str());
+    }
+    return ret;
+}
+
+bool Context::CheckModelKernelResultStr(std::string &kernelLog)
+{
+    auto rst = kernelLog.find("ERROR") == std::string::npos;
+    rst = rst && kernelLog.find("error") == std::string::npos;
+    return rst;
+}
+
+bool Context::CheckFrameworkKernelResultStr(std::string &kernelLog)
 {
     /* 不存在 Ascend C 框架感知的错误 */
     auto rst = kernelLog.find("error happened! =========") == std::string::npos;

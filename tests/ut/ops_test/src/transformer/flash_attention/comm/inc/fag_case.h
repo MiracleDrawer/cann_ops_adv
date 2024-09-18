@@ -23,6 +23,7 @@ public:
     static constexpr int32_t kTemplatePriority_Ubngs1s2_Bb = 10000;     // Ubngs1s2Bb 模板
     static constexpr int32_t kTemplatePriority_Ungs1s2_Bbn = 11000;     // Ungs1s2Bbn 模板
     static constexpr int32_t kTemplatePriority_Us1s2_Bbn2 = 15000;      // S1s2Bn2 模板
+    static constexpr int32_t kTemplatePriority_Us1s2_Bbn2gs1s2_sab = 15500;             // sameAB 模板
     static constexpr int32_t kTemplatePriority_Us1s2_Bbn2gs1s2 = 16000; // S1s2Bn2gs1s2 模板
 
 public:

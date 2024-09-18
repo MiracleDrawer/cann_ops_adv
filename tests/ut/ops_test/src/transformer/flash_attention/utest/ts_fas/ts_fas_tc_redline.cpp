@@ -1836,7 +1836,41 @@ const auto Tc_Fas_Redline_SpecCore_Case = ::testing::Values(
                     AttenMaskShapeType::S1_S2,                /* AttentionMaskShapeType */
                     ge::DataType::DT_BOOL,                     /* AttentionMaskDtype */
                     PrefixShapeType::NONE)                     /* PrefixShapeType */
-    )
+           ),
+    FasCase("Fas_Redline_SpecCore_Case_run_kernel_s1_unAlign", true, /* CaseName, Enable */
+            "",                                                /* DebugInfo */
+            OpInfo(ControlInfo(true, true),                    /* RunTiling, RunKernel */
+                   ExpectInfo(true,                            /* ExpectSuccess */
+                              10000000112201230953UL,          /* ExpectTilingKey */
+                              ExpectInfo::kFullTilingBlockDim)),                             /* ExpectTilingBlockDim */
+            FaParam(1, 1, 1, 256, 257, 15,                     /* B, N2, G, S1, S2, D */
+                    ge::DataType::DT_FLOAT16, LayoutType::SBH, /* Dtype, Layout */
+                    0.08838f, 0.9f, 65536, 65536,              /* Scale, KeepProb, PreTokens, NxtTokens */
+                    0, 0,                                      /* InnerPrecise, SparseMode */
+                    PseShapeType::NONE,                        /* PseShapeType */
+                    DropMaskShapeType::B_N1_S1_S2,             /* DropMaskShapeType */
+                    PaddingMaskShapeType::NONE,                /* PaddingMaskShapeType */
+                    AttenMaskShapeType::S1_S2,                /* AttentionMaskShapeType */
+                    ge::DataType::DT_BOOL,                     /* AttentionMaskDtype */
+                    PrefixShapeType::NONE)                     /* PrefixShapeType */
+           ),
+    FasCase("Fas_Redline_SpecCore_Case_run_kernel_B_unAlign",/* CaseName */
+            true, "",                                        /* Enable , DebugInfo */
+            OpInfo(ControlInfo(true, true),                  /* RunTiling, RunKernel */
+                   ExpectInfo(true,                          /* ExpectSuccess */
+                              10000000001121130099UL,        /* ExpectTilingKey */
+                              13)),                           /* ExpectTilingBlockDim */
+            FaParam(49, 1, 1, 16, 16, 15,                    /* B, N2, G, S1, S2, D */
+                    ge::DataType::DT_FLOAT16, LayoutType::BSH, /* Dtype, Layout */
+                    0.08838f, 0.9f, 65535, 65535,            /* Scale, KeepProb, PreTokens, NxtTokens */
+                    0, 0,                                    /* InnerPrecise, SparseMode */
+                    PseShapeType::NONE,                      /* PseShapeType */
+                    DropMaskShapeType::B_N1_S1_S2,           /* DropMaskShapeType */
+                    PaddingMaskShapeType::NONE,              /* PaddingMaskShapeType */
+                    AttenMaskShapeType::S1_S2,               /* AttentionMaskShapeType */
+                    ge::DataType::DT_BOOL,                   /* AttentionMaskDtype */
+                    PrefixShapeType::NONE)                   /* PrefixShapeType */
+            )
 );
 INSTANTIATE_TEST_SUITE_P(Fas, Ts_Fas_Ascend910B2_Redline_SpecCore, Tc_Fas_Redline_SpecCore_Case);
 INSTANTIATE_TEST_SUITE_P(Fas, Ts_Fas_Ascend910B3_Redline_SpecCore, Tc_Fas_Redline_SpecCore_Case);

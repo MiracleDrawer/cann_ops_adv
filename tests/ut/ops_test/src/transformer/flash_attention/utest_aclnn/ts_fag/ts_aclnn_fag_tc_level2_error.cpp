@@ -373,3 +373,75 @@ TEST_F(Ts_Aclnn_Fag_Ascend910B2, Tc_Fag_Level2_Err010)
 
     ASSERT_EQ(cs.Run(), false);
 }
+
+TEST_F(Ts_Aclnn_Fag_Ascend910B2, Tc_Fag_Level2_Err011)
+{
+    AclnnFagCase cs("Test_011", true,                                       /* CaseName,Enable */
+                    "",                                                     /* DebugInfo */
+                    OpInfo(ControlInfo(true, false),                         /* RunTiling,RunKernel */
+                           ExpectInfo(false,                                /* ExpectSuccess */
+                                      ExpectInfo::kInvalidTilingKey,        /* ExpectTilingKey */
+                                      ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
+                    AclnnFaParam(2, 5, 1, 2048, 2048, 71,                  /* B,N2,G,S1,S2,D */
+                                 ge::DataType::DT_FLOAT16, LayoutType::BSH, /* Dtype,Layout */
+                                 0.125f, 0.9f, 65536, 65536,                /* Scale,KeepProb,PreTokens,NxtTokens */
+                                 0, 0, 2,                                   /* InnerPrecise,SparseMode,pseType */
+                                 PseShapeType::NONE,                        /* PseShapeType */
+                                 DropMaskShapeType::B_N1_S1_S2DIV8,         /* DropMaskShapeType */
+                                 PaddingMaskShapeType::NONE,                /* PaddingMaskShapeType */
+                                 AttenMaskShapeType::NONE,                  /* AttentionMaskShapeType */
+                                 ge::DataType::DT_BOOL,                     /* AttentionMaskDtype */
+                                 PrefixShapeType::NONE)                     /* PrefixShapeType */
+    );
+    ASSERT_TRUE(cs.Init());
+
+    ASSERT_EQ(cs.Run(), false);
+}
+
+TEST_F(Ts_Aclnn_Fag_Ascend910B2, Tc_Fag_Level2_Err012)
+{
+    AclnnFagCase cs("Test_012", true,                                       /* CaseName,Enable */
+                    "",                                                     /* DebugInfo */
+                    OpInfo(ControlInfo(true, false),                         /* RunTiling,RunKernel */
+                           ExpectInfo(false,                                /* ExpectSuccess */
+                                      ExpectInfo::kInvalidTilingKey,        /* ExpectTilingKey */
+                                      ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
+                    AclnnFaParam(2, 5, 1, 2048, 2048, 71,                  /* B,N2,G,S1,S2,D */
+                                 ge::DataType::DT_FLOAT16, LayoutType::BSND, /* Dtype,Layout */
+                                 0.125f, 0.9f, 65536, 65536,                /* Scale,KeepProb,PreTokens,NxtTokens */
+                                 0, 0, 2,                                   /* InnerPrecise,SparseMode,pseType */
+                                 PseShapeType::NONE,                        /* PseShapeType */
+                                 DropMaskShapeType::B_N1_S1_S2DIV8,         /* DropMaskShapeType */
+                                 PaddingMaskShapeType::NONE,                /* PaddingMaskShapeType */
+                                 AttenMaskShapeType::NONE,                  /* AttentionMaskShapeType */
+                                 ge::DataType::DT_BOOL,                     /* AttentionMaskDtype */
+                                 PrefixShapeType::NONE)                     /* PrefixShapeType */
+    );
+    ASSERT_TRUE(cs.Init());
+
+    ASSERT_EQ(cs.Run(), false);
+}
+
+TEST_F(Ts_Aclnn_Fag_Ascend910B2, Tc_Fag_Level2_Err013)
+{
+    AclnnFagCase cs("Test_013", true,                                       /* CaseName,Enable */
+                    "",                                                     /* DebugInfo */
+                    OpInfo(ControlInfo(true, false),                         /* RunTiling,RunKernel */
+                           ExpectInfo(false,                                /* ExpectSuccess */
+                                      ExpectInfo::kInvalidTilingKey,        /* ExpectTilingKey */
+                                      ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
+                    AclnnFaParam(2, 5, 1, 2048, 2048, 71,                  /* B,N2,G,S1,S2,D */
+                                 ge::DataType::DT_FLOAT16, LayoutType::SBH, /* Dtype,Layout */
+                                 0.125f, 0.9f, 65536, 65536,                /* Scale,KeepProb,PreTokens,NxtTokens */
+                                 0, 0, 2,                                   /* InnerPrecise,SparseMode,pseType */
+                                 PseShapeType::NONE,                        /* PseShapeType */
+                                 DropMaskShapeType::B_N1_S1_S2DIV8,         /* DropMaskShapeType */
+                                 PaddingMaskShapeType::NONE,                /* PaddingMaskShapeType */
+                                 AttenMaskShapeType::NONE,                  /* AttentionMaskShapeType */
+                                 ge::DataType::DT_BOOL,                     /* AttentionMaskDtype */
+                                 PrefixShapeType::NONE)                     /* PrefixShapeType */
+    );
+    ASSERT_TRUE(cs.Init());
+
+    ASSERT_EQ(cs.Run(), false);
+}

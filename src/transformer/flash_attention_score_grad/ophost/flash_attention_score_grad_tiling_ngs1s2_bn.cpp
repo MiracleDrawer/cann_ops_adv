@@ -31,6 +31,12 @@ constexpr int64_t WORK_SPACE_BASE_CAL = 16 * 1024 * 1024;
 constexpr int64_t FP32_BYTES_NUM = 4;
 constexpr int64_t FP16_BYTES_NUM = 2;
 constexpr int64_t PER_SUB_RANGE = 8;
+constexpr int64_t C0_SIZE = 16;
+constexpr int64_t VEC_REPEAT = 8;
+constexpr int64_t NZ_S_MIN = 4;
+constexpr uint32_t POST_NZ_COEX_NODE = 10;
+constexpr uint32_t BLOCK_SIZE = 32;
+constexpr uint32_t POST_NZ_RESERVED_N = 1;
 constexpr uint32_t MM_MAX_STRIDE_LIMIT = 65535;
 constexpr int64_t CV_RATIO = 4;
 constexpr uint32_t WORKSPACE_ALIGN_SIZE = 512;
@@ -47,8 +53,8 @@ constexpr uint32_t MAX_KV_SEQLEN = 1536;
         }                                                                                                              \
     } while (0)
 
-#define NGS1S2BN_TILINGKEY(ub2, ub1, block, dtype, layout, sparse, mmCfg)                                              \
-    (GET_TILINGKEY(ub2, ub1, block, dtype, layout, sparse, mmCfg))
+#define NGS1S2BN_TILINGKEY(ub2, ub1, block, dtype, layout, sparse, mmCfg, mm1NzOut, mm2NzOut)                          \
+    (GET_TILINGKEY(ub2, ub1, block, dtype, layout, sparse, mmCfg, mm1NzOut, mm2NzOut))
 
 /* 这里的基本块和矩阵乘法的基本块定义有所区别（这里表示单次搬运和vector计算一次使用的数据量,
  * 原来表示一次matmul计算用到的数据量），
@@ -64,8 +70,11 @@ struct TempParamsUngs1s2Bbn {
     int64_t attenMaskS2Size = 0;
     uint32_t layout;
     int64_t ubSizeRemain;
+    bool mmPreIsNZOut;
+    bool mmNextIsNZOut;
     int64_t b;
     int64_t n;
+    int64_t sQ;
     int64_t d;
 };
 
@@ -97,39 +106,24 @@ public:
         } else if (basicParams.layout == static_cast<uint32_t>(InputLayout::SBH)) {
             layout = LayoutEnum::SBND;
         }
+
+        auto dtype = DtypeEnum::FLOAT16;
         if (basicParams.dataType == ge::DT_FLOAT16) {
             if (basicParams.precisionMode == HIGH_PRECISION) {
-                // BSH BSND -- LayoutEnum::BSND: 10000000000000003199
-                // SBH -- LayoutEnum::SBND:      10000000000000013199
-                // BNSD -- LayoutEnum::BNSD:     10000000000000023199
-                // SBH specMMTilingKey -- LayoutEnum::SBND:      10000000000001013199
-                normalTilingKey = GET_TILINGKEY(AxisEnum::NONE, AxisEnum::NONE, AxisEnum::N2,
-                                                DtypeEnum::FLOAT16_PRECISION, layout, SparseEnum::ALL); // support
-                specMMTilingKey =
-                    NGS1S2BN_TILINGKEY(AxisEnum::NONE, AxisEnum::NONE, AxisEnum::N2, DtypeEnum::FLOAT16_PRECISION,
-                                       layout, SparseEnum::ALL, MatmulConfig::NORMAL_CONFIG);
-            } else {
-                normalTilingKey =
-                    GET_TILINGKEY(AxisEnum::NONE, AxisEnum::NONE, AxisEnum::N2, DtypeEnum::FLOAT16, layout,
-                                  SparseEnum::ALL); // not used
-                specMMTilingKey = NGS1S2BN_TILINGKEY(AxisEnum::NONE, AxisEnum::NONE, AxisEnum::N2, DtypeEnum::FLOAT16,
-                                                     layout, SparseEnum::ALL, MatmulConfig::NORMAL_CONFIG);
+                dtype = DtypeEnum::FLOAT16_PRECISION;
             }
         } else if (basicParams.dataType == ge::DT_BF16) {
-            // BSH BSND -- LayoutEnum::BSND: 10000000000000002199
-            // SBH -- LayoutEnum::SBND:      10000000000000012199
-            // BNSD -- LayoutEnum::BNSD:     10000000000000022199
-            // SBH specMMTilingKey -- LayoutEnum::SBND:      10000000000001012199
-            normalTilingKey = GET_TILINGKEY(AxisEnum::NONE, AxisEnum::NONE, AxisEnum::N2, DtypeEnum::BFLOAT16, layout,
-                                            SparseEnum::ALL); // support
-            specMMTilingKey = NGS1S2BN_TILINGKEY(AxisEnum::NONE, AxisEnum::NONE, AxisEnum::N2, DtypeEnum::BFLOAT16,
-                                                 layout, SparseEnum::ALL, MatmulConfig::NORMAL_CONFIG);
+            dtype = DtypeEnum::BFLOAT16;
         } else {
-            normalTilingKey = GET_TILINGKEY(AxisEnum::NONE, AxisEnum::NONE, AxisEnum::N2, DtypeEnum::FLOAT32, layout,
-                                            SparseEnum::ALL); // not used
-            specMMTilingKey = NGS1S2BN_TILINGKEY(AxisEnum::NONE, AxisEnum::NONE, AxisEnum::N2, DtypeEnum::FLOAT32,
-                                                 layout, SparseEnum::ALL, MatmulConfig::NORMAL_CONFIG);
+            dtype = DtypeEnum::FLOAT32;
         }
+
+        auto mmPreIsNZOut = basicParams.mmPreIsNZOut ? OptionEnum::ENABLE : OptionEnum::DISABLE;
+        auto mmNextIsNZOut = basicParams.mmNextIsNZOut ? OptionEnum::ENABLE : OptionEnum::DISABLE;
+        auto unique = OptionEnum::DISABLE;
+
+        normalTilingKey = GET_TILINGKEY(AxisEnum::NONE, AxisEnum::NONE, AxisEnum::N2, dtype, layout, SparseEnum::ALL, unique, mmPreIsNZOut, mmNextIsNZOut);
+        specMMTilingKey = NGS1S2BN_TILINGKEY(AxisEnum::NONE, AxisEnum::NONE, AxisEnum::N2, dtype, layout, SparseEnum::ALL, MatmulConfig::NORMAL_CONFIG, mmPreIsNZOut, mmNextIsNZOut);
 
         if (basicParams.layout == static_cast<uint32_t>(InputLayout::SBH) &&
             basicParams.b * basicParams.n * basicParams.d > MM_MAX_STRIDE_LIMIT) {
@@ -206,7 +200,7 @@ public:
             ascendcPlatform.GetCoreMemSize(platform_ascendc::CoreMemType::L0_C, aicoreParams_.l0cSize);
         }
         OPS_ERR_IF((aicoreParams_.blockDim == 0) || (aicoreParams_.aicNum == 0),
-                    OPS_REPORT_VECTOR_INNER_ERR(context_, "num of coreNum(aivNum) is %ld, num of aicNum is %ld.",
+                    OPS_REPORT_VECTOR_INNER_ERR(context_, "num of coreNum(aivNum) is %lu, num of aicNum is %lu.",
                     aicoreParams_.blockDim, aicoreParams_.aicNum),
                     return ge::GRAPH_FAILED);
 
@@ -352,6 +346,7 @@ public:
 
         basicParams.b = td_.opInfo.get_b();
         basicParams.n = td_.opInfo.get_n() * td_.opInfo.get_g();
+        basicParams.sQ = td_.opInfo.get_sQ();
         basicParams.d = td_.opInfo.get_d();
         return CheckShapeValid(context_, basicParams.b, basicParams.n, td_.opInfo.get_sQ(), basicParams.d);
     }
@@ -536,22 +531,32 @@ public:
          * 要取dAlign和sKVAlign的较大值作为size 注意: 在前面的计算中已经保证了这里最大的vecClc Size不会超过36K。 */
         int64_t vecClc1Size = nInTimesG * sQ * td_.opInfo.get_vecCalcDTypeSize();
         int64_t dAlignSize = dAlign * td_.opInfo.get_inputDTypeSize();
+        // s 大于等于4时，mmNz才有收益
+        basicParams.mmPreIsNZOut = td_.opInfo.get_sQ() >= 4 ? true : false;
         if (td_.opInfo.get_inputDType() == static_cast<uint32_t>(ge::DT_BF16) ||
             basicParams.precisionMode == HIGH_PRECISION) {
             /* 注意!: 如果bf16或者float16高精度模式下，左边计算图dropOut的输出和mul的输出需要借助vecInQue1去做
                Cast成bf16或者fp16, 所以需要用sKVAlign和dAlign取较大值再乘以sizeof(fp16)。 */
             /* 同时，在存在pse的情况下，pse会借用vecInQue1其中的一个去完成fp32的转换，所以vecInQue1SizeWithPse又需要用
                sKVAlignSizeVec和dAlign * sizeof(fp16)取较大值 */
-            if (td_.opInfo.get_pseSq() == 0) {
-                vecInQue1SizeWithPse *= std::max(td_.opInfo.get_sKVAlignSize(), dAlignSize);
-            } else {
+            if (td_.opInfo.get_pseSq() == 1 || basicParams.mmPreIsNZOut) {
                 vecInQue1SizeWithPse *= std::max(td_.opInfo.get_sKVAlignSizeVec(), dAlignSize);
+            } else {
+                vecInQue1SizeWithPse *= std::max(td_.opInfo.get_sKVAlignSize(), dAlignSize);
+            }
+            if (basicParams.mmPreIsNZOut) {
+                vecInQue1SizeWithPse += nInTimesG * sKVAlign / C0_SIZE * VEC_REPEAT * sizeof(float);
             }
             vecClc1Size *= std::max(td_.opInfo.get_sKVAlignVec(), dAlign);
         } else {
             /* 不需要Cast，直接提供给attentionIn和Dx使用。 */
             vecInQue1SizeWithPse *= dAlignSize;
             vecClc1Size *= sKVAlign;
+        }
+
+        // 如果是nz，对于s2每一个分形需要多8个数据
+        if(basicParams.mmPreIsNZOut) {
+            vecClc1Size += nInTimesG * sKVAlign / 16 * 32;
         }
         int64_t vecClc2Size = vecClc1Size;
         td_.singleCoreParams.set_innerTmpBufSize(vecClc1Size);
@@ -800,19 +805,36 @@ public:
     ge::graphStatus DoMulsTiling()
     {
         OPS_LOG_D(context_, "Do muls tiling.");
+        int64_t dAlign = (td_.opInfo.get_d() + 15) / 16 * 16;
         uint64_t allNumQuery =
-            td_.opInfo.get_b() * td_.opInfo.get_n() * td_.opInfo.get_g() * td_.opInfo.get_sQ() * td_.opInfo.get_d();
-        uint64_t allNumKv = td_.opInfo.get_b() * td_.opInfo.get_n() * td_.opInfo.get_sKV() * td_.opInfo.get_d();
+            td_.opInfo.get_b() * td_.opInfo.get_n() * td_.opInfo.get_g() * td_.opInfo.get_sQ() * dAlign;
+        uint64_t allNumKv = td_.opInfo.get_b() * td_.opInfo.get_n() * td_.opInfo.get_sKV() * dAlign;
         int64_t usedCoreNum = td_.splitCoreParams.get_usedCoreNum();
         OPS_ERR_IF(usedCoreNum == 0,
                    OPS_LOG_W(context_, "usedCoreNum is 0."),
                    return ge::GRAPH_PARAM_INVALID);
-        int64_t postUbBaseSize = (aicoreParams_.ubSize) / POST_COEX_NODE / BUFFER_NUM / BASE_LEN_256 * BASE_LEN_256;
-        int64_t qPostBaseNum = postUbBaseSize / FP16_BYTES_NUM;
+
+        basicParams.mmNextIsNZOut = (td_.opInfo.get_sQ() >= NZ_S_MIN
+                              && td_.opInfo.get_inputLayout() == static_cast<uint32_t>(InputLayout::BNSD))
+                              ? true : false;
+        uint32_t postUbBaseSize = 0;
+        uint32_t qPostBaseNum = 0;
+        uint32_t nzReservedSize = 0;
+        if (!basicParams.mmNextIsNZOut) {
+            postUbBaseSize = (aicoreParams_.ubSize) / POST_COEX_NODE / BUFFER_NUM / BASE_LEN_256 * BASE_LEN_256;
+            qPostBaseNum = postUbBaseSize / FP16_BYTES_NUM;
+        } else {
+            int64_t curPostCoexNode = POST_NZ_COEX_NODE;
+            nzReservedSize = dAlign / C0_SIZE * BLOCK_SIZE * POST_NZ_RESERVED_N; // 16为一个单元长度
+            postUbBaseSize = (aicoreParams_.ubSize - 2 * nzReservedSize) / curPostCoexNode / BUFFER_NUM / // 开DB预留2份nzReservedSize
+                                 BASE_LEN_256 * BASE_LEN_256;
+            qPostBaseNum = postUbBaseSize / FP16_BYTES_NUM / dAlign * td_.opInfo.get_d();
+        }
+
         OPS_ERR_IF(qPostBaseNum == 0,
                    OPS_LOG_W(context_, "qPostBaseNum is 0."),
                    return ge::GRAPH_PARAM_INVALID);
-        uint64_t qPostBlockTotal = allNumQuery;
+        uint64_t qPostBlockTotal = allNumQuery / dAlign * td_.opInfo.get_d();
         uint64_t qSizeAlign =
             (qPostBlockTotal + BASE_LEN_256 - 1) / WORKSPACE_ALIGN_SIZE * WORKSPACE_ALIGN_SIZE * FP16_BYTES_NUM;
         int64_t qPostTailNumTmp = qPostBlockTotal % qPostBaseNum;
@@ -820,11 +842,11 @@ public:
         int64_t qPostBlockOuterTotal = (qPostBlockTotal + qPostBaseNum - 1) / qPostBaseNum;
         int64_t qPostBlockFactor = (qPostBlockOuterTotal + usedCoreNum - 1) / usedCoreNum;
 
-        int64_t kvPostBaseNum = postUbBaseSize / FP16_BYTES_NUM;
+        int64_t kvPostBaseNum = qPostBaseNum;
         OPS_ERR_IF(kvPostBaseNum == 0,
                    OPS_LOG_W(context_, "kvPostBaseNum is 0."),
                    return ge::GRAPH_PARAM_INVALID);
-        uint64_t kvPostBlockTotal = allNumKv;
+        uint64_t kvPostBlockTotal = allNumKv / dAlign * td_.opInfo.get_d();
         uint64_t kvSizeAlign = (kvPostBlockTotal + WORKSPACE_ALIGN_SIZE - 1) / WORKSPACE_ALIGN_SIZE *
                                WORKSPACE_ALIGN_SIZE * FP16_BYTES_NUM;
         int64_t kvPostTailNumTmp = kvPostBlockTotal % kvPostBaseNum;
@@ -846,7 +868,14 @@ public:
         td_.postTilingData.set_kvPostBaseNum(kvPostBaseNum);
         td_.postTilingData.set_kvPostTailNum(kvPostTailNum);
         td_.postTilingData.set_kvSizeAlign(kvSizeAlign);
-        td_.postTilingData.set_nzReservedSize(0);
+        td_.postTilingData.set_nzReservedSize(nzReservedSize);
+
+        td_.postTilingData.set_b(td_.opInfo.get_b());
+        td_.postTilingData.set_n2(td_.opInfo.get_n());
+        td_.postTilingData.set_g(td_.opInfo.get_g());
+        td_.postTilingData.set_s1(td_.opInfo.get_sQ());
+        td_.postTilingData.set_s2(td_.opInfo.get_sKV());
+        td_.postTilingData.set_d(td_.opInfo.get_d());
 
         td_.opInfo.set_dqWorkspaceLen(CeilCommon(allNumQuery * FP32_BYTES_NUM, WORKSPACE_ALIGN_SIZE) *
                                       WORKSPACE_ALIGN_SIZE);
@@ -857,9 +886,11 @@ public:
                                 td_.opInfo.get_sKVAlign();
         uint64_t allNumMulGm = td_.opInfo.get_b() * td_.opInfo.get_n() * td_.opInfo.get_g() * td_.opInfo.get_sQ() *
                                td_.opInfo.get_sKVAlign();
-        td_.opInfo.set_dropGmWorkspaceLen(CeilCommon(allNumDropGm * FP16_BYTES_NUM, WORKSPACE_ALIGN_SIZE) *
+
+        // CV并行实现，需要申请双倍的bmm345的输入空间
+        td_.opInfo.set_dropGmWorkspaceLen(2 * CeilCommon(allNumDropGm * FP16_BYTES_NUM, WORKSPACE_ALIGN_SIZE) *
                                           WORKSPACE_ALIGN_SIZE);
-        td_.opInfo.set_mulGmWorkspaceLen(CeilCommon(allNumMulGm * FP16_BYTES_NUM, WORKSPACE_ALIGN_SIZE) *
+        td_.opInfo.set_mulGmWorkspaceLen(2 * CeilCommon(allNumMulGm * FP16_BYTES_NUM, WORKSPACE_ALIGN_SIZE) *
                                          WORKSPACE_ALIGN_SIZE);
 
         return ge::GRAPH_SUCCESS;

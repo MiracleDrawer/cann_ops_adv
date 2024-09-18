@@ -30,31 +30,6 @@ else()
 endif ()
 message(STATUS "ASCEND_CANN_PACKAGE_PATH=${ASCEND_CANN_PACKAGE_PATH}")
 
-# 与基础 CANN 配套关系检查
-if (BUILD_OPEN_PROJECT)
-    option(CHECK_COMPATIBLE      "check compatibility"         ON)
-    if (CHECK_COMPATIBLE)
-        set(_param
-                "--cann_path=${ASCEND_CANN_PACKAGE_PATH}"
-                "--cann_package_name=toolkit"
-                "check_code_compatible"
-                "--code_version_info_file=${CMAKE_CURRENT_SOURCE_DIR}/version.info"
-        )
-        execute_process(
-                COMMAND ${HI_PYTHON} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/scripts/check_version_compatible.py ${_param}
-                RESULT_VARIABLE result
-                OUTPUT_STRIP_TRAILING_WHITESPACE
-                OUTPUT_VARIABLE CANN_VERSION
-        )
-        if (result)
-            message(FATAL_ERROR "Check version compatibility failed.")
-        else()
-            string(TOLOWER ${CANN_VERSION} CANN_VERSION)
-        endif ()
-    endif ()
-endif ()
-
-
 ########################################################################################################################
 # 公共配置
 ########################################################################################################################
@@ -203,6 +178,28 @@ endif ()
 # 预处理
 ########################################################################################################################
 if (BUILD_OPEN_PROJECT)
+    # 与基础 CANN 配套关系检查
+    option(CHECK_COMPATIBLE      "check compatibility"         ON)
+    if (CHECK_COMPATIBLE)
+        set(_param
+                "--cann_path=${ASCEND_CANN_PACKAGE_PATH}"
+                "--cann_package_name=toolkit"
+                "check_code_compatible"
+                "--code_version_info_file=${CMAKE_CURRENT_SOURCE_DIR}/version.info"
+        )
+        execute_process(
+                COMMAND ${HI_PYTHON} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/scripts/check_version_compatible.py ${_param}
+                RESULT_VARIABLE result
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+                OUTPUT_VARIABLE CANN_VERSION
+        )
+        if (result)
+            message(FATAL_ERROR "Check version compatibility failed.")
+        else()
+            string(TOLOWER ${CANN_VERSION} CANN_VERSION)
+        endif ()
+    endif ()
+
     if (NOT PREPARE_BUILD AND ENABLE_OPS_KERNEL)
         if (TILING_KEY)
             string(REPLACE ";" "::" EP_TILING_KEY "${TILING_KEY}")
@@ -248,7 +245,6 @@ if (BUILD_OPEN_PROJECT)
         file(TOUCH ${ASCEND_CUSTOM_OPC_OPTIONS})
     endif ()
 endif ()
-
 
 ########################################################################################################################
 # 其他配置

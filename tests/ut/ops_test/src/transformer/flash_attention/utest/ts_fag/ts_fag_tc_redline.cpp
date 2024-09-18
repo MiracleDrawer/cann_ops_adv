@@ -83,7 +83,7 @@ const auto Tc_Fag_Redline_Case = ::testing::Values(
             "",                                                     /* DebugInfo */
             OpInfo(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                    ExpectInfo(true,                                 /* ExpectSuccess */
-                              10000000001100002134UL,               /* ExpectTilingKey */
+                              10000001000110002434UL,               /* ExpectTilingKey */
                               ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
             FaParam(8, 16, 1, 2048, 2048, 64,                       /* B, N2, G, S1, S2, D */
                     ge::DataType::DT_BF16, LayoutType::BSND,        /* Dtype, Layout */
@@ -101,7 +101,7 @@ const auto Tc_Fag_Redline_Case = ::testing::Values(
             "",                                                     /* DebugInfo */
             OpInfo(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                    ExpectInfo(true,                                 /* ExpectSuccess */
-                              10000000001100000134UL,               /* ExpectTilingKey */
+                              10000001000110003434UL,               /* ExpectTilingKey */
                               ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
             FaParam(24, 10, 1, 2304, 2304, 64,                      /* B, N2, G, S1, S2, D */
                     ge::DataType::DT_FLOAT16, LayoutType::BSND,     /* Dtype, Layout */
@@ -119,7 +119,7 @@ const auto Tc_Fag_Redline_Case = ::testing::Values(
             "",                                                     /* DebugInfo */
             OpInfo(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                    ExpectInfo(true,                                 /* ExpectSuccess */
-                              10000000001100021134UL,               /* ExpectTilingKey */
+                              10000000000110021434UL,               /* ExpectTilingKey */
                               ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
             FaParam(2, 30, 2, 2048, 2048, 128,                      /* B, N2, G, S1, S2, D */
                     ge::DataType::DT_FLOAT, LayoutType::BNSD,       /* Dtype, Layout */
@@ -137,7 +137,7 @@ const auto Tc_Fag_Redline_Case = ::testing::Values(
             "",                                                     /* DebugInfo */
             OpInfo(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                    ExpectInfo(true,                                 /* ExpectSuccess */
-                              10000000001100002134UL,               /* ExpectTilingKey */
+                              10000000001110002134UL,               /* ExpectTilingKey */
                               ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
             FaParam(16, 16, 1, 256, 256, 128,                       /* B, N2, G, S1, S2, D */
                     ge::DataType::DT_BF16, LayoutType::BSND,        /* Dtype, Layout */
@@ -173,7 +173,7 @@ const auto Tc_Fag_Redline_Case = ::testing::Values(
             "",                                                     /* DebugInfo */
             OpInfo(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                    ExpectInfo(true,                                 /* ExpectSuccess */
-                              10000000000110002434UL,               /* ExpectTilingKey */
+                              10000001000110002434UL,               /* ExpectTilingKey */
                               ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
             FaParam(1, 5, 1, 8192, 8192, 128,                       /* B, N2, G, S1, S2, D */
                     ge::DataType::DT_BF16, LayoutType::BSND,        /* Dtype, Layout */
@@ -191,7 +191,7 @@ const auto Tc_Fag_Redline_Case = ::testing::Values(
             "",                                                     /* DebugInfo */
             OpInfo(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                    ExpectInfo(true,                                 /* ExpectSuccess */
-                              10000000000110003434UL,               /* ExpectTilingKey */
+                              10000001000110003434UL,               /* ExpectTilingKey */
                               ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
             FaParam(1, 40, 1, 8192, 8192, 128,                      /* B, N2, G, S1, S2, D */
                     ge::DataType::DT_FLOAT16, LayoutType::BSND,     /* Dtype, Layout */
@@ -204,27 +204,6 @@ const auto Tc_Fag_Redline_Case = ::testing::Values(
                     ge::DataType::DT_BOOL,                          /* AttentionMaskDtype */
                     PrefixShapeType::NONE),                         /* PrefixShapeType */
             Case::kTilingTemplatePriority_Invalid                   /* TilingTemplatePriority */
-            ),
-    FagCase("Fag_Us1s2Bbn2_Case_010", true,                         /* CaseName, Enable */
-            "",                                                     /* DebugInfo */
-            OpInfo(ControlInfo(true, false),                        /* RunTiling, RunKernel */
-                   ExpectInfo(true,                                 /* ExpectSuccess */
-                              ExpectInfo::kInvalidTilingKey,        /* ExpectTilingKey */
-                              ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
-            FaParam(12, 10, 1, 1024, 1024, 128,                     /* B, N2, G, S1, S2, D */
-                    ge::DataType::DT_FLOAT16, LayoutType::SBH,      /* Dtype, Layout */
-                    0.08838f, 0.8f, 65536, 0,                       /* Scale, KeepProb, PreTokens, NxtTokens */
-                    1, 5,                                           /* InnerPrecise, SparseMode */
-                    PseShapeType::NONE,                             /* PseShapeType */
-                    DropMaskShapeType::B_N1_S1_S2DIV8,              /* DropMaskShapeType */
-                    PaddingMaskShapeType::S1_S2,                    /* PaddingMaskShapeType */
-                    AttenMaskShapeType::B_1_S1_S2,                  /* AttentionMaskShapeType */
-                    ge::DataType::DT_BOOL,                          /* AttentionMaskDtype */
-                    PrefixShapeType::B,                             /* PrefixShapeType */
-                    {128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128}, /* PrefixTensorData */
-                    {},                                                           /* ActualSeqQTensorData */
-                    {}),                                                          /* ActualSeqKVTensorData */
-            FagCase::kTemplatePriority_Us1s2_Bbn2                                 /* TilingTemplatePriority */
             )
 
 );

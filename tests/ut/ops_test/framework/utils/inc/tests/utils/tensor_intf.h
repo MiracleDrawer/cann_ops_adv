@@ -24,6 +24,7 @@
 
 namespace ops::adv::tests::utils {
 
+
 class TensorIntf {
 public:
     enum class TensorType {
@@ -41,6 +42,8 @@ public:
     TensorIntf(const char *name, const std::vector<int64_t> &shape, const char *shapeType, ge::DataType dType,
                ge::Format format, TensorType type = TensorType::REQUIRED_INPUT);
 
+    TensorIntf(const char *name, const std::vector<std::vector<int64_t>> &shape, const char *shapeType,
+               ge::DataType dType, ge::Format format, TensorType type = TensorType::REQUIRED_INPUT);
     TensorIntf(const TensorIntf &o) = default;
 
     TensorIntf &operator=(const TensorIntf &o) = default;
@@ -91,7 +94,10 @@ public:
 protected:
     std::string name_;
     gert::Shape shape_;
+    std::vector<gert::Shape> shapes_;
     std::vector<int64_t> shapeView_;
+    std::vector<std::vector<int64_t>> shapesView_;
+    bool isArray_ = false;
     std::string shapeType_;
     ge::DataType dType_ = ge::DT_MAX;
     ge::Format format_ = ge::FORMAT_MAX;

@@ -25,11 +25,77 @@ TEST_P(Ts_Fag_Ascend910B2_UnpaddedAttention, Tc_BatchCase)
 
 const auto Tc_Fag_UnpaddedAttention_BatchCase = ::testing::Values(
 
+    FagCase("Fag_UnpaddedAttention_Case_TND_000", true,             /* CaseName, Enable */
+            "",                                                     /* DebugInfo */
+            OpInfo(ControlInfo(true, false),                        /* RunTiling, RunKernel */
+                   ExpectInfo(true,                                 /* ExpectSuccess */
+                              10000000001101033434UL,               /* ExpectTilingKey */
+                              ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
+            FaParam(3, 2, 3, 4096, 130, 64,                         /* B, N2, G, S1, S2, D */
+                    ge::DataType::DT_FLOAT16, LayoutType::TND,      /* Dtype, Layout */
+                    0.08838f, 0.8f, 65535, 0,                       /* Scale, KeepProb, PreTokens, NxtTokens */
+                    1, 1,                                           /* InnerPrecise, SparseMode */
+                    PseShapeType::NONE,                             /* PseShapeType */
+                    DropMaskShapeType::B_N1_S1_S2DIV8,              /* DropMaskShapeType */
+                    PaddingMaskShapeType::S1_S2,                    /* PaddingMaskShapeType */
+                    AttenMaskShapeType::S1_S2,                      /* AttentionMaskShapeType */
+                    ge::DataType::DT_BOOL,                          /* AttentionMaskDtype */
+                    PrefixShapeType::NONE,                          /* PrefixShapeType */
+                    {},                                             /* PrefixTensorData */
+                    {4096, 8192, 12288},                            /* ActualSeqQTensorData */
+                    {130, 260, 390}),                               /* ActualSeqKVTensorData */
+
+            FaCase::kTilingTemplatePriority_Invalid /* TilingTemplatePriority */
+            ),
+    FagCase("Fag_UnpaddedAttention_Case_TND_001", true,             /* CaseName, Enable */
+            "",                                                     /* DebugInfo */
+            OpInfo(ControlInfo(true, false),                        /* RunTiling, RunKernel */
+                   ExpectInfo(true,                                 /* ExpectSuccess */
+                              10000000001101033434UL,               /* ExpectTilingKey */
+                              ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
+            FaParam(3, 2, 3, 4096, 64, 64,                          /* B, N2, G, S1, S2, D */
+                    ge::DataType::DT_FLOAT16, LayoutType::TND,      /* Dtype, Layout */
+                    0.08838f, 0.8f, 65535, 0,                       /* Scale, KeepProb, PreTokens, NxtTokens */
+                    1, 1,                                           /* InnerPrecise, SparseMode */
+                    PseShapeType::NONE,                             /* PseShapeType */
+                    DropMaskShapeType::B_N1_S1_S2DIV8,              /* DropMaskShapeType */
+                    PaddingMaskShapeType::S1_S2,                    /* PaddingMaskShapeType */
+                    AttenMaskShapeType::S1_S2,                      /* AttentionMaskShapeType */
+                    ge::DataType::DT_BOOL,                          /* AttentionMaskDtype */
+                    PrefixShapeType::NONE,                          /* PrefixShapeType */
+                    {},                                             /* PrefixTensorData */
+                    {4096, 8192, 12288},                            /* ActualSeqQTensorData */
+                    {64, 128, 192}),                                /* ActualSeqKVTensorData */
+
+            FaCase::kTilingTemplatePriority_Invalid /* TilingTemplatePriority */
+            ),
+    FagCase("Fag_UnpaddedAttention_Case_TND_002", true,             /* CaseName, Enable */
+            "",                                                     /* DebugInfo */
+            OpInfo(ControlInfo(true, false),                        /* RunTiling, RunKernel */
+                   ExpectInfo(true,                                 /* ExpectSuccess */
+                              10000000011101033434UL,               /* ExpectTilingKey */
+                              ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
+            FaParam(3, 2, 3, 4096, 64, 72,                          /* B, N2, G, S1, S2, D */
+                    ge::DataType::DT_FLOAT16, LayoutType::TND,      /* Dtype, Layout */
+                    0.08838f, 0.8f, 65535, 0,                       /* Scale, KeepProb, PreTokens, NxtTokens */
+                    1, 1,                                           /* InnerPrecise, SparseMode */
+                    PseShapeType::NONE,                             /* PseShapeType */
+                    DropMaskShapeType::B_N1_S1_S2DIV8,              /* DropMaskShapeType */
+                    PaddingMaskShapeType::S1_S2,                    /* PaddingMaskShapeType */
+                    AttenMaskShapeType::S1_S2,                      /* AttentionMaskShapeType */
+                    ge::DataType::DT_BOOL,                          /* AttentionMaskDtype */
+                    PrefixShapeType::NONE,                          /* PrefixShapeType */
+                    {},                                             /* PrefixTensorData */
+                    {4096, 8192, 12288},                            /* ActualSeqQTensorData */
+                    {64, 128, 192}),                                /* ActualSeqKVTensorData */
+
+            FaCase::kTilingTemplatePriority_Invalid /* TilingTemplatePriority */
+            ),
     FagCase("Fag_UnpaddedAttention_Case_000", true,                 /* CaseName, Enable */
             "",                                                     /* DebugInfo */
             OpInfo(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                    ExpectInfo(true,                                 /* ExpectSuccess */
-                              10000000000101033434UL,               /* ExpectTilingKey */
+                              10000000001101033434UL,               /* ExpectTilingKey */
                               ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
             FaParam(3, 2, 3, 28, 28, 64,                            /* B, N2, G, S1, S2, D */
                     ge::DataType::DT_FLOAT16, LayoutType::TND,      /* Dtype, Layout */
@@ -51,7 +117,7 @@ const auto Tc_Fag_UnpaddedAttention_BatchCase = ::testing::Values(
             "",                                                     /* DebugInfo */
             OpInfo(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                    ExpectInfo(true,                                 /* ExpectSuccess */
-                              10000000000101033434UL,               /* ExpectTilingKey */
+                              10000000001101033434UL,               /* ExpectTilingKey */
                               ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
             FaParam(3, 2, 3, 2800, 2800, 64,                        /* B, N2, G, S1, S2, D */
                     ge::DataType::DT_FLOAT16, LayoutType::TND,      /* Dtype, Layout */
@@ -72,7 +138,7 @@ const auto Tc_Fag_UnpaddedAttention_BatchCase = ::testing::Values(
             "",                                                     /* DebugInfo */
             OpInfo(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                    ExpectInfo(true,                                 /* ExpectSuccess */
-                              10000000000101033434UL,               /* ExpectTilingKey */
+                              10000000001101033434UL,               /* ExpectTilingKey */
                               ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
             FaParam(3, 2, 3, 28, 28, 64,                            /* B, N2, G, S1, S2, D */
                     ge::DataType::DT_FLOAT16, LayoutType::TND,      /* Dtype, Layout */
@@ -93,7 +159,7 @@ const auto Tc_Fag_UnpaddedAttention_BatchCase = ::testing::Values(
             "",                                                     /* DebugInfo */
             OpInfo(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                    ExpectInfo(true,                                 /* ExpectSuccess */
-                              10000000000101033434UL,               /* ExpectTilingKey */
+                              10000000001101033434UL,               /* ExpectTilingKey */
                               ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
             FaParam(3, 2, 3, 28, 28, 64,                            /* B, N2, G, S1, S2, D */
                     ge::DataType::DT_FLOAT16, LayoutType::TND,      /* Dtype, Layout */
@@ -114,7 +180,7 @@ const auto Tc_Fag_UnpaddedAttention_BatchCase = ::testing::Values(
             "",                                                     /* DebugInfo */
             OpInfo(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                    ExpectInfo(true,                                 /* ExpectSuccess */
-                              10000000000101033434UL,               /* ExpectTilingKey */
+                              10000000001101033434UL,               /* ExpectTilingKey */
                               ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
             FaParam(3, 2, 3, 28, 28, 64,                            /* B, N2, G, S1, S2, D */
                     ge::DataType::DT_FLOAT16, LayoutType::TND,      /* Dtype, Layout */
@@ -198,7 +264,7 @@ const auto Tc_Fag_UnpaddedAttention_BatchCase = ::testing::Values(
             "",                                                     /* DebugInfo */
             OpInfo(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                    ExpectInfo(true,                                 /* ExpectSuccess */
-                              10000000000101033434UL,               /* ExpectTilingKey */
+                              10000000001101033434UL,               /* ExpectTilingKey */
                               ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
             FaParam(5, 2, 3, 100, 50, 64,                           /* B, N2, G, S1, S2, D */
                     ge::DataType::DT_FLOAT16, LayoutType::TND,      /* Dtype, Layout */
@@ -361,9 +427,28 @@ const auto Tc_Fag_UnpaddedAttention_BatchCase = ::testing::Values(
                     {2048, 2321, 2515},                             /* ActualSeqQTensorData */
                     {2048, 2321, 2515}),                            /* ActualSeqKVTensorData */
             FaCase::kTilingTemplatePriority_Invalid                 /* TilingTemplatePriority */
-            )
-
-);
+            ),
+    FagCase("Fag_UnpaddedAttention_Case_016", true,                 /* CaseName, Enable */
+            "",                                                     /* DebugInfo */
+            OpInfo(ControlInfo(true, true),                         /* RunTiling, RunKernel */
+                   ExpectInfo(true,                                 /* ExpectSuccess */
+                              10000000001101033434UL,               /* ExpectTilingKey */
+                              ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
+            FaParam(1, 1, 1, 64, 64, 32,                            /* B, N2, G, S1, S2, D */
+                    ge::DataType::DT_FLOAT16, LayoutType::TND,      /* Dtype, Layout */
+                    0.08838f, 0.8f, 65535, 65535,                   /* Scale, KeepProb, PreTokens, NxtTokens */
+                    1, 1,                                           /* InnerPrecise, SparseMode */
+                    PseShapeType::NONE,                             /* PseShapeType */
+                    DropMaskShapeType::B_N1_S1_S2DIV8,              /* DropMaskShapeType */
+                    PaddingMaskShapeType::S1_S2,                    /* PaddingMaskShapeType */
+                    AttenMaskShapeType::S1_S2,                      /* AttentionMaskShapeType */
+                    ge::DataType::DT_BOOL,                          /* AttentionMaskDtype */
+                    PrefixShapeType::NONE,                          /* PrefixShapeType */
+                    {},                                             /* PrefixTensorData */
+                    {64},                                           /* ActualSeqQTensorData */
+                    {64}),                                          /* ActualSeqKVTensorData */
+            FaCase::kTilingTemplatePriority_Invalid                 /* TilingTemplatePriority */
+            ));
 INSTANTIATE_TEST_SUITE_P(Fag, Ts_Fag_Ascend910B2_UnpaddedAttention, Tc_Fag_UnpaddedAttention_BatchCase);
 
 class Ts_Fag_Ascend910B2_UnpaddedAttention_InvalidParam : public Ts_Fag_Ascend910B2_UnpaddedAttention {};
@@ -415,9 +500,9 @@ TEST_F(Ts_Fag_Ascend910B2, Tc_seqlen_dim_long)
 {
     auto cur = FagCase("Fag_UnpaddedAttention_Case_000", true,                 /* CaseName, Enable */
                        "",                                                     /* DebugInfo */
-                       OpInfo(ControlInfo(true, true),                         /* RunTiling, RunKernel */
+                       OpInfo(ControlInfo(true, RunKernelNotInPr),             /* RunTiling, RunKernel */
                               ExpectInfo(true,                                 /* ExpectSuccess */
-                                         10000000000101033434UL,               /* ExpectTilingKey */
+                                         10000000001101033434UL,               /* ExpectTilingKey */
                                          ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
                        FaParam(2049, 2, 1, 32, 32, 32,                         /* B, N2, G, S1, S2, D */
                                ge::DataType::DT_FLOAT16, LayoutType::TND,      /* Dtype, Layout */

@@ -26,7 +26,8 @@ constexpr uint32_t DROPOUT4BIT_LEN = 16;
 using matmul::Matmul;
 using matmul::MatmulType;
 // T1 for data, T2 for vecClc
-template <typename T1, typename T2, const MatmulConfig &MM_CFG, LayoutMode layout = LayoutMode::BNGS1S2>
+template <typename T1, typename T2, const MatmulConfig &MM_CFG, LayoutMode layout = LayoutMode::BNGS1S2,
+          const CubeFormat MMPre_OUT_FORMAT = CubeFormat::ND, const CubeFormat MMNext_OUT_FORMAT = CubeFormat::ND>
 class FlashAttentionScoreGradUngs1s2Bb {
 public:
     __aicore__ inline FlashAttentionScoreGradUngs1s2Bb(){};
@@ -45,12 +46,23 @@ public:
     using GmT1FalseLayout = MatmulType<TPosition::GM, CubeFormat::ND, T1, false, layout>;
     using GmT1TrueBNSS = MatmulType<TPosition::GM, CubeFormat::ND, T1, true, LayoutMode::BNGS1S2>;
     using GmT1FalseBNSS = MatmulType<TPosition::GM, CubeFormat::ND, T1, false, LayoutMode::BNGS1S2>;
-    using GmT2FalseBNSS = MatmulType<TPosition::GM, CubeFormat::ND, T2, false, LayoutMode::BNGS1S2>;
+
+    using GmT2FalseBNSS = MatmulType<TPosition::GM, MMPre_OUT_FORMAT, T2, false, LayoutMode::BNGS1S2>;
     using GmT2FalseLayout = MatmulType<TPosition::GM, CubeFormat::ND, T2, false, layout>;
+    using GmT2FalseNzBNSS = MatmulType<TPosition::GM, MMNext_OUT_FORMAT, T2, false, LayoutMode::BNGS1S2>;
 
     Matmul<GmT1FalseLayout, GmT1TrueLayout, GmT2FalseBNSS, biasType, MM_CFG> mm1;
-    Matmul<GmT1FalseBNSS, GmT1FalseLayout, GmT2FalseLayout, biasType, MM_CFG> mm31;
-    Matmul<GmT1TrueBNSS, GmT1FalseLayout, GmT2FalseLayout, biasType, MM_CFG> mm32;
+    using modeTypeMmDq = typename AscendC::Conditional<
+        (MMNext_OUT_FORMAT == CubeFormat::NZ),
+        Matmul<GmT1FalseBNSS, GmT1FalseLayout, GmT2FalseNzBNSS, biasType, MM_CFG>,
+        Matmul<GmT1FalseBNSS, GmT1FalseLayout, GmT2FalseLayout, biasType, MM_CFG>>::type;
+    modeTypeMmDq mm31;
+
+    using modeTypeMmDk = typename AscendC::Conditional<
+        (MMNext_OUT_FORMAT == CubeFormat::NZ),
+        Matmul<GmT1TrueBNSS, GmT1FalseLayout, GmT2FalseNzBNSS, biasType, MM_CFG>,
+        Matmul<GmT1TrueBNSS, GmT1FalseLayout, GmT2FalseLayout, biasType, MM_CFG>>::type;
+    modeTypeMmDk mm32;
     Matmul<GmT1TrueBNSS, GmT1FalseLayout, GmT1FalseLayout, biasType, MM_CFG> mm4;
 
 protected:
@@ -156,24 +168,37 @@ protected:
     int64_t mBlockIdx;
     int64_t bInNGSq;
 
+    int64_t pingPongDropOffset;
+    int64_t pingPongMulOffset;
+    uint32_t pingpongIdx = 1;
+    uint32_t lastPingpongIdx = 0;
+    uint32_t lastBCvInner = 0;
+
     DropMaskInfo dropMaskInfo = {0};
 
+    constexpr static int64_t BEST_BASIC_BLOCK_SIZE = 64 * 128 * 4;
     constexpr static uint32_t ADDR_ALIGN_SIZE = 512;
     constexpr static uint32_t BLOCK_SIZE = 32;
     constexpr static uint32_t BIT_SIZE = 8;
     constexpr static int64_t PSE_BNSS = 0;
     constexpr static int64_t PSE_BN1S = 1;
     constexpr static int64_t PSE_1NSS = 2;
+    // for nz
+    constexpr static int64_t C0_SIZE = 16;
+    constexpr static int64_t VEC_REPEAT = 8;
+    constexpr static uint32_t CAL_BLOCK_NUM = 32 / sizeof(T2);
 
     __aicore__ inline void FrontCompute(const int64_t &batchSqLoopOffset, const int64_t &batchSkvLoopOffset,
                                         const int64_t &dropMaskOffset, const int64_t &bCvMmOffset,
-                                        const int64_t &bCvIndex);
+                                        const int64_t &bCvNzMmOffset, const int64_t &bCvIndex,
+                                        const int64_t &currentBatchRange);
 
     __aicore__ inline void ReCompute(const int64_t &batchSqCLoopOffset, const int64_t &batchSkvCLoopOffset,
                                      const int64_t &batchSqLoopOffset, const int64_t &batchSkvLoopOffset,
                                      const int64_t &attenMaskOffset, const int64_t &dropMaskOffset,
                                      const int64_t &batchSoftmaxInputOffset, const int64_t &bCvMmOffset,
-                                     const int64_t &bCvIndex, const bool isCvTail);
+                                     const int64_t &bCvNzMmOffset, const int64_t &bCvIndex,
+                                     const bool isCvTail, const int64_t &currentBatchRange);
 
     __aicore__ inline void ClcSub(LocalTensor<T2> &frontResInner, LocalTensor<T2> &dpResInner,
                                   LocalTensor<T2> &sftFrontResInner);
@@ -196,22 +221,30 @@ protected:
                                       LocalTensor<float> &maxInner, LocalTensor<float> &sumInner);
 
     __aicore__ inline void ClcMm31(const GlobalTensor<T2> &tensorC, const GlobalTensor<T1> &tensorA,
-                                   const GlobalTensor<T1> &tensorB);
+                                   const GlobalTensor<T1> &tensorB, const uint32_t &currBCvInner, const bool &isSync);
 
     /* matmul 32 和 matmul31的区别在于输入TensorA是需要做Transpose的，且输出需要做G轴的reduce. */
     __aicore__ inline void ClcMm32(const GlobalTensor<T2> &tensorC, const GlobalTensor<T1> &tensorA,
-                                   const GlobalTensor<T1> &tensorB);
+                                   const GlobalTensor<T1> &tensorB, const uint32_t &currBCvInner, const bool &isSync);
 
     __aicore__ inline void ClcMm4(const GlobalTensor<T1> &tensorC, const GlobalTensor<T1> &tensorA,
-                                  const GlobalTensor<T1> &tensorB);
+                                  const GlobalTensor<T1> &tensorB, const uint32_t &currBCvInner, const bool &isSync);
 
     __aicore__ inline void Copy2Workspace(const int64_t &batchSqLoopOffset, const int64_t &batchSkvLoopOffset,
                                           LocalTensor<T2> &mulResInner, LocalTensor<T2> &dvDropResInner,
                                           const int64_t &bCvMmOffset);
+    __aicore__ inline void ResetGm4Dkdv(const uint32_t &inputLayoutTmp, const int64_t &currBatchSkvLoopOffset,
+                                        const uint32_t &currBCvInner, const int64_t &mmNzDkvOffset);
+    __aicore__ inline void NZCopyIn(int64_t mmOffset, GlobalTensor<T2> &mmWspGm, LocalTensor<T2> &mmTensorCurr,
+                                    int64_t sQ, int64_t sKVAlign);
+    __aicore__ inline void NZ2ND(LocalTensor<T2> &mmTensorCurr, LocalTensor<T2> &tmpTensor, int64_t sQ,
+                                 int64_t sKVAlign, int64_t srcBatchOffset, int64_t dstBatchOffset);
 };
 
-template <typename T1, typename T2, const MatmulConfig &MM_CFG, LayoutMode layout>
-__aicore__ inline void FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout>::Init(
+template <typename T1, typename T2, const MatmulConfig &MM_CFG, LayoutMode layout,
+          const CubeFormat MMPre_OUT_FORMAT, const CubeFormat MMNext_OUT_FORMAT>
+__aicore__ inline void
+    FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout, MMPre_OUT_FORMAT, MMNext_OUT_FORMAT>::Init(
     __gm__ uint8_t *key, __gm__ uint8_t *value, __gm__ uint8_t *dx, __gm__ uint8_t *query, __gm__ uint8_t *pse_shift,
     __gm__ uint8_t *drop_mask, __gm__ uint8_t *atten_mask, __gm__ uint8_t *forward_res, __gm__ uint8_t *softmax_max,
     __gm__ uint8_t *softmax_sum, __gm__ uint8_t *dq, __gm__ uint8_t *dk, __gm__ uint8_t *dv, __gm__ uint8_t *workspace,
@@ -285,6 +318,10 @@ __aicore__ inline void FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout>:
     dkWorkspaceLen = ordTilingData_->opInfo.dkWorkspaceLen;
     dropGmWorkspaceLen = ordTilingData_->opInfo.dropGmWorkspaceLen;
     mulGmWorkspaceLen = ordTilingData_->opInfo.mulGmWorkspaceLen;
+
+    pingPongDropOffset = dropGmWorkspaceLen / 2 / sizeof(T1);
+    pingPongMulOffset = mulGmWorkspaceLen / 2 / sizeof(T1);
+
     innerTmpBufSize = ordTilingData_->singleCoreParams.innerTmpBufSize;
     vecQueIn1Size = ordTilingData_->singleCoreParams.vecQueIn1Size;
 
@@ -349,9 +386,9 @@ __aicore__ inline void FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout>:
     // 16k
     pipe->InitBuffer(softmaxGradQue, 1, vecQueIn1Size);
     // 8k
-    pipe->InitBuffer(dropoutQue, 1, innerTmpBufSize / 4);
+    pipe->InitBuffer(dropoutQue, 1, BEST_BASIC_BLOCK_SIZE / 4);
     // 32k
-    pipe->InitBuffer(maxSumQue, 1, innerTmpBufSize);
+    pipe->InitBuffer(maxSumQue, 1, BEST_BASIC_BLOCK_SIZE);
     pipe->InitBuffer(vecOutQue1, 1, apiClcQueueSize);
 
     // drop workspace offset
@@ -385,8 +422,10 @@ __aicore__ inline void FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout>:
     }
 }
 
-template <typename T1, typename T2, const MatmulConfig &MM_CFG, LayoutMode layout>
-__aicore__ inline void FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout>::ClcSub(
+template <typename T1, typename T2, const MatmulConfig &MM_CFG, LayoutMode layout,
+          const CubeFormat MMPre_OUT_FORMAT, const CubeFormat MMNext_OUT_FORMAT>
+__aicore__ inline void
+    FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout, MMPre_OUT_FORMAT, MMNext_OUT_FORMAT>::ClcSub(
     LocalTensor<T2> &frontResInner, LocalTensor<T2> &dpResInner, LocalTensor<T2> &sftFrontResInner)
 {
     // [m,n] - [m,8] -> [m,n] 按b轴的block数repeat，每个指令repeat算[m,8] - [m,8], subRange循环处理 超过mask情况
@@ -406,8 +445,10 @@ __aicore__ inline void FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout>:
     }
 }
 
-template <typename T1, typename T2, const MatmulConfig &MM_CFG, LayoutMode layout>
-__aicore__ inline void FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout>::SetReClcShape(
+template <typename T1, typename T2, const MatmulConfig &MM_CFG, LayoutMode layout,
+          const CubeFormat MMPre_OUT_FORMAT, const CubeFormat MMNext_OUT_FORMAT>
+__aicore__ inline void
+    FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout, MMPre_OUT_FORMAT, MMNext_OUT_FORMAT>::SetReClcShape(
     LocalTensor<T2> &mulResInner, LocalTensor<float> &maxInner, LocalTensor<float> &sumInner,
     LocalTensor<T2> &dvDropResInner)
 {
@@ -417,8 +458,10 @@ __aicore__ inline void FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout>:
     dvDropResInner.SetShapeInfo(ShapeInfo(2, innerMatOutShape, DataFormat::ND));
 }
 
-template <typename T1, typename T2, const MatmulConfig &MM_CFG, LayoutMode layout>
-__aicore__ inline void FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout>::CopyInSoftMax(
+template <typename T1, typename T2, const MatmulConfig &MM_CFG, LayoutMode layout,
+          const CubeFormat MMPre_OUT_FORMAT, const CubeFormat MMNext_OUT_FORMAT>
+__aicore__ inline void
+    FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout, MMPre_OUT_FORMAT, MMNext_OUT_FORMAT>::CopyInSoftMax(
     LocalTensor<float> &maxInner, const GlobalTensor<float> &softmaxMaxGmIn, LocalTensor<float> &sumInner,
     const GlobalTensor<float> &softmaxSumGmIn)
 {
@@ -426,9 +469,10 @@ __aicore__ inline void FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout>:
     DataCopy(sumInner, softmaxSumGmIn, innerReduceNum);
 }
 
-template <typename T1, typename T2, const MatmulConfig &MM_CFG, LayoutMode layout>
-__aicore__ inline bool
-FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout>::CopyInAttenMask(const int64_t &attenMaskOffset)
+template <typename T1, typename T2, const MatmulConfig &MM_CFG, LayoutMode layout,
+          const CubeFormat MMPre_OUT_FORMAT, const CubeFormat MMNext_OUT_FORMAT>
+__aicore__ inline bool FlashAttentionScoreGradUngs1s2Bb<
+    T1, T2, MM_CFG, layout, MMPre_OUT_FORMAT, MMNext_OUT_FORMAT>::CopyInAttenMask(const int64_t &attenMaskOffset)
 {
     if (hasAttenMask != 1) {
         return false;
@@ -458,10 +502,11 @@ FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout>::CopyInAttenMask(const 
     return true;
 }
 
-template <typename T1, typename T2, const MatmulConfig &MM_CFG, LayoutMode layout>
-__aicore__ inline void
-FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout>::CalcAttenMaskOffset(int64_t &attenMaskOffset,
-                                                                              const int64_t delta)
+template <typename T1, typename T2, const MatmulConfig &MM_CFG, LayoutMode layout,
+          const CubeFormat MMPre_OUT_FORMAT, const CubeFormat MMNext_OUT_FORMAT>
+__aicore__ inline void FlashAttentionScoreGradUngs1s2Bb<
+    T1, T2, MM_CFG, layout, MMPre_OUT_FORMAT, MMNext_OUT_FORMAT>::CalcAttenMaskOffset(int64_t &attenMaskOffset,
+                                                                                      const int64_t delta)
 {
     if (delta == 0) {
         attenMaskOffset = 0;
@@ -480,16 +525,19 @@ FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout>::CalcAttenMaskOffset(in
     }
 }
 
-template <typename T1, typename T2, const MatmulConfig &MM_CFG, LayoutMode layout>
-__aicore__ inline void
-FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout>::CalcCausalAttenMaskOffset(int64_t &attenMaskOffset,
-                                                                                    const int64_t delta)
+template <typename T1, typename T2, const MatmulConfig &MM_CFG, LayoutMode layout,
+          const CubeFormat MMPre_OUT_FORMAT, const CubeFormat MMNext_OUT_FORMAT>
+__aicore__ inline void FlashAttentionScoreGradUngs1s2Bb<
+    T1, T2, MM_CFG, layout, MMPre_OUT_FORMAT, MMNext_OUT_FORMAT>::CalcCausalAttenMaskOffset(int64_t &attenMaskOffset,
+                                                                                            const int64_t delta)
 {
     CalcAttenMaskOffset(attenMaskOffset, delta);
 }
 
-template <typename T1, typename T2, const MatmulConfig &MM_CFG, LayoutMode layout>
-__aicore__ inline void FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout>::ClcAttenMask(LocalTensor<T2> &mmResUb)
+template <typename T1, typename T2, const MatmulConfig &MM_CFG, LayoutMode layout,
+          const CubeFormat MMPre_OUT_FORMAT, const CubeFormat MMNext_OUT_FORMAT>
+__aicore__ inline void FlashAttentionScoreGradUngs1s2Bb<
+    T1, T2, MM_CFG, layout, MMPre_OUT_FORMAT, MMNext_OUT_FORMAT>::ClcAttenMask(LocalTensor<T2> &mmResUb)
 {
     LocalTensor<uint8_t> attenMaskUb = vecInQue2.DeQue<uint8_t>();
     LocalTensor<uint8_t> ubWorkspace = vecOutQue1.AllocTensor<uint8_t>();
@@ -514,8 +562,10 @@ __aicore__ inline void FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout>:
     vecInQue2.FreeTensor(attenMaskUb);
 }
 
-template <typename T1, typename T2, const MatmulConfig &MM_CFG, LayoutMode layout>
-__aicore__ inline void FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout>::ClcSoftMax(
+template <typename T1, typename T2, const MatmulConfig &MM_CFG, LayoutMode layout,
+          const CubeFormat MMPre_OUT_FORMAT, const CubeFormat MMNext_OUT_FORMAT>
+__aicore__ inline void
+    FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout, MMPre_OUT_FORMAT, MMNext_OUT_FORMAT>::ClcSoftMax(
     LocalTensor<T2> &softmaxResInner, LocalTensor<T2> &reMatmulResInner, LocalTensor<float> &maxInner,
     LocalTensor<float> &sumInner)
 {
@@ -532,10 +582,13 @@ __aicore__ inline void FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout>:
     vecOutQue1.FreeTensor(apiClcTensor);
 }
 
-template <typename T1, typename T2, const MatmulConfig &MM_CFG, LayoutMode layout>
-__aicore__ inline void FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout>::FrontCompute(
+template <typename T1, typename T2, const MatmulConfig &MM_CFG, LayoutMode layout,
+          const CubeFormat MMPre_OUT_FORMAT, const CubeFormat MMNext_OUT_FORMAT>
+__aicore__ inline void
+    FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout, MMPre_OUT_FORMAT, MMNext_OUT_FORMAT>::FrontCompute(
     const int64_t &batchSqLoopOffset, const int64_t &batchSkvLoopOffset, const int64_t &dropMaskOffset,
-    const int64_t &bCvMmOffset, const int64_t &bCvIndex)
+    const int64_t &bCvMmOffset, const int64_t &bCvNzMmOffset, const int64_t &bCvIndex,
+    const int64_t &currentBatchRange)
 {
     uint32_t sftFrontResSize = bInNGSq * BLOCK_SIZE / sizeof(T2);
     LocalTensor<T2> sftFrontResInner = softmaxGradQue.AllocTensor<T2>();
@@ -595,7 +648,8 @@ __aicore__ inline void FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout>:
                 copyParams.srcStride = ((n * g - 1) * d + dOffset) * sizeof(T1);
             }
             DataCopyPad(dxInner[ubOffset], dxGm[batchSqLoopOffset + gmOffset], copyParams, copyPadParams);
-            DataCopyPad(frontResInner[ubOffset], forwardResGm[batchSqLoopOffset + gmOffset], copyParams, copyPadParams);
+            DataCopyPad(frontResInner[ubOffset], forwardResGm[batchSqLoopOffset + gmOffset],
+                        copyParams, copyPadParams);
             vecInQue1.EnQue(dxInner);
             vecInQue1.DeQue<T1>();
             vecInQue2.EnQue(frontResInner);
@@ -658,37 +712,56 @@ __aicore__ inline void FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout>:
     if (bCvIndex == 0) {
         if (inputLayout == 1 || inputLayout == 2) {
             mm1.WaitIterateBatch();
-        } else {
+        } else if (currentBatchRange < 2) {
             // BSH只能同步
+            // bmm1
             mm1.SetTail(sQ, sKV, d);
             mm1.SetTensorA(this->dxGm[batchSqLoopOffset]);
             mm1.SetTensorB(this->valueGm[batchSkvLoopOffset], true);
-            // BSH
             for (uint32_t i = 0; i < bCvInner; i++) {
                 mm1.SetTensorA(this->dxGm[batchSqLoopOffset + i * n * g * sQ * d]);
                 mm1.SetTensorB(this->valueGm[batchSkvLoopOffset + i * n * sKV * d], true);
-                mm1.template IterateBatch<true>(matmulResultBuffer1[i * n * g * sQ * sKV], n * g, n, false);
+                if constexpr (MMPre_OUT_FORMAT == CubeFormat::NZ) {
+                    mm1.template IterateBatch<true>(matmulResultBuffer1[i * n * g * sQ * sKVAlign], n * g, n, false);
+                } else {
+                    mm1.template IterateBatch<true>(matmulResultBuffer1[i * n * g * sQ * sKV], n * g, n, false);
+                }
             }
         }
         mm1.End();
     }
 
-    DataCopyExtParams intriParams;
-    intriParams.blockCount = bInNGSq;
-    intriParams.blockLen = sKV * vecCalcDTypeSize;
-    intriParams.srcStride = 0;
-    intriParams.dstStride = dstStride;
-    intriParams.rsv = 0;
+    if constexpr (MMPre_OUT_FORMAT == CubeFormat::ND) {
+        DataCopyExtParams intriParams;
+        intriParams.blockCount = bInNGSq;
+        intriParams.blockLen = sKV * vecCalcDTypeSize;
+        intriParams.srcStride = 0;
+        intriParams.dstStride = dstStride;
+        intriParams.rsv = 0;
 
-    DataCopyPadExtParams<T2> copyPadParams;
-    copyPadParams.isPad = true;
-    copyPadParams.leftPadding = 0;
-    copyPadParams.rightPadding = rightPadding;
-    copyPadParams.paddingValue = 0;
+        DataCopyPadExtParams<T2> copyPadParams;
+        copyPadParams.isPad = true;
+        copyPadParams.leftPadding = 0;
+        copyPadParams.rightPadding = rightPadding;
+        copyPadParams.paddingValue = 0;
 
-    DataCopyPad(mm1Res, matmulResultBuffer1[bCvMmOffset], intriParams, copyPadParams);
-    vecClc1.EnQue(mm1Res);
-    vecClc1.DeQue<T2>();
+        DataCopyPad(mm1Res, matmulResultBuffer1[bCvMmOffset], intriParams, copyPadParams);
+        vecClc1.EnQue(mm1Res);
+        vecClc1.DeQue<T2>();
+    } else {
+        NZCopyIn(bCvNzMmOffset, matmulResultBuffer1, mm1Res, sQ, bIn * n * g *  sKVAlign);
+        vecClc1.EnQue(mm1Res);
+        vecClc1.DeQue<T2>();
+        auto tmpTensor = vecOutQue1.AllocTensor<T2>();
+        DataCopy(tmpTensor, mm1Res, sQ * bIn * n * g * sKVAlign + bIn * n * g * sKVAlign / C0_SIZE * VEC_REPEAT);
+        pipe_barrier(PIPE_V);
+        for (int64_t i = 0; i < bIn * n * g; i++) {
+            int64_t srcBatchOffset = i * (sQ * sKVAlign + sKVAlign / C0_SIZE * VEC_REPEAT);
+            int64_t dstBatchOffset = i * sQ * sKVAlign;
+            NZ2ND(mm1Res, tmpTensor, sQ, sKVAlign, srcBatchOffset, dstBatchOffset);
+        }
+        vecOutQue1.FreeTensor(tmpTensor);
+    }
 
     if (isDrop) {
         dropoutQue.DeQue<T2>();
@@ -717,71 +790,167 @@ __aicore__ inline void FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout>:
     softmaxGradQue.FreeTensor(sftFrontResInner);
 }
 
-template <typename T1, typename T2, const MatmulConfig &MM_CFG, LayoutMode layout>
-__aicore__ inline void FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout>::ClcMm31(
-    const GlobalTensor<T2> &tensorC, const GlobalTensor<T1> &tensorA, const GlobalTensor<T1> &tensorB)
+template <typename T1, typename T2, const MatmulConfig &MM_CFG, LayoutMode layout,
+          const CubeFormat MMPre_OUT_FORMAT, const CubeFormat MMNext_OUT_FORMAT>
+__aicore__ inline void
+    FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout, MMPre_OUT_FORMAT, MMNext_OUT_FORMAT>::ClcMm31(
+    const GlobalTensor<T2> &tensorC, const GlobalTensor<T1> &tensorA, const GlobalTensor<T1> &tensorB,
+    const uint32_t &currBCvInner, const bool &isSync)
 {
     mm31.SetTensorA(tensorA, false);
     mm31.SetTensorB(tensorB, false);
-
     if (inputLayout == 1 || inputLayout == 2) {
         // SBH, BNSD
-        mm31.template IterateBatch<true>(tensorC, bCvInner * n * g, bCvInner * n, false);
+        if (isSync) {
+          mm31.template IterateBatch<true>(tensorC, currBCvInner * n * g, currBCvInner * n, false);
+        } else {
+          mm31.template IterateBatch<false>(tensorC, currBCvInner * n * g, currBCvInner * n, false);
+        }
     } else {
         // BSH
-        for (uint32_t i = 0; i < bCvInner; i++) {
+        for (uint32_t i = 0; i < currBCvInner; i++) {
             mm31.SetTensorA(tensorA[i * n * g * sQ * sKV]);
             mm31.SetTensorB(tensorB[i * n * sKV * d], false);
-            mm31.template IterateBatch<true>(tensorC[i * n * g * sQ * d], n * g, n, false);
+            if constexpr (MMNext_OUT_FORMAT == CubeFormat::NZ) {
+                if (isSync) {
+                  mm31.template IterateBatch<true>(tensorC[i * n * g * sQ * originalDAlign], n * g, n, false);
+                } else {
+                  mm31.template IterateBatch<false>(tensorC[i * n * g * sQ * originalDAlign], n * g, n, false);
+                }
+            } else {
+                if (isSync) {
+                  mm31.template IterateBatch<true>(tensorC[i * n * g * sQ * d], n * g, n, false);
+                } else {
+                  mm31.template IterateBatch<false>(tensorC[i * n * g * sQ * d], n * g, n, false);
+                }
+            }
         }
     }
     mm31.End();
 }
 
-template <typename T1, typename T2, const MatmulConfig &MM_CFG, LayoutMode layout>
-__aicore__ inline void FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout>::ClcMm32(
-    const GlobalTensor<T2> &tensorC, const GlobalTensor<T1> &tensorA, const GlobalTensor<T1> &tensorB)
+template <typename T1, typename T2, const MatmulConfig &MM_CFG, LayoutMode layout,
+          const CubeFormat MMPre_OUT_FORMAT, const CubeFormat MMNext_OUT_FORMAT>
+__aicore__ inline void
+    FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout, MMPre_OUT_FORMAT, MMNext_OUT_FORMAT>::ClcMm32(
+    const GlobalTensor<T2> &tensorC, const GlobalTensor<T1> &tensorA, const GlobalTensor<T1> &tensorB,
+    const uint32_t &currBCvInner, const bool &isSync)
 {
     mm32.SetTensorA(tensorA, true);
     mm32.SetTensorB(tensorB, false);
-
     if (inputLayout == 1 || inputLayout == 2) {
         // SBH, BNSD
-        mm32.template IterateBatch<true>(tensorC, bCvInner * n * g, bCvInner * n * g, false);
+        if (isSync) {
+          mm32.template IterateBatch<true>(tensorC, currBCvInner * n * g, currBCvInner * n * g, false);
+        } else {
+          mm32.template IterateBatch<false>(tensorC, currBCvInner * n * g, currBCvInner * n * g, false);
+        }
     } else {
         // BSH
-        for (uint32_t i = 0; i < bCvInner; i++) {
+        for (uint32_t i = 0; i < currBCvInner; i++) {
             mm32.SetTensorA(tensorA[i * n * g * sQ * sKV], true);
             mm32.SetTensorB(tensorB[i * n * g * sQ * d], false);
-            mm32.template IterateBatch<true>(tensorC[i * n * sKV * d], n * g, n * g, false);
+            if constexpr (MMNext_OUT_FORMAT == CubeFormat::NZ) {
+                if (isSync) {
+                  mm32.template IterateBatch<true>(tensorC[i * n * sKV * originalDAlign], n * g, n * g, false);
+                } else {
+                  mm32.template IterateBatch<false>(tensorC[i * n * sKV * originalDAlign], n * g, n * g, false);
+                }
+            } else {
+                if (isSync) {
+                  mm32.template IterateBatch<true>(tensorC[i * n * sKV * d], n * g, n * g, false);
+                } else {
+                  mm32.template IterateBatch<false>(tensorC[i * n * sKV * d], n * g, n * g, false);
+                }
+            }
         }
     }
     mm32.End();
 }
 
-template <typename T1, typename T2, const MatmulConfig &MM_CFG, LayoutMode layout>
-__aicore__ inline void FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout>::ClcMm4(const GlobalTensor<T1> &tensorC,
-                                                                                        const GlobalTensor<T1> &tensorA,
-                                                                                        const GlobalTensor<T1> &tensorB)
+template <typename T1, typename T2, const MatmulConfig &MM_CFG, LayoutMode layout,
+          const CubeFormat MMPre_OUT_FORMAT, const CubeFormat MMNext_OUT_FORMAT>
+__aicore__ inline void FlashAttentionScoreGradUngs1s2Bb<
+    T1, T2, MM_CFG, layout, MMPre_OUT_FORMAT, MMNext_OUT_FORMAT>::ClcMm4(const GlobalTensor<T1> &tensorC,
+                                                                         const GlobalTensor<T1> &tensorA,
+                                                                         const GlobalTensor<T1> &tensorB,
+                                                                         const uint32_t &currBCvInner,
+                                                                         const bool &isSync)
 {
     mm4.SetTensorA(tensorA, true);
     mm4.SetTensorB(tensorB, false);
     if (inputLayout == 1 || inputLayout == 2) {
         // SBH, BNSD
-        mm4.template IterateBatch<true>(tensorC, bCvInner * n * g, bCvInner * n * g, false);
+        if (isSync) {
+          mm4.template IterateBatch<true>(tensorC, currBCvInner * n * g, currBCvInner * n * g, false);
+        } else {
+          mm4.template IterateBatch<false>(tensorC, currBCvInner * n * g, currBCvInner * n * g, false);
+        }
     } else {
         // BSH
-        for (uint32_t i = 0; i < bCvInner; i++) {
+        for (uint32_t i = 0; i < currBCvInner; i++) {
             mm4.SetTensorA(tensorA[i * n * g * sQ * sKV], true);
             mm4.SetTensorB(tensorB[i * n * g * sQ * d], false);
-            mm4.template IterateBatch<true>(tensorC[i * n * sKV * d], n * g, n * g, false);
+            if (isSync) {
+              mm4.template IterateBatch<true>(tensorC[i * n * sKV * d], n * g, n * g, false);
+            } else {
+              mm4.template IterateBatch<false>(tensorC[i * n * sKV * d], n * g, n * g, false);
+            }
         }
     }
     mm4.End();
 }
 
-template <typename T1, typename T2, const MatmulConfig &MM_CFG, LayoutMode layout>
-__aicore__ inline void FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout>::Copy2Workspace(
+template <typename T1, typename T2, const MatmulConfig &MM_CFG, LayoutMode layout,
+          const CubeFormat MMPre_OUT_FORMAT, const CubeFormat MMNext_OUT_FORMAT>
+__aicore__ inline void
+FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout, MMPre_OUT_FORMAT, MMNext_OUT_FORMAT>::NZCopyIn(
+    int64_t mmOffset, GlobalTensor<T2> &mmWspGm, LocalTensor<T2> &mmTensorCurr, int64_t sQ, int64_t sKVAlign)
+{
+    DataCopyParams intriParams;
+    intriParams.blockCount = sKVAlign / C0_SIZE;
+    intriParams.blockLen = sQ * C0_SIZE / CAL_BLOCK_NUM;
+    intriParams.srcStride = 0;
+    intriParams.dstStride = 1;
+    DataCopy(mmTensorCurr, mmWspGm[mmOffset], intriParams);
+}
+
+template <typename T1, typename T2, const MatmulConfig &MM_CFG, LayoutMode layout,
+          const CubeFormat MMPre_OUT_FORMAT, const CubeFormat MMNext_OUT_FORMAT>
+__aicore__ inline void FlashAttentionScoreGradUngs1s2Bb<
+    T1, T2, MM_CFG, layout, MMPre_OUT_FORMAT, MMNext_OUT_FORMAT>::NZ2ND(LocalTensor<T2> &mmTensorCurr,
+    LocalTensor<T2> &tmpTensor, int64_t sQ, int64_t sKVAlign, int64_t srcBatchOffset, int64_t dstBatchOffset)
+{
+    CopyRepeatParams nz2ndParams;
+    nz2ndParams.srcStride = sQ * C0_SIZE / CAL_BLOCK_NUM + 1;
+    nz2ndParams.dstStride = C0_SIZE / CAL_BLOCK_NUM;
+    nz2ndParams.srcRepeatSize = C0_SIZE / CAL_BLOCK_NUM;
+    nz2ndParams.dstRepeatSize = sKVAlign / CAL_BLOCK_NUM;
+
+    uint16_t c0Repeat = C0_SIZE / CAL_BLOCK_NUM;
+    uint16_t c1Repeat = sKVAlign / C0_SIZE / VEC_REPEAT;
+    uint16_t c1Remain = sKVAlign / C0_SIZE % VEC_REPEAT;
+    uint16_t nRepeat = sQ;
+    for (uint16_t i = 0; i < c0Repeat; ++i) {
+        for (uint16_t j = 0; j < c1Repeat; ++j) {
+            Copy(mmTensorCurr[dstBatchOffset + i * CAL_BLOCK_NUM + j * VEC_REPEAT * C0_SIZE],
+                 tmpTensor[srcBatchOffset + i * CAL_BLOCK_NUM + j * VEC_REPEAT * (sQ * C0_SIZE + CAL_BLOCK_NUM)],
+                 VEC_REPEAT * CAL_BLOCK_NUM, nRepeat, nz2ndParams);
+        }
+        if (c1Remain > 0) {
+            Copy(mmTensorCurr[dstBatchOffset + i * CAL_BLOCK_NUM + c1Repeat * VEC_REPEAT * C0_SIZE],
+                 tmpTensor[srcBatchOffset + i * CAL_BLOCK_NUM
+                           + c1Repeat * VEC_REPEAT * (sQ * C0_SIZE + CAL_BLOCK_NUM)],
+                 VEC_REPEAT * c1Remain, nRepeat, nz2ndParams);
+        }
+    }
+    pipe_barrier(PIPE_V);
+}
+
+template <typename T1, typename T2, const MatmulConfig &MM_CFG, LayoutMode layout,
+          const CubeFormat MMPre_OUT_FORMAT, const CubeFormat MMNext_OUT_FORMAT>
+__aicore__ inline void FlashAttentionScoreGradUngs1s2Bb<
+    T1, T2, MM_CFG, layout, MMPre_OUT_FORMAT, MMNext_OUT_FORMAT>::Copy2Workspace(
     const int64_t &batchSqLoopOffset, const int64_t &batchSkvLoopOffset, LocalTensor<T2> &mulResInner,
     LocalTensor<T2> &dvDropResInner, const int64_t &bCvMmOffset)
 {
@@ -795,29 +964,34 @@ __aicore__ inline void FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout>:
     LocalTensor<T1> castedMulResPad = vecOutQue1.AllocTensor<T1>();
     castedMulResPad.SetSize(innerMatResNum);
     Cast(castedMulResPad, mulResInner, RoundMode::CAST_ROUND, innerMatResNum);
+
     vecOutQue1.EnQue(castedMulResPad);
     vecOutQue1.DeQue<T1>();
 
-    DataCopyPad(mulWorkspaceGm[bCvMmOffset], castedMulResPad, intriParams);
+    DataCopyPad(mulWorkspaceGm[pingpongIdx * pingPongMulOffset + bCvMmOffset], castedMulResPad, intriParams);
     vecOutQue1.FreeTensor(castedMulResPad);
 
     LocalTensor<T1> castedDvDropResPad = vecOutQue1.AllocTensor<T1>();
     castedDvDropResPad.SetSize(innerMatResNum);
     Cast(castedDvDropResPad, dvDropResInner, RoundMode::CAST_ROUND, innerMatResNum);
+
     vecOutQue1.EnQue(castedDvDropResPad);
     vecOutQue1.DeQue<T1>();
 
-    DataCopyPad(dropWorkspaceGm[bCvMmOffset], castedDvDropResPad, intriParams);
+    DataCopyPad(dropWorkspaceGm[pingpongIdx * pingPongDropOffset + bCvMmOffset], castedDvDropResPad, intriParams);
 
     vecOutQue1.FreeTensor(castedDvDropResPad);
 }
 
 
-template <typename T1, typename T2, const MatmulConfig &MM_CFG, LayoutMode layout>
-__aicore__ inline void FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout>::ReCompute(
+template <typename T1, typename T2, const MatmulConfig &MM_CFG, LayoutMode layout,
+          const CubeFormat MMPre_OUT_FORMAT, const CubeFormat MMNext_OUT_FORMAT>
+__aicore__ inline void
+    FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout, MMPre_OUT_FORMAT, MMNext_OUT_FORMAT>::ReCompute(
     const int64_t &batchSqCLoopOffset, const int64_t &batchSkvCLoopOffset, const int64_t &batchSqLoopOffset,
     const int64_t &batchSkvLoopOffset, const int64_t &attenMaskOffset, const int64_t &dropMaskOffset,
-    const int64_t &batchReduceOffset, const int64_t &bCvMmOffset, const int64_t &bCvIndex, const bool isCvTail)
+    const int64_t &batchReduceOffset, const int64_t &bCvMmOffset, const int64_t &bCvNzMmOffset,
+    const int64_t &bCvIndex, const bool isCvTail, const int64_t &currentBatchRange)
 {
     LocalTensor<T2> subResInner = vecClc1.AllocTensor<T2>();
     LocalTensor<T2> &mulResInner = subResInner;
@@ -844,37 +1018,57 @@ __aicore__ inline void FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout>:
     if (bCvIndex == 0) {
         if (inputLayout == 1 || inputLayout == 2) {
             mm1.WaitIterateBatch();
-        } else {
+        } else if (currentBatchRange < 2) {
             // BSH 只支持同步
+            // bmm2
             mm1.SetTail(sQ, sKV, d);
-            mm1.SetTensorA(this->queryGm[batchSqCLoopOffset]);
-            mm1.SetTensorB(this->keyGm[batchSkvCLoopOffset], true);
+            mm1.SetTensorA(this->queryGm[batchSqLoopOffset]);
+            mm1.SetTensorB(this->keyGm[batchSkvLoopOffset], true);
             for (uint32_t i = 0; i < bCvInner; i++) {
-                mm1.SetTensorA(this->queryGm[batchSqCLoopOffset + i * n * g * sQ * d]);
-                mm1.SetTensorB(this->keyGm[batchSkvCLoopOffset + i * n * sKV * d], true);
-                mm1.template IterateBatch<true>(matmulResultBuffer2[i * n * g * sQ * sKV], n * g, n, false);
+                mm1.SetTensorA(this->queryGm[batchSqLoopOffset + i * n * g * sQ * d]);
+                mm1.SetTensorB(this->keyGm[batchSkvLoopOffset + i * n * sKV * d], true);
+                if constexpr (MMPre_OUT_FORMAT == CubeFormat::NZ) {
+                    mm1.template IterateBatch<true>(matmulResultBuffer2[i * n * g * sQ * sKVAlign], n * g, n, false);
+                } else {
+                    mm1.template IterateBatch<true>(matmulResultBuffer2[i * n * g * sQ * sKV], n * g, n, false);
+                }
             }
         }
         mm1.End();
     }
 
-    DataCopyExtParams intriParams;
-    intriParams.blockCount = bInNGSq;
-    intriParams.blockLen = sKV * vecCalcDTypeSize;
-    intriParams.srcStride = 0;
-    intriParams.dstStride = dstStride;
-    intriParams.rsv = 0;
+    if constexpr (MMPre_OUT_FORMAT == CubeFormat::ND) {
+        DataCopyExtParams intriParams;
+        intriParams.blockCount = bInNGSq;
+        intriParams.blockLen = sKV * vecCalcDTypeSize;
+        intriParams.srcStride = 0;
+        intriParams.dstStride = dstStride;
+        intriParams.rsv = 0;
 
-    DataCopyPadExtParams<T2> copyPadParams;
-    copyPadParams.isPad = true;
-    copyPadParams.leftPadding = 0;
-    copyPadParams.rightPadding = rightPadding;
-    copyPadParams.paddingValue = 0;
+        DataCopyPadExtParams<T2> copyPadParams;
+        copyPadParams.isPad = true;
+        copyPadParams.leftPadding = 0;
+        copyPadParams.rightPadding = rightPadding;
+        copyPadParams.paddingValue = 0;
 
-    DataCopyPad(reMatmulResInner, matmulResultBuffer2[bCvMmOffset], intriParams, copyPadParams);
+        DataCopyPad(reMatmulResInner, matmulResultBuffer2[bCvMmOffset], intriParams, copyPadParams);
 
-    vecClc2.EnQue(reMatmulResInner);
-    vecClc2.DeQue<T2>();
+        vecClc2.EnQue(reMatmulResInner);
+        vecClc2.DeQue<T2>();
+    } else {
+        NZCopyIn(bCvNzMmOffset, matmulResultBuffer2, reMatmulResInner, sQ, bIn * n * g * sKVAlign);
+        vecClc2.EnQue(reMatmulResInner);
+        vecClc2.DeQue<T2>();
+        auto tmpTensor = vecOutQue1.AllocTensor<T2>();
+        DataCopy(tmpTensor, reMatmulResInner, sQ * bIn * n * g * sKVAlign + bIn * n * g * sKVAlign / C0_SIZE * VEC_REPEAT);
+        pipe_barrier(PIPE_V);
+        for (int64_t i = 0; i < bIn * n * g; i++) {
+            int64_t srcBatchOffset = i * (sQ * sKVAlign + sKVAlign / C0_SIZE * VEC_REPEAT);
+            int64_t dstBatchOffset = i * sQ * sKVAlign;
+            NZ2ND(reMatmulResInner, tmpTensor, sQ, sKVAlign, srcBatchOffset, dstBatchOffset);
+        }
+        vecOutQue1.FreeTensor(tmpTensor);
+    }
 
     if (existPse != 0) {
         LocalTensor<T1> pseUb = vecInQue2.DeQue<T1>();
@@ -956,53 +1150,76 @@ __aicore__ inline void FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout>:
     Copy2Workspace(batchSqLoopOffset, batchSkvLoopOffset, mulResInner, dvDropResInner, bCvMmOffset);
     vecClc1.FreeTensor(mulResInner);
     vecClc2.FreeTensor(dvDropResInner);
+}
 
-    if (isCvTail) {
-        // 清除GM，否则pta连跑有问题
-        if (inputLayout == 1) {
-            // SBH
-            for (int64_t i = 0; i < sKV; i++) {
-                int64_t offset = batchSkvCLoopOffset + i * b * n * 1 * d;
-                int64_t num = bCvInner * n * 1 * d;
+template <typename T1, typename T2, const MatmulConfig &MM_CFG, LayoutMode layout,
+          const CubeFormat MMPre_OUT_FORMAT, const CubeFormat MMNext_OUT_FORMAT>
+__aicore__ inline void
+    FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout, MMPre_OUT_FORMAT, MMNext_OUT_FORMAT>::ResetGm4Dkdv(
+    const uint32_t &inputLayoutTmp, const int64_t &currBatchSkvLoopOffset, const uint32_t &currBCvInner,
+    const int64_t &mmNzDkvOffset) {
+    // 清除GM，否则pta连跑有问题
+    if (inputLayoutTmp == 1) {
+        // SBH
+        for (int64_t i = 0; i < sKV; i++) {
+            int64_t offset = currBatchSkvLoopOffset + i * b * n * 1 * d;
+            int64_t num = currBCvInner * n * 1 * d;
+            if constexpr (MMNext_OUT_FORMAT == CubeFormat::NZ) {
+                int64_t nums = currBCvInner * n * 1 * sKV * originalDAlign;
+                InitOutput<T2>(dkWorkspaceGm[mmNzDkvOffset], nums, 0);
+            } else {
                 InitOutput<T2>(dkWorkspaceGm[offset], num, 0);
-                InitOutput<T1>(dvGm[offset], num, 0);
             }
-        } else {
-            int64_t num = bCvInner * n * 1 * sKV * d;
-            InitOutput<T2>(dkWorkspaceGm[batchSkvCLoopOffset], num, 0);
-            InitOutput<T1>(dvGm[batchSkvCLoopOffset], num, 0);
+            InitOutput<T1>(dvGm[offset], num, 0);
         }
-        ClcMm31(dqWorkspaceGm[batchSqCLoopOffset], mulWorkspaceGm, keyGm[batchSkvCLoopOffset]);
-        ClcMm32(dkWorkspaceGm[batchSkvCLoopOffset], mulWorkspaceGm, queryGm[batchSqCLoopOffset]);
-        ClcMm4(dvGm[batchSkvCLoopOffset], dropWorkspaceGm, dxGm[batchSqCLoopOffset]);
+    } else {
+        int64_t num = currBCvInner * n * 1 * sKV * d;
+        if constexpr (MMNext_OUT_FORMAT == CubeFormat::NZ) {
+            int64_t nums = currBCvInner * n * 1 * sKV * originalDAlign;
+            InitOutput<T2>(dkWorkspaceGm[mmNzDkvOffset], nums, 0);
+        } else {
+            InitOutput<T2>(dkWorkspaceGm[currBatchSkvLoopOffset], num, 0);
+        }
+        InitOutput<T1>(dvGm[currBatchSkvLoopOffset], num, 0);
     }
 }
 
-
 // T1 INPUT_T, T2 CALC_T
-template <typename T1, typename T2, const MatmulConfig &MM_CFG, LayoutMode layout>
-__aicore__ inline void FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout>::Process()
+template <typename T1, typename T2, const MatmulConfig &MM_CFG, LayoutMode layout,
+          const CubeFormat MMPre_OUT_FORMAT, const CubeFormat MMNext_OUT_FORMAT>
+__aicore__ inline void
+    FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout, MMPre_OUT_FORMAT, MMNext_OUT_FORMAT>::Process()
 {
     if (g_coreType == AIV && mBlockIdx >= usedCoreNum) {
         SyncAll();
         return;
     }
 
+    int64_t lastBatchSqLoopOffset = 0;
+    int64_t lastBatchSkvLoopOffset = 0;
+    int64_t lastMmNzDqOffset = 0;
+    int64_t lastMmNzDkvOffset = 0;
+
     int64_t batchOffset = mBlockIdx * singleCoreBatchRange;
     int64_t currentBatchRange =
         singleCoreBatchRange < (bOut - batchOffset) ? singleCoreBatchRange : (bOut - batchOffset);
 
     for (int64_t batchIdx = 0; batchIdx < currentBatchRange; batchIdx++) {
+        pingpongIdx = 1 - pingpongIdx;
         int64_t bIdx = batchOffset + batchIdx;
         int64_t bCvSqOffset = 0;
         int64_t bCvSkvOffset = 0;
         int64_t bCvMmOffset = 0;
+        int64_t bCvNzMmOffset = 0;
         int64_t bCvDropMaskOffset = 0;
         int64_t bCvAttenMaskOffset = 0;
 
         int64_t batchSqLoopOffset = 0;
         int64_t batchSkvLoopOffset = 0;
         int64_t batchSoftmaxInputOffset = 0;
+
+        int64_t mmNzDqOffset = 0;
+        int64_t mmNzDkvOffset = 0;
 
         bool isCvTail = false;
 
@@ -1039,6 +1256,11 @@ __aicore__ inline void FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout>:
             batchSkvLoopOffset = bIdx * sKV * bCvInner * n * d;
         }
 
+        if constexpr (MMNext_OUT_FORMAT == CubeFormat::NZ) {
+            mmNzDqOffset = bIdx * bCvInner * n * g * sQ * originalDAlign;
+            mmNzDkvOffset = bIdx * bCvInner * n * sKV * originalDAlign;
+        }
+
         innerMatResNum = bInNGSq * sKVAlign;
 
         maskInputNum = bInNGSq * sKVAlignByte;
@@ -1053,6 +1275,71 @@ __aicore__ inline void FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout>:
         bCvInner = bCvInner < (b - bIdx * bCvInner) ? bCvInner : (b - bIdx * bCvInner);
         uint32_t bCvLoop = (bCvInner + bIn - 1) / bIn;
 
+        // 发射本轮bmm12
+        if (inputLayout == 1 || inputLayout == 2) {
+            // SBH, BNSD
+            mm1.SetTensorA(this->dxGm[batchSqLoopOffset]);
+            mm1.SetTensorB(this->valueGm[batchSkvLoopOffset], true);
+            mm1.template IterateBatch<false, true>(matmulResultBuffer1, bCvInner * n * g, bCvInner * n, false);
+
+            mm1.SetTensorA(this->queryGm[batchSqLoopOffset]);
+            mm1.SetTensorB(this->keyGm[batchSkvLoopOffset], true);
+            mm1.template IterateBatch<false, true>(matmulResultBuffer2, bCvInner * n * g, bCvInner * n, false);
+        } else if (currentBatchRange > 1) {
+            // 当循环大于1时，cv并行才可以显现效果，如果循环次数为1，保持原来的bmm12计算位置
+            // BSH只能同步
+            // bmm1
+            mm1.SetTail(sQ, sKV, d);
+            mm1.SetTensorA(this->dxGm[batchSqLoopOffset]);
+            mm1.SetTensorB(this->valueGm[batchSkvLoopOffset], true);
+            for (uint32_t i = 0; i < bCvInner; i++) {
+                mm1.SetTensorA(this->dxGm[batchSqLoopOffset + i * n * g * sQ * d]);
+                mm1.SetTensorB(this->valueGm[batchSkvLoopOffset + i * n * sKV * d], true);
+                if constexpr (MMPre_OUT_FORMAT == CubeFormat::NZ) {
+                    mm1.template IterateBatch<true>(matmulResultBuffer1[i * n * g * sQ * sKVAlign], n * g, n, false);
+                } else {
+                    mm1.template IterateBatch<true>(matmulResultBuffer1[i * n * g * sQ * sKV], n * g, n, false);
+                }
+            }
+            // BSH 只支持同步
+            // bmm2
+            mm1.SetTail(sQ, sKV, d);
+            mm1.SetTensorA(this->queryGm[batchSqLoopOffset]);
+            mm1.SetTensorB(this->keyGm[batchSkvLoopOffset], true);
+            for (uint32_t i = 0; i < bCvInner; i++) {
+                mm1.SetTensorA(this->queryGm[batchSqLoopOffset + i * n * g * sQ * d]);
+                mm1.SetTensorB(this->keyGm[batchSkvLoopOffset + i * n * sKV * d], true);
+                if constexpr (MMPre_OUT_FORMAT == CubeFormat::NZ) {
+                    mm1.template IterateBatch<true>(matmulResultBuffer2[i * n * g * sQ * sKVAlign], n * g, n, false);
+                } else {
+                    mm1.template IterateBatch<true>(matmulResultBuffer2[i * n * g * sQ * sKV], n * g, n, false);
+                }
+
+            }
+        }
+        mm1.End();
+
+        // 发射上一轮bmm345(第一轮不做bmm345)
+        if (batchIdx > 0) {
+            // 清除GM，否则pta连跑有问题
+            ResetGm4Dkdv(inputLayout, lastBatchSkvLoopOffset, lastBCvInner, lastMmNzDkvOffset);
+            if constexpr (MMNext_OUT_FORMAT == CubeFormat::NZ) {
+                ClcMm31(dqWorkspaceGm[lastMmNzDqOffset], mulWorkspaceGm[lastPingpongIdx * pingPongMulOffset],
+                        keyGm[lastBatchSkvLoopOffset], lastBCvInner, false);
+                ClcMm32(dkWorkspaceGm[lastMmNzDkvOffset], mulWorkspaceGm[lastPingpongIdx * pingPongMulOffset],
+                        queryGm[lastBatchSqLoopOffset], lastBCvInner, false);
+            } else {
+                // 异步
+                ClcMm31(dqWorkspaceGm[lastBatchSqLoopOffset], mulWorkspaceGm[lastPingpongIdx * pingPongMulOffset],
+                        keyGm[lastBatchSkvLoopOffset], lastBCvInner, false);
+                ClcMm32(dkWorkspaceGm[lastBatchSkvLoopOffset], mulWorkspaceGm[lastPingpongIdx * pingPongMulOffset],
+                        queryGm[lastBatchSqLoopOffset], lastBCvInner, false);
+            }
+            ClcMm4(dvGm[lastBatchSkvLoopOffset], dropWorkspaceGm[lastPingpongIdx * pingPongDropOffset],
+                   dxGm[lastBatchSqLoopOffset], lastBCvInner, false);
+        }
+
+        // 发射本轮 vec
         for (uint32_t bCvIndex = 0; bCvIndex < bCvLoop; bCvIndex++) {
             if (inputLayout == 1) { // SBH即SBND
                 bCvSqOffset = bCvIndex * bIn * n * g * d;
@@ -1066,6 +1353,7 @@ __aicore__ inline void FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout>:
             }
 
             bCvMmOffset = (bCvIndex * bIn) * n * g * sQ * sKV;
+            bCvNzMmOffset = bCvIndex * bIn * n * g * sQ * sKVAlign;
             bCvDropMaskOffset = (bCvIndex * bIn) * n * g * sQ * sKV;
 
             if (sKV % DROPOUT4BIT_LEN == 0) {
@@ -1129,24 +1417,42 @@ __aicore__ inline void FlashAttentionScoreGradUngs1s2Bb<T1, T2, MM_CFG, layout>:
                 dropMaskInfo.s2TotalSize = sKV;
             }
 
-            if (bCvIndex == 0 && (inputLayout == 1 || inputLayout == 2)) {
-                // SBH, BNSD
-                mm1.SetTensorA(this->dxGm[batchSqLoopOffset]);
-                mm1.SetTensorB(this->valueGm[batchSkvLoopOffset], true);
-                mm1.template IterateBatch<false, true>(matmulResultBuffer1, bCvInner * n * g, bCvInner * n, false);
-
-                mm1.SetTensorA(this->queryGm[batchSqLoopOffset]);
-                mm1.SetTensorB(this->keyGm[batchSkvLoopOffset], true);
-                mm1.template IterateBatch<false, true>(matmulResultBuffer2, bCvInner * n * g, bCvInner * n, false);
-            }
-
             FrontCompute(batchSqLoopOffset + bCvSqOffset, batchSkvLoopOffset + bCvSkvOffset,
-                         dropMaskOffset + bCvDropMaskOffset, bCvMmOffset, bCvIndex);
+                         dropMaskOffset + bCvDropMaskOffset, bCvMmOffset, bCvNzMmOffset, bCvIndex, currentBatchRange);
             ReCompute(batchSqLoopOffset, batchSkvLoopOffset, batchSqLoopOffset + bCvSqOffset,
                       batchSkvLoopOffset + bCvSkvOffset, attenMaskOffset + bCvAttenMaskOffset,
                       dropMaskOffset + bCvDropMaskOffset, batchSoftmaxInputOffset + bCvSoftmaxInputOffset, bCvMmOffset,
-                      bCvIndex, isCvTail);
+                      bCvNzMmOffset, bCvIndex, isCvTail, currentBatchRange);
         }
+
+        // 最后一个循环 直接发射本轮bmm345
+        if (batchIdx + 1 >= currentBatchRange) {
+          // 清除GM，否则pta连跑有问题
+          ResetGm4Dkdv(inputLayout, batchSkvLoopOffset, bCvInner, mmNzDkvOffset);
+
+            if constexpr (MMNext_OUT_FORMAT == CubeFormat::NZ) {
+                ClcMm31(dqWorkspaceGm[mmNzDqOffset], mulWorkspaceGm[pingpongIdx * pingPongMulOffset],
+                        keyGm[batchSkvLoopOffset], bCvInner, true);
+                ClcMm32(dkWorkspaceGm[mmNzDkvOffset], mulWorkspaceGm[pingpongIdx * pingPongMulOffset],
+                        queryGm[batchSqLoopOffset], bCvInner, true);
+            } else {
+                ClcMm31(dqWorkspaceGm[batchSqLoopOffset], mulWorkspaceGm[pingpongIdx * pingPongMulOffset],
+                        keyGm[batchSkvLoopOffset], bCvInner, true);
+                ClcMm32(dkWorkspaceGm[batchSkvLoopOffset], mulWorkspaceGm[pingpongIdx * pingPongMulOffset],
+                        queryGm[batchSqLoopOffset], bCvInner, true);
+            }
+            ClcMm4(dvGm[batchSkvLoopOffset], dropWorkspaceGm[pingpongIdx * pingPongDropOffset],
+                   dxGm[batchSqLoopOffset], bCvInner, true);
+        }
+        // 备份本轮bmm345地址
+        lastBCvInner = bCvInner;
+        lastBatchSqLoopOffset = batchSqLoopOffset;
+        lastBatchSkvLoopOffset = batchSkvLoopOffset;
+        if constexpr (MMNext_OUT_FORMAT == CubeFormat::NZ) {
+            lastMmNzDqOffset = mmNzDqOffset;
+            lastMmNzDkvOffset = mmNzDkvOffset;
+        }
+        lastPingpongIdx = pingpongIdx;
     }
     SyncAll();
 }

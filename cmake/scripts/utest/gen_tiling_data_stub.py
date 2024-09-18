@@ -226,6 +226,14 @@ class Process:
                  "\n"
                  "#undef min\n"
                  "#define min std::min\n")
+            def_src += \
+                ("\n"
+                 "#undef GET_TILING_DATA_MEMBER\n"
+                 "#define GET_TILING_DATA_MEMBER(tiling_type, member, var, tiling)                      \\\n"
+                 "decltype(tiling_type::member) var;                                                    \\\n"
+                 "size_t offset = (size_t)(&((tiling_type *)0)->member);                                \\\n"
+                 "(void)memcpy_s(&var, sizeof(decltype(var)), tiling + offset, sizeof(decltype(var)));  \n"
+                )
             source = bgn_src + def_src
             cls._write_file(file=stub_file, src=source)
             logging.info("Generate TilingStubFile: %s", stub_file)

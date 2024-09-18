@@ -142,8 +142,8 @@ void AnalysisAxisForBnsd(const Shape &qShape, const Shape &kShape, FaShapeInfo &
 aclnnStatus AnalysisAxis(const aclTensor *query, const aclTensor *key, const char *inputLayout, int64_t headNum,
                          FaShapeInfo &shapeInfo)
 {
-    Shape qShape = query->GetViewShape();
     Shape kShape = key->GetViewShape();
+    Shape qShape = query->GetViewShape();
     shapeInfo.dimNum = qShape.GetDimNum();
 
     // 记录轴的长度 b, n2, g, s1, s2, d
@@ -235,8 +235,8 @@ void SetShapeInfoForSbh(int64_t alignedH1Size, FaShapeInfo &shapeInfo)
 
 bool IsNeedPad(const FaShapeInfo &shapeInfo)
 {
-    if ((shapeInfo.axes.d == HEAD_DIM_72 || shapeInfo.axes.d == HEAD_DIM_88) && shapeInfo.axes.s1 < SEQ_LEN_1024 &&
-         shapeInfo.axes.s2 < SEQ_LEN_1024 && shapeInfo.inputLayout != InputLayout::BNSD &&
+    if ((shapeInfo.axes.d == HEAD_DIM_72 || shapeInfo.axes.d == HEAD_DIM_88) &&
+         shapeInfo.axes.s2 <= SEQ_LEN_1024 && shapeInfo.inputLayout != InputLayout::BNSD &&
          shapeInfo.inputLayout != InputLayout::TND && shapeInfo.axes.n1 == shapeInfo.axes.n2 &&
          shapeInfo.needTranspose == false) {
         return false;
@@ -247,9 +247,9 @@ bool IsNeedPad(const FaShapeInfo &shapeInfo)
 aclnnStatus InputDtypeCheck(const aclTensor *query, const aclTensor *key, const aclTensor *value,
                             const aclTensor *realShiftOptional, int64_t pseTypeOptional)
 {
-    auto qDtype = query->GetDataType();
-    auto kDtype = key->GetDataType();
     auto vDtype = value->GetDataType();
+    auto kDtype = key->GetDataType();
+    auto qDtype = query->GetDataType();
     if (qDtype != kDtype || kDtype != vDtype) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "The data type of query[%s], key[%s], value[%s] are not equal.",
                 op::ToString(DataType(qDtype)).GetString(), op::ToString(DataType(kDtype)).GetString(),
