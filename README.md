@@ -94,9 +94,9 @@ cann-ops-adv支持由源码编译，进行源码编译前，请根据如下步�
 
 1. **获取CANN开发套件包**
 
-   请从[Link](https://www.hiascend.com/developer/download/community/result?module=cann)获取配套版本的CANN开发套件包Ascend-cann-toolkit\_\<cann_version>\_linux\-\<arch>.run和算子二进制包Ascend-cann-kernels-\<soc_version>_\<cann_version>\_linux.run（二进制包，算子运行时依赖），开放项目与CANN社区版本的配套关系可参见[开放项目与CANN版本配套表](https://gitee.com/ascend/cann-community/blob/master/README.md#cannversionmap)。
-
-   支持的操作系统请参见对应[用户手册](https://hiascend.com/document/redirect/CannCommunityInstSoftware)的“支持的操作系统”章节。**注意：请选择配套版本的软件包与文档**。
+   请参见"[开放项目与CANN版本配套表](https://gitee.com/ascend/cann-community/blob/master/README.md#cannversionmap)"获取对应的CANN开发套件包`Ascend-cann-toolkit_<cann_version>_linux-<arch>.run`和算子二进制包`Ascend-cann-kernels-<soc_version>_<cann_version>_linux.run`（二进制包，算子运行时依赖）。
+   - **为确保您的源码定制开发顺利进行，请选择配套的CANN版本与Gitee分支源码，使用master分支可能存在版本不匹配的风险。**
+   - 支持的安装方式及操作系统请参见配套版本的[用户手册](https://hiascend.com/document/redirect/CannCommunityInstSoftware)。
 
 2. **安装依赖**
 
@@ -211,7 +211,7 @@ ${tag_version}请替换为具体的标签名称，本源码仓与CANN版本的�
   Self-extractable archive "CANN-custom_ops-<cann_version>-linux.<arch>.run" successfully created.
   ```
 
-编译成功后在 `本仓代码根目录/output` 目录生成自定义算子包：CANN-custom_ops-\<cann_version>-linux.\<arch>.run。
+编译成功后在 `本仓代码根目录/output` 目录生成自定义算子包：`CANN-custom_ops-<cann_version>-linux.<arch>.run`。
 
 其中，\<cann_version>表示软件版本号，\<arch>表示操作系统架构。
 
