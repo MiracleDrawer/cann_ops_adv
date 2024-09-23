@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2023-2024 Huawei Technologies Co., Ltd.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2024. All rights reserved.
  * This file is a part of the CANN Open Software.
  * Licensed under CANN Open Software License Agreement Version 1.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -108,7 +108,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X310<PFAT>::ComputeEachCoreSI
         }
         outerSize = this->isOuterTail_ ? this->singleProcessSOuterSizeTail : this->singleProcessSOuterSize;
         this->fetchOuterSize_ = outerSize; // fetch outersize
-        // L1驻留 SetTensorA获取L1即可
+        // L1 residency SetTensorA to Obtain L1
         this->CopyND2NZOnTheFly(this->a1Local_, this->queryGm[this->tensorACoreOffset], outerSize, 
             this->tilingData->promptAttentionBaseParams.headSize, this->queryStride, true);
         
@@ -155,7 +155,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X310<PFAT>::ComputeEachCoreSI
         event_t eventID = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE3));
         SetFlag<HardEvent::V_MTE3>(eventID);
         WaitFlag<HardEvent::V_MTE3>(eventID);
-        // 将valueGM copy到L1
+        // Copy valueGM to L1
         this->c1Local_ = this->c1Buf_.template Get<mmOutputType>();
         this->CopyND2NZOnTheFly(this->c1Local_, this->valueGm[this->valueOffset], innerSize, 
             this->tilingData->promptAttentionBaseParams.headSize, this->keyValueStride, true);
@@ -225,7 +225,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X310<PFAT>::ComputeEachCore(u
     }
     int sNum = this->tilingData->promptAttentionBaseParams.dimNumOfseq;
 
-    // 临时复用
+    // Temporary reuse
     // CoreHeadNumTail to coreNStart
     // actualS1 to coreNEnd
     // actualCoreNums to coreSidStart

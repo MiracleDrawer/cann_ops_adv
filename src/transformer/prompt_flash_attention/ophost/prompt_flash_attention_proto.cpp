@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2023 Huawei Technologies Co., Ltd.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2024. All rights reserved.
  * This file is a part of the CANN Open Software.
  * Licensed under CANN Open Software License Agreement Version 1.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ namespace {
 const uint32_t ATTR_INPUT_LAYOUT_INDEX = 4;
 }  // namespace
 namespace ops {
-ge::graphStatus InferShapePromptFlashAttention(gert::InferShapeContext* context) {
+static ge::graphStatus InferShapePromptFlashAttention(gert::InferShapeContext* context) {
   OPS_LOG_I(context->GetNodeName(), "Enter PromptFlashAttention infershape impl.");
   // query shape : (B, S, H)
   const gert::Shape* query_shape = context->GetInputShape(0);
@@ -40,9 +40,9 @@ ge::graphStatus InferShapePromptFlashAttention(gert::InferShapeContext* context)
   if (inputLayout == "BNSD_BSND") {
     *attentionOutShape = *query_shape;
     attentionOutShape->SetDim(0, query_shape->GetDim(0));
-    attentionOutShape->SetDim(1, query_shape->GetDim(2));
-    attentionOutShape->SetDim(2, query_shape->GetDim(1));
-    attentionOutShape->SetDim(3, query_shape->GetDim(3));
+    attentionOutShape->SetDim(1, query_shape->GetDim(2));       // 2: Obtain the second dimension
+    attentionOutShape->SetDim(2, query_shape->GetDim(1));       // 2: DIM_NUM_2
+    attentionOutShape->SetDim(3, query_shape->GetDim(3));       // 3: DIM_NUM_3
   } else {
     *attentionOutShape = *query_shape;
   }
@@ -50,7 +50,7 @@ ge::graphStatus InferShapePromptFlashAttention(gert::InferShapeContext* context)
   return GRAPH_SUCCESS;
 }
 
-ge::graphStatus InferDataTypePromptFlashAttention(gert::InferDataTypeContext* context) {
+static ge::graphStatus InferDataTypePromptFlashAttention(gert::InferDataTypeContext* context) {
   OPS_LOG_I(context->GetNodeName(), "Enter PromptFlashAttention infershape impl.");
   // default set q's dtype as ifa's output type
   ge::DataType outputType = context->GetInputDataType(0);
@@ -65,7 +65,7 @@ ge::graphStatus InferDataTypePromptFlashAttention(gert::InferDataTypeContext* co
   return GRAPH_SUCCESS;
 }
 
-ge::graphStatus InferDataTypeIncreFlashAttention(gert::InferDataTypeContext* context) {
+static ge::graphStatus InferDataTypeIncreFlashAttention(gert::InferDataTypeContext* context) {
   OPS_LOG_I(context->GetNodeName(), "Enter IncreFlashAttention inferDataShape impl.");
   // default set q's dtype as ifa's output type
   ge::DataType outputType = context->GetInputDataType(0);

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2023-2024 Huawei Technologies Co., Ltd.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2024. All rights reserved.
  * This file is a part of the CANN Open Software.
  * Licensed under CANN Open Software License Agreement Version 1.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -435,7 +435,7 @@ __aicore__ inline void PromptFlashAttentionNZKVBase<T, U, FORMAT, O, M>::Bmm2Upd
     constexpr int32_t REPEAT_DATA_NUM = 256 / sizeof(softmaxType);
 
     BinaryRepeatParams repeatParams;
-    // 连续计算默认值
+    // Default value for continuous calculation
     repeatParams.src0BlkStride = 1;
     repeatParams.src0RepStride = 8;
     repeatParams.src1BlkStride = 1;
@@ -515,7 +515,7 @@ template<typename T, typename U, CubeFormat FORMAT, typename O,  ModeNZ M>
 __aicore__ inline void PromptFlashAttentionNZKVBase<T, U, FORMAT, O, M>::ComputeOffset(uint32_t sInnerLoopIdx) {
     int sInnerOffsetDataSize = sInnerLoopIdx * singleProcessSInnerSize;
     ComputeAttenMaskOffset(sInnerOffsetDataSize);
-    // 这里不能更新tensorBOffset，会把原来设置的值刷掉
+    // tensorBOffset cannot be updated here, as it will erase the previously set values
     valueOffset = valueCoreOffset + sInnerOffsetDataSize * MultiHeadKV;
     tensorAOffset = tensorACoreOffset;
 }
@@ -529,7 +529,7 @@ __aicore__ inline void PromptFlashAttentionNZKVBase<T, U, FORMAT, O, M>::Compute
 
 template<typename T, typename U, CubeFormat FORMAT, typename O,  ModeNZ M>
 __aicore__ inline void PromptFlashAttentionNZKVBase<T, U, FORMAT, O, M>::DataCopyTransposeOut(LocalTensor<mmOutputType>& bmm2ResUb) {
-    // 这里拷贝需要考虑BNSD到BSH的转换和NZ到ND的转换
+    // Copying here needs to consider the conversion from BNSD to BSH and the conversion from NZ to ND.
     struct DataCopyParams dataCopyParams;
     dataCopyParams.blockCount = singleProcessSOuterSize;
     dataCopyParams.blockLen = 1;
@@ -569,8 +569,8 @@ __aicore__ inline void PromptFlashAttentionNZKVBase<T, U, FORMAT, O, M>::Bmm1Com
     mm.SetTensorA(queryGm[offset]);
     mm.SetTensorB(b1Local, true);
     mm.SetTail(singleProcessSOuterSize, singleProcessSInnerSize);
-    LocalTensor<uint8_t> tmpSoftmaxFlashV2Ub = tmpSoftmaxFlashV2Ub_.template Get<uint8_t>(); // workspace大小
-    mm.SetLocalWorkspace(tmpSoftmaxFlashV2Ub); // 规避方案，需要额外申请localworkspace
+    LocalTensor<uint8_t> tmpSoftmaxFlashV2Ub = tmpSoftmaxFlashV2Ub_.template Get<uint8_t>(); // The size of workspace
+    mm.SetLocalWorkspace(tmpSoftmaxFlashV2Ub); // Avoidance plan, additional application for localworkspace is required
     mm.template Iterate<false>();
 }
 

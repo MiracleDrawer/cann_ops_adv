@@ -74,7 +74,7 @@ int CreateAclTensor(const std::vector<T> &hostData, const std::vector<int64_t> &
         strides[i] = shape[i + 1] * strides[i + 1];
     }
 
-    // Call the aclCreateTensor interface to create aclSensor.
+    // Call the aclCreateTensor interface to create aclTensor.
     *tensor = aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, aclFormat::ACL_FORMAT_ND,
                               shape.data(), shape.size(), *deviceAddr);
     return 0;
@@ -89,13 +89,13 @@ int main()
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Init acl failed. ERROR: %d\n", ret); return ret);
 
     // 2. To construct input and output, it is necessary to customize the construction according to the API interface.
-    std::vector<int64_t> queryShape = {1, 2, 1, 16}; // BNSD
-    std::vector<int64_t> keyShape = {1, 2, 2, 16};   // BNSD
-    std::vector<int64_t> valueShape = {1, 2, 2, 16}; // BNSD
-    std::vector<int64_t> attenShape = {1, 1, 1, 2};  // B 1 S1 S2
-    std::vector<int64_t> outShape = {1, 2, 1, 16};   // BNSD
-    std::vector<int64_t> keySharedPrefixShape = {1, 2, 1, 16};
-    std::vector<int64_t> valueSharedPrefixShape = {1, 2, 1, 16};
+    std::vector<int64_t> queryShape = {1, 2, 1, 16}; // B N S1 D
+    std::vector<int64_t> keyShape = {1, 2, 2, 16};   // B N S2 D
+    std::vector<int64_t> valueShape = {1, 2, 2, 16}; // B N S2 D
+    std::vector<int64_t> attenShape = {1, 1, 1, 3};  // B 1 S1 S2+prefixSeqLengths
+    std::vector<int64_t> outShape = {1, 2, 1, 16};   // B N S1 D
+    std::vector<int64_t> keySharedPrefixShape = {1, 2, 1, 16}; //1 N S3 D
+    std::vector<int64_t> valueSharedPrefixShape = {1, 2, 1, 16}; //1 N S3 D
 
     void *queryDeviceAddr = nullptr;
     void *keyDeviceAddr = nullptr;
@@ -116,7 +116,7 @@ int main()
     int64_t queryShapeSize = GetShapeSize(queryShape); // BNSD
     int64_t keyShapeSize = GetShapeSize(keyShape);     // BNSD
     int64_t valueShapeSize = GetShapeSize(valueShape); // BNSD
-    int64_t attenShapeSize = GetShapeSize(attenShape); // B 1 S1 S2
+    int64_t attenShapeSize = GetShapeSize(attenShape); // B 1 S1 S2+prefixSeqLengths
     int64_t outShapeSize = GetShapeSize(outShape);     // BNSD
     int64_t keySharedPrefixShapeSize = GetShapeSize(keySharedPrefixShape);
     int64_t valueSharedPrefixShapeSize = GetShapeSize(valueSharedPrefixShape);
@@ -162,11 +162,13 @@ int main()
 
     std::vector<int64_t> actualSeqlenVector = {2};
     auto actualSeqLengths = aclCreateIntArray(actualSeqlenVector.data(), actualSeqlenVector.size());
+    std::vector<int64_t> prefixSeqLengthsVector = {1};
+    auto prefixSeqLengths = aclCreateIntArray(prefixSeqLengthsVector.data(), prefixSeqLengthsVector.size());
     int64_t numHeads = 2; // N
     int64_t numKeyValueHeads = numHeads;
     double scaleValue = 1 / sqrt(16); // 1/sqrt(d)
-    int64_t preTokens = 65535;
-    int64_t nextTokens = 65535;
+    int64_t preTokens = 2147483647;
+    int64_t nextTokens = 2147483647;
     std::string sLayerOut = "BNSD";
     int64_t sparseMode = 0;
     int64_t innerPrecise = 1;
@@ -182,7 +184,7 @@ int main()
     ret = aclnnFusedInferAttentionScoreV2GetWorkspaceSize(
         queryTensor, tensorKeyList, tensorValueList, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-        keySharedPrefixTensor, valueSharedPrefixTensor, nullptr, numHeads, scaleValue, preTokens, nextTokens, &sLayerOut[0],
+        keySharedPrefixTensor, valueSharedPrefixTensor, prefixSeqLengths, numHeads, scaleValue, preTokens, nextTokens, &sLayerOut[0],
         numKeyValueHeads, sparseMode, innerPrecise, blockSize, antiquantMode, softmaxLseFlag, keyAntiquantMode,
         valueAntiquantMode, outTensor, nullptr, &workspaceSize, &executor);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnFusedInferAttentionScoreV2GetWorkspaceSize failed. ERROR: %d\n", ret);
@@ -218,6 +220,7 @@ int main()
     aclDestroyTensor(keySharedPrefixTensor);
     aclDestroyTensor(valueSharedPrefixTensor);
     aclDestroyIntArray(actualSeqLengths);
+    aclDestroyIntArray(prefixSeqLengths);
     aclrtFree(queryDeviceAddr);
     aclrtFree(keyDeviceAddr);
     aclrtFree(valueDeviceAddr);

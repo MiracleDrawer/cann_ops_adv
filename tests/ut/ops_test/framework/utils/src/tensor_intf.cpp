@@ -60,17 +60,41 @@ bool TensorIntf::IsOptional() const
 std::string TensorIntf::GetTilingStr() const
 {
     std::string str;
-    if (shape_.GetDimNum() <= 0) {
-        str = "null";
+    std::string finalStr = "[";
+    if (this->isArray_ == false) {
+        if (shape_.GetDimNum() <= 0) {
+            str = "null";
+        } else {
+            str = R"({ )"
+                  R"("name": ")" +
+                  name_ + R"(", )" + R"("dtype": ")" + TensorIntf::ToString(dType_) + R"(", )" + R"("format": ")" +
+                  TensorIntf::ToString(format_) + R"(", )" + R"("ori_format": ")" + TensorIntf::ToString(format_) +
+                  R"(", )" + R"("shape": )" + TensorIntf::ToString(shape_) + R"(, )" + R"("ori_shape": )" +
+                  TensorIntf::ToString(shape_) + R"( })";
+        }
+        return str;
     } else {
+        uint64_t i = 0;
+        for (; i < this->shapes_.size() - 1; i++) {
+            str = R"({ )"
+                  R"("name": ")" +
+                  name_ + R"(", )" + R"("dtype": ")" + TensorIntf::ToString(dType_) + R"(", )" + R"("format": ")" +
+                  TensorIntf::ToString(format_) + R"(", )" + R"("ori_format": ")" + TensorIntf::ToString(format_) +
+                  R"(", )" + R"("shape": )" + TensorIntf::ToString(this->shapes_[i]) + R"(, )" + R"("ori_shape": )" +
+                  TensorIntf::ToString(this->shapes_[i]) + R"( })";
+            finalStr += str;
+            finalStr += ";";
+        }
         str = R"({ )"
               R"("name": ")" +
               name_ + R"(", )" + R"("dtype": ")" + TensorIntf::ToString(dType_) + R"(", )" + R"("format": ")" +
               TensorIntf::ToString(format_) + R"(", )" + R"("ori_format": ")" + TensorIntf::ToString(format_) +
-              R"(", )" + R"("shape": )" + TensorIntf::ToString(shape_) + R"(, )" + R"("ori_shape": )" +
-              TensorIntf::ToString(shape_) + R"( })";
+              R"(", )" + R"("shape": )" + TensorIntf::ToString(this->shapes_[i]) + R"(, )" + R"("ori_shape": )" +
+              TensorIntf::ToString(this->shapes_[i]) + R"( })";
+        finalStr += str;
+        finalStr += "]";
+        return finalStr;
     }
-    return str;
 }
 
 const std::string &TensorIntf::Name() const
@@ -115,10 +139,18 @@ size_t TensorIntf::GetDimNum() const
 
 int64_t TensorIntf::GetExpDataSize() const
 {
-    if (shape_.GetDimNum() <= 0) {
-        return 0;
+    if (this->isArray_ == false) {
+        if (shape_.GetDimNum() <= 0) {
+            return 0;
+        }
+        return shape_.GetShapeSize() * ge::GetSizeByDataType(dType_);
+    } else {
+        int64_t needSize = 1;
+        for (uint64_t i = 0; i < this->shapes_.size(); i++) {
+            needSize += 2 + this->shapes_[i].GetDimNum();
+        }
+        return needSize * 8;
     }
-    return shape_.GetShapeSize() * ge::GetSizeByDataType(dType_);
 }
 
 uint8_t *TensorIntf::GetDevData() const

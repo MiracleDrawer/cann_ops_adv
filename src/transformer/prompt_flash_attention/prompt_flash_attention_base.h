@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2023-2024 Huawei Technologies Co., Ltd.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2024. All rights reserved.
  * This file is a part of the CANN Open Software.
  * Licensed under CANN Open Software License Agreement Version 1.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -62,7 +62,7 @@ struct PromptFlashAttentionTypeTraits<half, Mode::HighPrecision>
     using mmOutputType = float;
     using softmaxType = float;
     using pseShiftType = half;
-    using pseShiftCastType = float;  // pseShiftCastType只有在高精度和bf16的情况下为fp32
+    using pseShiftCastType = float;  // pseShiftCastType is only fp32 in the case of high precision and bf16
 };
 
 template<>
@@ -73,7 +73,7 @@ struct PromptFlashAttentionTypeTraits<bfloat16_t>
     using mmOutputType = float;
     using softmaxType = float;
     using pseShiftType = bfloat16_t;
-    using pseShiftCastType = float;  // pseShiftCastType只有在高精度和bf16的情况下为fp32
+    using pseShiftCastType = float;  // pseShiftCastType is only fp32 in the case of high precision and bf16
 };
 #endif
 
@@ -105,6 +105,8 @@ public:
     __aicore__ inline void Process();
     __aicore__ inline void InitQuant(__gm__ uint8_t* deq_scale1, __gm__ uint8_t* scale1, __gm__ uint8_t* deq_scale2,
                                      __gm__ uint8_t* scale2, __gm__ uint8_t* offset2);
+    __aicore__ inline void InitMsd(__gm__ uint8_t* key_antiquant_scale, __gm__ uint8_t* key_antiquant_offset, __gm__ uint8_t* value_antiquant_scale, __gm__ uint8_t* value_antiquant_offset);
+   
     // define datatype
     using mmInputType = typename PromptFlashAttentionTypeTraits<T, M>::mmInputType;
     using mmBiasType = typename PromptFlashAttentionTypeTraits<T, M>::mmBiasType;
@@ -164,11 +166,11 @@ protected:
     GlobalTensor<int64_t> kvPaddingSizeGm;
 
     // quant: define quant variable
-    uint64_t dequantScale1;
-    float quantScale1;
-    uint64_t dequantScale2;
-    float quantScale2;
-    float quantOffset2;
+    uint64_t dequantScale1 = 0;
+    float quantScale1 = 0;
+    uint64_t dequantScale2 = 0;
+    float quantScale2 = 0;
+    float quantOffset2 = 0;
 
     GlobalTensor<uint32_t> deqScale1Fp32Gm;
     GlobalTensor<uint32_t> deqScale2Fp32Gm;
@@ -178,108 +180,108 @@ protected:
     __gm__ uint8_t* currentKey;
     __gm__ uint8_t* currentValue;
 
-    bool useMask;
-    bool usePseShift;
+    bool useMask = false;
+    bool usePseShift = false;
     bool needCalMask_ = false;
-    uint32_t tmp_block_idx;
-    uint32_t loopSNum;
-    int32_t sOuterOffset;
-    int32_t preTokensOffset;
-    int32_t nextTokensOffset;
-    uint32_t batchNOffset;
-    uint32_t maskOffset;
-    uint32_t maskCoreOffset;
-    uint64_t attenMaskCoreOffset;
-    uint64_t pseShiftCoreOffset;
-    uint32_t valueOffset;
-    uint32_t valueCoreOffset;
-    uint64_t attenMaskOffset;
-    uint64_t attenMaskOffsetPre;
-    uint64_t pseShiftOffset;
-    uint32_t tensorAOffset;
-    uint32_t tensorBOffset;
-    uint32_t tensorACoreOffset;
-    uint32_t tensorBCoreOffset;
-    uint32_t attentionOutOffset;
-    uint32_t offsetSS;
-    uint32_t offsetSH;
-    uint32_t offsetSTypeNum;
-    uint32_t offsetNSTypeNum;
-    uint32_t offsetNSS;
-    uint32_t offsetNSH;
-    uint32_t maskDataType;
-    uint32_t attenMaskBatch;
-    uint32_t pseShiftBatch;
-    uint32_t maskCopyInCol;
-    uint32_t pseShiftCopyInCol;
+    uint32_t tmp_block_idx = 0;
+    uint32_t loopSNum = 0;
+    int32_t sOuterOffset = 0;
+    int32_t preTokensOffset = 0;
+    int32_t nextTokensOffset = 0;
+    uint32_t batchNOffset = 0;
+    uint32_t maskOffset = 0;
+    uint32_t maskCoreOffset = 0;
+    uint64_t attenMaskCoreOffset = 0;
+    uint64_t pseShiftCoreOffset = 0;
+    uint32_t valueOffset = 0;
+    uint32_t valueCoreOffset = 0;
+    uint64_t attenMaskOffset = 0;
+    uint64_t attenMaskOffsetPre = 0;
+    uint64_t pseShiftOffset = 0;
+    uint32_t tensorAOffset = 0;
+    uint32_t tensorBOffset = 0;
+    uint32_t tensorACoreOffset = 0;
+    uint32_t tensorBCoreOffset = 0;
+    uint32_t attentionOutOffset = 0;
+    uint32_t offsetSS = 0;
+    uint32_t offsetSH = 0;
+    uint32_t offsetSTypeNum = 0;
+    uint32_t offsetNSTypeNum = 0;
+    uint32_t offsetNSS = 0;
+    uint32_t offsetNSH = 0;
+    uint32_t maskDataType = 0;
+    uint32_t attenMaskBatch = 0;
+    uint32_t pseShiftBatch = 0;
+    uint32_t maskCopyInCol = 0;
+    uint32_t pseShiftCopyInCol = 0;
 
     // tilingdata
-    uint32_t singleProcessSOuterSizeWhole;
-    uint32_t singleProcessSOuterSize;
-    uint32_t singleProcessSOuterSizeTail;
-    uint32_t singleProcessSInnerSize;
-    uint32_t singleProcessSInnerSizeNow;
-    uint32_t singleProcessSInnerSizeTail;
-    uint32_t singleProcessSInnerBmmTail;
-    uint32_t mmResUbSize;
-    uint32_t attenMaskUbSize;
-    uint32_t pseShiftUbSize;
-    uint32_t maskSize;
-    uint32_t softmaxMaxSize;
-    uint32_t softmaxSumSize;
-    uint32_t softmaxExpSize;
-    uint32_t spmTmpSize;
-    uint32_t scmTmpSize;
-    uint32_t bmm2ResUbSize;
-    uint32_t tmpMMResBmm2PreUbSize;
-    uint32_t tmpSoftmaxBmm2UbSize;
-    uint32_t padSize;
-    uint32_t pseShiftPadSize;
-    uint32_t unalignSInner;
-    uint32_t typeByteNum;
-    uint32_t outputTypeByteNum;
-    uint32_t softmaxTypeByteNum;
-    uint32_t headNumRatio;
-    uint32_t maskTypeByteNum;
-    uint32_t pseShiftTypeByteNum;
-    uint32_t selectSpaceUbSize;
-    uint32_t softMaxV2Size_;
-    uint32_t mm2TmpUbSize_;
-    uint32_t splitS2;
-    uint32_t layoutType;
-    uint32_t maskInnerTailAlign;
-    uint32_t pseShiftInnerTailAlign;
+    uint32_t singleProcessSOuterSizeWhole = 0;
+    uint32_t singleProcessSOuterSize = 0;
+    uint32_t singleProcessSOuterSizeTail = 0;
+    uint32_t singleProcessSInnerSize = 0;
+    uint32_t singleProcessSInnerSizeNow = 0;
+    uint32_t singleProcessSInnerSizeTail = 0;
+    uint32_t singleProcessSInnerBmmTail = 0;
+    uint32_t mmResUbSize = 0;
+    uint32_t attenMaskUbSize = 0;
+    uint32_t pseShiftUbSize = 0;
+    uint32_t maskSize = 0;
+    uint32_t softmaxMaxSize = 0;
+    uint32_t softmaxSumSize = 0;
+    uint32_t softmaxExpSize = 0;
+    uint32_t spmTmpSize = 0;
+    uint32_t scmTmpSize = 0;
+    uint32_t bmm2ResUbSize = 0;
+    uint32_t tmpMMResBmm2PreUbSize = 0;
+    uint32_t tmpSoftmaxBmm2UbSize = 0;
+    uint32_t padSize = 0;
+    uint32_t pseShiftPadSize = 0;
+    uint32_t unalignSInner = 0;
+    uint32_t typeByteNum = 0;
+    uint32_t outputTypeByteNum = 0;
+    uint32_t softmaxTypeByteNum = 0;
+    uint32_t headNumRatio = 0;
+    uint32_t maskTypeByteNum = 0;
+    uint32_t pseShiftTypeByteNum = 0;
+    uint32_t selectSpaceUbSize = 0;
+    uint32_t softMaxV2Size_ = 0;
+    uint32_t mm2TmpUbSize_ = 0;
+    uint32_t splitS2 = 0;
+    uint32_t layoutType = 0;
+    uint32_t maskInnerTailAlign = 0;
+    uint32_t pseShiftInnerTailAlign = 0;
 
     SoftMaxTiling softmaxTilingData;
     SoftMaxTiling softmaxFlashTilingData;
     CopyTransposeTiling transposeTilingData;
-    uint32_t bmm2_settail_m;
-    uint32_t sOuterSizeTail_tmp;
-    uint32_t tailCoresOuterSizeTail_tmp;
-    uint32_t MultiHeadQ;
-    uint32_t MultiHeadKV;
-    uint32_t startInBlock;
-    uint32_t maxInnerLoopTimes;
-    uint32_t seqListOffset;
-    int64_t multiSeqOffset;
+    uint32_t bmm2_settail_m  = 0;
+    uint32_t sOuterSizeTail_tmp = 0;
+    uint32_t tailCoresOuterSizeTail_tmp = 0;
+    uint32_t MultiHeadQ = 0;
+    uint32_t MultiHeadKV = 0;
+    uint32_t startInBlock = 0;
+    uint32_t maxInnerLoopTimes = 0;
+    uint32_t seqListOffset = 0;
+    int64_t multiSeqOffset = 0;
 
-    int32_t preTokensPerBatch;
-    int32_t nextTokensPerBatch;
-    uint32_t attentionMaskStride;
-    int32_t attentionMaskType;
-    uint32_t attentionMaskMaxSize;
+    int32_t preTokensPerBatch = 0;
+    int32_t nextTokensPerBatch = 0;
+    uint32_t attentionMaskStride = 0;
+    int32_t attentionMaskType = 0;
+    uint32_t attentionMaskMaxSize = 0;
 
-    uint32_t pseShiftStride;
+    uint32_t pseShiftStride = 0;
 
     bool isActualLenDimsNull;
     bool isActualLenDimsKVNull;
-    int32_t actualSeqLengthPerBatch;
-    int32_t actualSeqLengthKVPerBatch;
+    int32_t actualSeqLengthPerBatch = 0;
+    int32_t actualSeqLengthKVPerBatch = 0;
     uint32_t accumSOuterTilingNums[BATCH_NUM_MAX];
     uint32_t actualSeqOffsets[BATCH_NUM_MAX];
 
-    uint32_t isKvContinuous;
-    uint32_t fromFused;
+    uint32_t isKvContinuous = 0;
+    uint32_t fromFused = 0;
 
     __aicore__ inline void ElewiseCompute(LocalTensor<mmOutputType>& mmResUb, uint32_t computeSize, uint32_t type);
 
@@ -539,6 +541,13 @@ __aicore__ inline void PromptFlashAttentionBase<T, U, FORMAT, O, M>::InitQuant(_
 }
 
 template<typename T, typename U, CubeFormat FORMAT, typename O,  Mode M>
+__aicore__ inline void PromptFlashAttentionBase<T, U, FORMAT, O, M>::InitMsd(__gm__ uint8_t* key_antiquant_scale, __gm__ uint8_t* key_antiquant_offset, 
+                                                                             __gm__ uint8_t* value_antiquant_scale, __gm__ uint8_t* value_antiquant_offset){
+    return;
+}
+   
+
+template<typename T, typename U, CubeFormat FORMAT, typename O,  Mode M>
 __aicore__ inline void PromptFlashAttentionBase<T, U, FORMAT, O, M>::InitOutputSingleCore()
 {
     auto &initParams = tilingData->promptAttentionInitOutputParams;
@@ -597,10 +606,10 @@ __aicore__ inline void PromptFlashAttentionBase<T, U, FORMAT, O, M>::ElewiseComp
             LocalTensor<uint8_t> selectSpace = selectSpaceUb.Get<uint8_t>(selectSpaceUbSize);
             mmOutputType scalar;
             if constexpr (IsSameType<mmOutputType, float>::value) {
-                uint32_t tmp = 0xFF7FFFFF;  // float最小值
+                uint32_t tmp = 0xFF7FFFFF;  // Minimum of float
                 scalar = *((float *)&tmp);
             } else {
-                uint16_t tmp = 0xFBFF;   // pf16最小值
+                uint16_t tmp = 0xFBFF;   // Minimum of FP16
                 scalar = *((half *)&tmp);
             }
             SelectWithBytesMaskShapeInfo selectWithBytesMaskShapeInfo;
@@ -782,7 +791,7 @@ __aicore__ inline void PromptFlashAttentionBase<T, U, FORMAT, O, M>::Bmm2Compute
                   (IsSameType<mmInputType, half>::value &&
                   IsSameType<mmOutputType, float>::value)) {
         pipe_barrier(PIPE_V);
-        LocalTensor<mmInputType> tmpBmm2ResCastTensor; // 原地Cast
+        LocalTensor<mmInputType> tmpBmm2ResCastTensor; // The same ub buffer is used before and after the cast.
         tmpBmm2ResCastTensor = bmm2ResL1.template ReinterpretCast<mmInputType>();
         tmpBmm2ResCastTensor.SetSize(bmm2ResL1.GetSize());
         Cast(tmpBmm2ResCastTensor, bmm2ResL1, RoundMode::CAST_ROUND, bmm2ResL1.GetSize());
@@ -928,7 +937,7 @@ __aicore__ inline void PromptFlashAttentionBase<T, U, FORMAT, O, M>::DataCopyTra
         } else {
             DataCopyParams intriParams;
             intriParams.blockCount = 1;
-            intriParams.blockLen = tilingData->promptAttentionBaseParams.headSize * sizeof(T); // 此处应该是非对齐
+            intriParams.blockLen = tilingData->promptAttentionBaseParams.headSize * sizeof(O); // This should be unaligned
             intriParams.srcStride = 0;
             intriParams.dstStride = 0;
             int startAddr = multiSeqOffset + transposeParams.nIndex * transposeTilingData22.dstShapeHN +
@@ -964,7 +973,7 @@ __aicore__ inline void PromptFlashAttentionBase<T, U, FORMAT, O, M>::DataCopyTra
         } else {
             DataCopyParams intriParams;
             intriParams.blockCount = 1;
-            intriParams.blockLen = tilingData->promptAttentionBaseParams.headSize * sizeof(T); // 此处应该是非对齐
+            intriParams.blockLen = tilingData->promptAttentionBaseParams.headSize * sizeof(O); // This should be unaligned
             intriParams.srcStride = 0;
             intriParams.dstStride = 0;
 
@@ -1010,7 +1019,7 @@ __aicore__ inline void PromptFlashAttentionBase<T, U, FORMAT, O, M>::DataCopyTra
         outputQuantRes = bmm2ResUb.template ReinterpretCast<int8_t>();
         outputQuantRes.SetSize(bmm2ResUb.GetSize());
         QuantCompute(outputQuantRes, bmm2ResUb, quantScale2, quantOffset2, bmm2ResUbSize);
-        // 量化vecor计算和datacopy间插同步保证时序
+        // Quantifying vector computation and interpolating synchronization between datacopy to ensure timing
         event_t enQueEvtID = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE3));
         SetFlag<HardEvent::V_MTE3>(enQueEvtID);
         WaitFlag<HardEvent::V_MTE3>(enQueEvtID);
@@ -1046,7 +1055,7 @@ __aicore__ inline void PromptFlashAttentionBase<T, U, FORMAT, O, M>::DataCopyOut
                      bmm2ResUb[nextTokensOffset * tilingData->promptAttentionBaseParams.headSize], dataCopyParams);
         } else {
             dataCopyParams.blockCount = this->singleProcessSOuterSize - preTokensOffset;
-            dataCopyParams.blockLen = tilingData->promptAttentionBaseParams.headSize * sizeof(T); // 此处应该是非对齐
+            dataCopyParams.blockLen = tilingData->promptAttentionBaseParams.headSize * sizeof(O); // This should be unaligned
             dataCopyParams.srcStride = 0;
             dataCopyParams.dstStride = 0;
             DataCopyPad(attentionOutGm[attentionOutOffset],
@@ -1057,7 +1066,7 @@ __aicore__ inline void PromptFlashAttentionBase<T, U, FORMAT, O, M>::DataCopyOut
     if constexpr (IsSameType<O, bfloat16_t>::value ||
                   (IsSameType<O, half>::value &&
                   IsSameType<mmOutputType, float>::value)) {
-        LocalTensor<O> tmpBmm2ResCastTensor; // 原地Cast
+        LocalTensor<O> tmpBmm2ResCastTensor; // The same ub buffer is used before and after the cast.
         tmpBmm2ResCastTensor = bmm2ResUb.template ReinterpretCast<O>();
         tmpBmm2ResCastTensor.SetSize(bmm2ResUb.GetSize());
         pipe_barrier(PIPE_V);
@@ -1091,7 +1100,7 @@ __aicore__ inline void PromptFlashAttentionBase<T, U, FORMAT, O, M>::DataCopyOut
             WaitFlag<HardEvent::V_MTE3>(enQueEvtID);
 
             dataCopyParams.blockCount = this->singleProcessSOuterSize;
-            dataCopyParams.blockLen = tilingData->promptAttentionBaseParams.headSize * sizeof(T); // 此处应该是非对齐
+            dataCopyParams.blockLen = tilingData->promptAttentionBaseParams.headSize * sizeof(O); // This should be unaligned
             dataCopyParams.srcStride = 0;
             dataCopyParams.dstStride = 0;
             DataCopyPad(attentionOutGm[attentionOutOffset],
@@ -1104,7 +1113,7 @@ __aicore__ inline void PromptFlashAttentionBase<T, U, FORMAT, O, M>::DataCopyOut
         outputQuantRes = bmm2ResUb.template ReinterpretCast<int8_t>();
         outputQuantRes.SetSize(bmm2ResUb.GetSize());
         QuantCompute(outputQuantRes, bmm2ResUb, quantScale2, quantOffset2, bmm2ResUbSize);
-        // 量化vecor计算和datacopy间插同步保证时序
+        // Insert synchronization between quantization calculation and datacopy to ensure accurate timing.
         event_t enQueEvtID = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE3));
         SetFlag<HardEvent::V_MTE3>(enQueEvtID);
         WaitFlag<HardEvent::V_MTE3>(enQueEvtID);

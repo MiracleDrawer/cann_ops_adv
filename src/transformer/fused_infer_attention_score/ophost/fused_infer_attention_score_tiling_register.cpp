@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2024 Huawei Technologies Co., Ltd.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2024. All rights reserved.
  * This file is a part of the CANN Open Software.
  * Licensed under CANN Open Software License Agreement Version 1.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -17,7 +17,8 @@
 #include "register/op_def_registry.h"
 
 namespace optiling {
-ge::graphStatus TilingPrepareForFusedInferAttentionScore(gert::TilingParseContext *context) {
+static ge::graphStatus TilingPrepareForFusedInferAttentionScore(gert::TilingParseContext * /* context */)
+{
     return ge::GRAPH_SUCCESS;
 }
 IMPL_OP_OPTILING(FusedInferAttentionScore)
@@ -25,6 +26,6 @@ IMPL_OP_OPTILING(FusedInferAttentionScore)
                                  KV_PADDING_SIZE_INDEX, ACTUAL_SHARED_PREFIX_LEN_INDEX},
                                 {gert::TilingPlacement::TILING_ON_HOST, gert::TilingPlacement::TILING_ON_AICPU})
     .Tiling(DoOpTilingFusedInferAttentionScore)
-    .TilingParse<FusedInferAttentionScoreCompileInfo>(TilingPrepareForFusedInferAttentionScore); // 向框架注册入口函数
+    .TilingParse<FusedInferAttentionScoreCompileInfo>(TilingPrepareForFusedInferAttentionScore); // Register entrance functions to the framework
 
 } // namespace optiling

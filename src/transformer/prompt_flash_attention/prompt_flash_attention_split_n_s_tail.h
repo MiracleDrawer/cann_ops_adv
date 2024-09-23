@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2023-2024 Huawei Technologies Co., Ltd.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2024. All rights reserved.
  * This file is a part of the CANN Open Software.
  * Licensed under CANN Open Software License Agreement Version 1.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -124,7 +124,7 @@ __aicore__ inline void PromptFlashAttentionSplitNSTail<T, U, FORMAT, O, M>::Atte
     attenMaskUb.SetSize(this->singleProcessSOuterSize * sinnerSize);
 
     DataCopyExtParams intriParams;
-    intriParams.blockCount = this->singleProcessSOuterSize; // 此处应该是非对齐
+    intriParams.blockCount = this->singleProcessSOuterSize; // This should be non aligned.
 
     intriParams.blockLen = sinnerSize * sizeof(U);
 
@@ -196,7 +196,7 @@ __aicore__ inline void PromptFlashAttentionSplitNSTail<T, U, FORMAT, O, M>::Bmm1
             this->tilingData->promptAttentionBaseParams.alignedHeadSize) {
                 this->bmm2.template GetTensorC<false>(bmm2ResUb, false, false);
         } else {
-            // 适配D非对齐场景，GetTensorC 拷贝到ub时，使能模板参数dopad，并传入原始宽高
+            // Adapt to D non aligned scenarios. When GetTensorC function copy something to bmm2ResUb, enable template parameters dopad, and transfer the original width and height. 
             this->bmm2.template GetTensorC<false, true>(bmm2ResUb, false, false,
                 this->singleProcessSOuterSize, this->tilingData->promptAttentionBaseParams.headSize);
         }
@@ -258,7 +258,7 @@ __aicore__ inline void PromptFlashAttentionSplitNSTail<T, U, FORMAT, O, M>::Bmm1
         this->tilingData->promptAttentionBaseParams.alignedHeadSize) {
             this->bmm2.template GetTensorC<false>(bmm2ResUb, false, false);
     } else {
-        // 适配D非对齐场景，GetTensorC 拷贝到ub时，使能模板参数dopad，并传入原始宽高
+        // Adapt to D non aligned scenarios. When GetTensorC function copy something to bmm2ResUb, enable template parameters dopad, and transfer the original width and height.
         this->bmm2.template GetTensorC<false, true>(bmm2ResUb, false, false,
             this->singleProcessSOuterSize, this->tilingData->promptAttentionBaseParams.headSize);
     }
@@ -279,7 +279,7 @@ __aicore__ inline void PromptFlashAttentionSplitNSTail<T, U, FORMAT, O, M>::Bmm1
             this->tilingData->promptAttentionBaseParams.alignedHeadSize) {
                 this->bmm2.template GetTensorC<false>(bmm2ResUb, false, false);
         } else {
-            // 适配D非对齐场景，GetTensorC 拷贝到ub时，使能模板参数dopad，并传入原始宽高
+            // Adapt to D non aligned scenarios. When GetTensorC function copy something to bmm2ResUb, enable template parameters dopad, and transfer the original width and height.
             this->bmm2.template GetTensorC<false, true>(bmm2ResUb, false, false,
                 this->singleProcessSOuterSize, this->tilingData->promptAttentionBaseParams.headSize);
         }
@@ -416,7 +416,7 @@ __aicore__ inline void PromptFlashAttentionSplitNSTail<T, U, FORMAT, O, M>::Comp
 
         for (uint32_t loopNIdx = 0; loopNIdx < coreHeadNum; loopNIdx++) {
             this->batchNOffset = nGropOffeset + loopNIdx;
-            // 偶数次N循环时 curSidx 反转
+            // When the number of cycles N is even, reverse curSidx.
             if (loopNIdx % 2 != 0) {
                 curSIdx = s1 - curSIdx - 1;
             }

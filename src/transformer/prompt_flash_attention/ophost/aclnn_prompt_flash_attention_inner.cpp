@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2023 Huawei Technologies Co., Ltd.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2024. All rights reserved.
  * This file is a part of the CANN Open Software.
  * Licensed under CANN Open Software License Agreement Version 1.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -151,9 +151,9 @@ static aclnnStatus analysisAxis(const aclTensor *query, const aclTensor *key, co
     Shape kShape = key->GetViewShape();
     shapeInfo.dimNum = qShape.GetDimNum();
 
-    // 记录轴的长度 b, n2, g, s1, s2, d
-    // H1等于N1*D, H2等于N2*D
-    // N1等于g*N2
+    // Record the length of the axis b, n2, g, s1, s2, d
+    // H1 = N1*D, H2 = N2*D
+    // N1 = g*N2
     shapeInfo.axes.n1 = headNum;
 
     if (strlen(inputLayout) != 0) {
@@ -243,6 +243,11 @@ static aclnnStatus analysisAxis(const aclTensor *query, const aclTensor *key, co
         }
     }
 
+    if (shapeInfo.axes.d > 512) { // 512: D is limited at 512
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "D should <= 512, but D = %ld.", shapeInfo.axes.d);
+        return ACLNN_ERR_PARAM_INVALID;
+    }
+
     OP_LOGD("Analysis axis success. "
             "The axis result: [B]: %ld, [n1]: %ld, [n2]: %ld, [s1]: %ld, [s2]: %ld, [d]: %ld",
             shapeInfo.axes.b, shapeInfo.axes.n1, shapeInfo.axes.n2, shapeInfo.axes.s1, shapeInfo.axes.s2,
@@ -268,7 +273,7 @@ static void SetShapeInfoForNSD(FaShapeInfo &shapeInfo) {
     }
 }
 
-static aclnnStatus analysisInputShapeInfo(const aclTensor *query, const aclTensor *key, const aclTensor *value,
+static aclnnStatus AnalysisInputShapeInfo(const aclTensor *query, const aclTensor *key, const aclTensor *value,
                                           char *inputLayout, int64_t headNum, FaShapeInfo &shapeInfo,
                                           const aclTensor *attentionOut)
 {
@@ -284,7 +289,7 @@ static aclnnStatus analysisInputShapeInfo(const aclTensor *query, const aclTenso
         return ACLNN_SUCCESS;
     }
 
-    // 根据dtype计算D补齐时，考虑输入q, k, v和输出，只要有int8类型，均按32元素对齐
+    // When D padding is calculated based on dtype, the input q, k, v, and output format need to be considered. As long as there is the int8 type, the elements are aligned by 32.
     DataType queryDataType = query->GetDataType();
     DataType keyDataType = key->GetDataType();
     DataType valueDataType = value->GetDataType();
@@ -316,7 +321,7 @@ static aclnnStatus analysisInputShapeInfo(const aclTensor *query, const aclTenso
 
 static inline const aclTensor *GeneratePaddings(int32_t dimNum, int32_t padNum, aclOpExecutor *executor)
 {
-    // 2代表每根轴的前后都可以补0
+    // 2 represents that 0 can be added to the front and back of each axis
     FVector<int64_t> padVec(dimNum * 2, 0);
     padVec[padVec.size() - 1] = padNum;
 
@@ -330,7 +335,7 @@ static inline const aclTensor *GeneratePaddings(int32_t dimNum, int32_t padNum, 
     return padTensor;
 }
 
-static aclnnStatus contiguousInput(const aclTensor *&query, const aclTensor *&key, const aclTensor *&value,
+static aclnnStatus ContiguousInput(const aclTensor *&query, const aclTensor *&key, const aclTensor *&value,
                                    const aclTensor *&pseShift, const aclTensor *&attenMask,
                                    aclOpExecutor *executor)
 {
@@ -367,7 +372,7 @@ static aclnnStatus reShapeMiddle(const aclTensor *&query, const aclTensor *&key,
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus preprocessQKVInput(const aclTensor *&query, const aclTensor *&key, const aclTensor *&value,
+static aclnnStatus PreprocessQKVInput(const aclTensor *&query, const aclTensor *&key, const aclTensor *&value,
                                       const aclTensor *&quantScale2, const aclTensor *&quantOffset2,
                                       const struct FaShapeInfo &shapeInfo, aclOpExecutor *executor)
 {
@@ -452,7 +457,7 @@ static aclnnStatus preprocessQKVInput(const aclTensor *&query, const aclTensor *
     return ACLNN_SUCCESS;
 }
 
-static aclnnStatus postProcessOutput(const aclTensor *&l0AttentionOutOut, const aclTensor *attentionOutOut,
+static aclnnStatus PostProcessOutput(const aclTensor *&l0AttentionOutOut, const aclTensor *attentionOutOut,
                                      struct FaShapeInfo &shapeInfo, aclOpExecutor *executor)
 {
     if (shapeInfo.needPad) {
@@ -514,21 +519,44 @@ static bool CheckNotNull(const aclTensor* query, const aclTensor* key, const acl
 }
 
 static bool CheckTensorDataType(const aclTensor* query, const aclTensor* key, const aclTensor* value,
-                                const aclTensor* attenMask, const aclTensor* attentionOut) {
-    DataType queryDataType = query->GetDataType();
-    DataType keyDataType = key->GetDataType();
-    DataType valueDataType = value->GetDataType();
-    DataType outputDataType = attentionOut->GetDataType();
+                                const aclTensor *pseShift, const aclTensor* attenMask,
+                                const aclTensor* attentionOut) {
+    const DataType queryDataType = query->GetDataType();
+    const DataType keyDataType = key->GetDataType();
+    const DataType valueDataType = value->GetDataType();
+    const DataType outputDataType = attentionOut->GetDataType();
 
-    // 当前 PFA支持场景，q k v datatype需要一致
+    // In the current PFA scenario, the datatypes of q, k, and v must be the same.
     if ((queryDataType != keyDataType) || (queryDataType != valueDataType)) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Please check input Tensor datatype. "
             "The combination of [queryDataType]: %s, [keyDataType]: %s, [valueDataType]: %s is not supported by PFA.",
             StrDataTypePfa[queryDataType].c_str(), StrDataTypePfa[keyDataType].c_str(), StrDataTypePfa[valueDataType].c_str());
         return false;
     }
+    // map for dataType, {q/k/v, pseShift}
+    static const unordered_map<DataType, DataType> qkvAndPseTypeRangeMap = {
+        {DataType::DT_FLOAT16, DataType::DT_FLOAT16},
+        {DataType::DT_BF16, DataType::DT_BF16},
+        {DataType::DT_INT8, DataType::DT_FLOAT16}
+    };
+    // check dataType of q/k/v
+    if (qkvAndPseTypeRangeMap.find(queryDataType) == qkvAndPseTypeRangeMap.end()) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "query/value/key dataType(%s) is invalid, valid range is {%s, %s, %s}",
+            StrDataTypePfa[queryDataType].c_str(), StrDataTypePfa[DataType::DT_FLOAT16].c_str(),
+            StrDataTypePfa[DataType::DT_BF16].c_str(), StrDataTypePfa[DataType::DT_INT8].c_str());
+        return false;
+    }
+    if (pseShift != nullptr) {
+        const DataType pseDataType = pseShift->GetDataType(); // check dataType combination of q and pseShift
+        if (pseDataType != qkvAndPseTypeRangeMap.at(queryDataType)) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "pseShift dataType(%s) is invalid, should be %s when q/k/v is %s",
+                StrDataTypePfa[pseDataType].c_str(), StrDataTypePfa[qkvAndPseTypeRangeMap.at(queryDataType)].c_str(),
+                StrDataTypePfa[queryDataType].c_str());
+            return false;
+        }
+    }
 
-    // 当前仅在量化相关场景（int8进/fp16出 或 fp16进/int8出）时输入输出dtype不同
+    // Currently, only the input and output dtype are different when quantifying related scenarios (int8_in/fp16_out or fp16_in/int8_out)
     if (queryDataType != outputDataType) {
         bool isQuant = ((queryDataType == DataType::DT_INT8 && outputDataType == DataType::DT_FLOAT16) || 
         (queryDataType == DataType::DT_FLOAT16 && outputDataType == DataType::DT_INT8) ||
@@ -541,9 +569,18 @@ static bool CheckTensorDataType(const aclTensor* query, const aclTensor* key, co
         }
     }
 
-    // int8量化场景，不支持 fp16类型 atten mask 
+    // Int8 quantization scene, does not support fp16 type atten mask
     if (attenMask != nullptr) {
-        DataType attenMaskDataType = attenMask->GetDataType();
+        const std::set<DataType> validMaskType = {DataType::DT_FLOAT16, DataType::DT_INT8,
+            DataType::DT_UINT8, DataType::DT_BOOL};
+        const DataType attenMaskDataType = attenMask->GetDataType();
+        if (validMaskType.find(attenMaskDataType) == validMaskType.end()) {
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "attenMask dataType(%s) is invalid, should be in range {%s, %s, %s, %s}",
+                StrDataTypePfa[attenMaskDataType].c_str(), StrDataTypePfa[DataType::DT_FLOAT16].c_str(),
+                StrDataTypePfa[DataType::DT_INT8].c_str(), StrDataTypePfa[DataType::DT_UINT8].c_str(),
+                StrDataTypePfa[DataType::DT_BOOL].c_str());
+            return false;
+        }
         if ((queryDataType == DataType::DT_INT8) && (attenMaskDataType == DataType::DT_FLOAT16)) {
             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Please check Tensor datatype. "
                 "When input tensor datatype is %s, attenMaskDataType can not be %s.",
@@ -560,7 +597,7 @@ static inline bool CheckResultOutShapePfa(const aclTensor *inferOut, const aclTe
     auto const &yShape = out->GetViewShape();
     if(xShape != yShape) {
         if(!(xShape.GetShapeSize() == 1 && yShape.GetShapeSize() == 1)) {
-            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Out tensor's shape[%s] is not equal with inferOut shape[%s].",
+            OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Out tensor's shape[%s] is not equal with Expect Out tensor's shape[%s], Please check the Out tensor's shape.",
                 op::ToString(out->GetViewShape()).GetString(), op::ToString(inferOut->GetViewShape()).GetString());
             return false;
         }
@@ -586,28 +623,28 @@ aclnnStatus aclnnInnerPromptFlashAttentionGetWorkspaceSize(
     auto uniqueExecutor = CREATE_EXECUTOR();
     CHECK_RET(uniqueExecutor.get() != nullptr, ACLNN_ERR_INNER_CREATE_EXECUTOR);
 
-    // 检查必选输入指针是否为空
+    // Check if the required input pointer is empty
     CHECK_RET(CheckNotNull(query, key, value, inputLayout, attentionOut), ACLNN_ERR_PARAM_NULLPTR);
 
-    // b, n1, s1 为0时，不进行任何处理
-    // n2, s2, d 为0时，直接调用l0接口处理
+    // When b, n1, s1 = 0, no processing is performed
+    // When n2, s2, d = 0, directly call the l0 interface for processing
     if (attentionOut->IsEmpty()) {
         *workspaceSize = 0;
         uniqueExecutor.ReleaseTo(executor);
         return ACLNN_SUCCESS;
     }
 
-    CHECK_RET(CheckTensorDataType(query, key, value, attenMask, attentionOut), ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(CheckTensorDataType(query, key, value, pseShift, attenMask, attentionOut), ACLNN_ERR_PARAM_INVALID);
 
     FaShapeInfo shapeInfo;
-    CHECK_RET(analysisInputShapeInfo(query, key, value, inputLayout, numHeads, shapeInfo, attentionOut) ==
+    CHECK_RET(AnalysisInputShapeInfo(query, key, value, inputLayout, numHeads, shapeInfo, attentionOut) ==
               ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
 
     aclOpExecutor *l0Executor = uniqueExecutor.get();
-    CHECK_RET(contiguousInput(query, key, value, pseShift, attenMask, l0Executor) == ACLNN_SUCCESS,
+    CHECK_RET(ContiguousInput(query, key, value, pseShift, attenMask, l0Executor) == ACLNN_SUCCESS,
               ACLNN_ERR_INNER_NULLPTR);
 
-    CHECK_RET(preprocessQKVInput(query, key, value, quantScale2, quantOffset2, shapeInfo, l0Executor) == ACLNN_SUCCESS, ACLNN_ERR_INNER_NULLPTR);
+    CHECK_RET(PreprocessQKVInput(query, key, value, quantScale2, quantOffset2, shapeInfo, l0Executor) == ACLNN_SUCCESS, ACLNN_ERR_INNER_NULLPTR);
 
     auto l0AttentionOutOut = l0op::PromptFlashAttention(query, key, value, pseShift, attenMask,
                                                         actualSeqLengths, actualSeqLengthsKv,
@@ -617,7 +654,7 @@ aclnnStatus aclnnInnerPromptFlashAttentionGetWorkspaceSize(
                                                         numKeyValueHeads, sparseMode, innerPrecise,
                                                         attentionOut, l0Executor);
     CHECK_RET(l0AttentionOutOut != nullptr, ACLNN_ERR_INNER_NULLPTR);
-    CHECK_RET(postProcessOutput(l0AttentionOutOut, attentionOut, shapeInfo, l0Executor) == ACLNN_SUCCESS,
+    CHECK_RET(PostProcessOutput(l0AttentionOutOut, attentionOut, shapeInfo, l0Executor) == ACLNN_SUCCESS,
               ACLNN_ERR_INNER_NULLPTR);
     CHECK_RET(CheckResultOutShapePfa(l0AttentionOutOut, attentionOut), ACLNN_ERR_PARAM_INVALID);
     auto viewCopyResult = l0op::ViewCopy(l0AttentionOutOut, attentionOut, l0Executor);
@@ -632,7 +669,7 @@ aclnnStatus aclnnInnerPromptFlashAttention(void *workspace, uint64_t workspaceSi
                                            const aclrtStream stream)
 {
     L2_DFX_PHASE_2(aclnnInnerPromptFlashAttention);
-    // 固定写法，调用框架能力，完成计算
+    // Fixed format. The calculation is completed by calling the framework capability.
     return CommonOpExecutorRun(workspace, workspaceSize, executor, stream);
 }
 

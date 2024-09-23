@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2023-2024 Huawei Technologies Co., Ltd.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2024. All rights reserved.
  * This file is a part of the CANN Open Software.
  * Licensed under CANN Open Software License Agreement Version 1.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -34,8 +34,14 @@ extern "C" __global__ __aicore__ void fused_infer_attention_score(__gm__ uint8_t
                                                              __gm__ uint8_t* tiling) {
   // judge ifa or pfa by range of tilingKey
   if(TILING_KEY_VAR >= 1000000000000000000) {
-    prompt_flash_attention_FIAS(query, key, value, pse_shift, attenMask, actualSeqLengths, actualSeqLengthsKV, deq_scale1, quant_scale1,
-      deq_scale2, quant_scale2, quant_offset2, antiquantScale, antiquantOffset, blocktable, queryPaddingSize, kvPaddingSize, keySharedPrefix, valueSharedPrefix, actualSharedPrefixLen, attentionOut, softmaxLse, workspace, tiling);
+    prompt_flash_attention_FIAS(query, key, value, pse_shift, attenMask, actualSeqLengths, 
+                            actualSeqLengthsKV, deq_scale1, quant_scale1,
+                            deq_scale2, quant_scale2, quant_offset2, antiquantScale, 
+                            antiquantOffset, blocktable, queryPaddingSize, kvPaddingSize, 
+                            keyAntiquantScale, keyAntiquantOffset, valueAntiquantScale, 
+                            valueAntiquantOffset, keySharedPrefix, valueSharedPrefix, 
+                            actualSharedPrefixLen, attentionOut, softmaxLse, workspace, tiling);
+
   } else {
     incre_flash_attention_FIAS(query, key, value, pse_shift, attenMask, actualSeqLengthsKV, deq_scale1, quant_scale1, deq_scale2,
                           quant_scale2, quant_offset2, antiquantScale, antiquantOffset, blocktable, kvPaddingSize,

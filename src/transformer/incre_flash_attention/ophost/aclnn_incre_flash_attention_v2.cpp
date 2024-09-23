@@ -17,35 +17,37 @@ extern "C" {
 #endif
 
 extern aclnnStatus aclnnInnerIncreFlashAttentionGetWorkspaceSize(
-    const aclTensor* query, const aclTensorList* key, const aclTensorList* value, const aclTensor* pseShift,
-    const aclTensor* attenMask, const aclIntArray* actualSeqLengths, const aclTensor* deqScale1,
-    const aclTensor* quantScale1, const aclTensor* deqScale2, const aclTensor* quantScale2,
-    const aclTensor* quantOffset2, const aclTensor* antiquantScale, const aclTensor* antiquantOffset,
-    const aclTensor* blocktable, const aclTensor* kvPaddingSize, int64_t numHeads, double scaleValue, char* inputLayout,
-    int64_t numKeyValueHeads, int64_t blockSize, int64_t innerPrecise, const aclTensor* attentionOut,
-    uint64_t* workspaceSize, aclOpExecutor** executor);
+    const aclTensor *query, const aclTensorList *key, const aclTensorList *value, const aclTensor *pseShift,
+    const aclTensor *attenMask, const aclIntArray *actualSeqLengths, const aclTensor *deqScale1,
+    const aclTensor *quantScale1, const aclTensor *deqScale2, const aclTensor *quantScale2,
+    const aclTensor *quantOffset2, const aclTensor *antiquantScale, const aclTensor *antiquantOffset,
+    const aclTensor *blocktable, const aclTensor *kvPaddingSize, int64_t numHeads, double scaleValue, char *inputLayout,
+    int64_t numKeyValueHeads, int64_t blockSize, int64_t innerPrecise, const aclTensor *attentionOut,
+    uint64_t *workspaceSize, aclOpExecutor **executor);
 
-extern aclnnStatus aclnnInnerIncreFlashAttention(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
+extern aclnnStatus aclnnInnerIncreFlashAttention(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
                                                  const aclrtStream stream);
 
 aclnnStatus aclnnIncreFlashAttentionV2GetWorkspaceSize(
-    const aclTensor* query, const aclTensorList* key, const aclTensorList* value, const aclTensor* pseShift,
-    const aclTensor* attenMask, const aclIntArray* actualSeqLengths, const aclTensor* dequantScale1,
-    const aclTensor* quantScale1, const aclTensor* dequantScale2, const aclTensor* quantScale2,
-    const aclTensor* quantOffset2, int64_t numHeads, double scaleValue, char* inputLayout, int64_t numKeyValueHeads,
-    const aclTensor* attentionOut, uint64_t* workspaceSize, aclOpExecutor** executor) {
-  aclnnStatus ret = aclnnInnerIncreFlashAttentionGetWorkspaceSize(
-      query, key, value, nullptr, attenMask, actualSeqLengths, dequantScale1, quantScale1, dequantScale2, quantScale2,
-      quantOffset2, nullptr, nullptr, nullptr, nullptr, numHeads, scaleValue, inputLayout, numKeyValueHeads, 0, 1,
-      attentionOut, workspaceSize, executor);
+    const aclTensor *query, const aclTensorList *key, const aclTensorList *value, const aclTensor *pseShift,
+    const aclTensor *attenMask, const aclIntArray *actualSeqLengths, const aclTensor *dequantScale1,
+    const aclTensor *quantScale1, const aclTensor *dequantScale2, const aclTensor *quantScale2,
+    const aclTensor *quantOffset2, int64_t numHeads, double scaleValue, char *inputLayout, int64_t numKeyValueHeads,
+    const aclTensor *attentionOut, uint64_t *workspaceSize, aclOpExecutor **executor)
+{
+    aclnnStatus ret = aclnnInnerIncreFlashAttentionGetWorkspaceSize(
+        query, key, value, nullptr, attenMask, actualSeqLengths, dequantScale1, quantScale1, dequantScale2, quantScale2,
+        quantOffset2, nullptr, nullptr, nullptr, nullptr, numHeads, scaleValue, inputLayout, numKeyValueHeads, 0, 1,
+        attentionOut, workspaceSize, executor);
 
-  return ret;
+    return ret;
 }
 
-aclnnStatus aclnnIncreFlashAttentionV2(void* workspace, uint64_t workspaceSize, aclOpExecutor* executor,
-                                       const aclrtStream stream) {
-  aclnnStatus ret = aclnnInnerIncreFlashAttention(workspace, workspaceSize, executor, stream);
-  return ret;
+aclnnStatus aclnnIncreFlashAttentionV2(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
+                                       const aclrtStream stream)
+{
+    aclnnStatus ret = aclnnInnerIncreFlashAttention(workspace, workspaceSize, executor, stream);
+    return ret;
 }
 
 #ifdef __cplusplus

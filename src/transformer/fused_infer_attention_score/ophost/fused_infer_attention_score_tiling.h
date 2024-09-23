@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2024 Huawei Technologies Co., Ltd.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2024. All rights reserved.
  * This file is a part of the CANN Open Software.
  * Licensed under CANN Open Software License Agreement Version 1.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -83,7 +83,7 @@ struct FusedInferAttentionScoreCompileInfo {
     platform_ascendc::SocVersion socShortName;
 };
 BEGIN_TILING_DATA_DEF(FusedInferAttentionScoreTilingData)
-  TILING_DATA_FIELD_DEF(uint32_t, placeHolder);
+TILING_DATA_FIELD_DEF(uint32_t, placeHolder);
 END_TILING_DATA_DEF;
 // Test purposes - using old key
 REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore, IncreFlashAttentionTilingDataV2)
@@ -177,12 +177,10 @@ REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000000100001612, PromptF
 REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000800100101612, PromptFlashAttentionTilingData)
 REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000800100001612, PromptFlashAttentionTilingData)
 REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000000101001612, PromptFlashAttentionTilingData)
-REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000000102001612, PromptFlashAttentionTilingData)
 REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000000100101012, PromptFlashAttentionTilingData)
 REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000800100101012, PromptFlashAttentionTilingData)
 REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000000100001012, PromptFlashAttentionTilingData)
 REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000000101001012, PromptFlashAttentionTilingData)
-REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000000102001012, PromptFlashAttentionTilingData)
 REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000800100001012, PromptFlashAttentionTilingData)
 REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000000100121012, PromptFlashAttentionTilingData)
 REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000800100121012, PromptFlashAttentionTilingData)
@@ -200,10 +198,20 @@ REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000000100021212, PromptF
 REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000000100021217, PromptFlashAttentionTilingData)
 REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000000100001212, PromptFlashAttentionTilingData)
 REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000000100001217, PromptFlashAttentionTilingData)
+
+// msd tilingkey
+REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000400300111112, PromptFlashAttentionTilingData)
+REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000400300011112, PromptFlashAttentionTilingData)
+REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000400200111112, PromptFlashAttentionTilingData)
+REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000400200011112, PromptFlashAttentionTilingData)
+REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000400300121112, PromptFlashAttentionTilingData)
+REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000400300021112, PromptFlashAttentionTilingData)
+REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000400200121112, PromptFlashAttentionTilingData)
+REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000400200021112, PromptFlashAttentionTilingData)
 extern "C" {
-ge::graphStatus DeviceDoOpTilingIncreFlashAttention(gert::TilingContext* context);
-ge::graphStatus DeviceDoOpTilingFusedInferAttentionScore(gert::TilingContext* context);
+ge::graphStatus DeviceDoOpTilingIncreFlashAttention(gert::TilingContext *context);
+ge::graphStatus DeviceDoOpTilingFusedInferAttentionScore(gert::TilingContext *context);
 }
-ge::graphStatus DoOpTilingFusedInferAttentionScore(gert::TilingContext* context);
+ge::graphStatus DoOpTilingFusedInferAttentionScore(gert::TilingContext *context);
 } // namespace optiling
-#endif  // AIR_CXX_RUNTIME_V2_OP_IMPL_FUSEDINFERATTENTIONSCORE_H_
+#endif // AIR_CXX_RUNTIME_V2_OP_IMPL_FUSEDINFERATTENTIONSCORE_H_

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2023-2024 Huawei Technologies Co., Ltd.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2024. All rights reserved.
  * This file is a part of the CANN Open Software.
  * Licensed under CANN Open Software License Agreement Version 1.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -129,7 +129,7 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT
     LocalTensor<U> attenMaskUb = this->attenMaskQueue.template AllocTensor<U>();
     attenMaskUb.SetSize(this->singleProcessSOuterSize * sinnerSize);
     DataCopyExtParams intriParams;
-    intriParams.blockCount = this->singleProcessSOuterSize; // 此处应该是非对齐
+    intriParams.blockCount = this->singleProcessSOuterSize; // This should be non aligned
 
     intriParams.blockLen = sinnerSize * sizeof(U);
 
@@ -162,7 +162,7 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT
     this->mm.template GetTensorC<false>(mmResUb, false, false);
 
     uint32_t computeSize = this->singleProcessSInnerSizeNow * this->singleProcessSOuterSize;
-    // 填充atten： mask块->atten块
+    // Fill in atten: mask block ->atten block
 
     Muls(mmResUb, mmResUb, static_cast<mmOutputType>(this->tilingData->promptAttentionBaseParams.scaleValue), computeSize);
     pipe_barrier(PIPE_V);
@@ -185,42 +185,42 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT
     uint32_t alignSInner = (this->unalignSInner + this->typeByteNum -1) / this->typeByteNum * this->typeByteNum;
     SoftMaxShapeInfo shapeInfo = {this->singleProcessSOuterSize, alignSInner,
                                   this->singleProcessSOuterSize, this->unalignSInner};
-    // 计算softmax中间结果： softmaxExp,softmaxMaxUb, softmaxSumUb
+    // Calculate the intermediate result of softmax: softmaxExp,softmaxMaxUb, softmaxSumUb
     if (this->IsSoftmaxFlashBasic()
         && this->singleProcessSInnerBmmTail == this->singleProcessSInnerSize
         && this->singleProcessSOuterSize % 8 == 0) {
-        this->SoftmaxBasicComputeFirstNoTail(mmResUb, softmaxMaxUb, softmaxSumUb, this->softmaxExpUb, shapeInfo);  // 计算整块
+        this->SoftmaxBasicComputeFirstNoTail(mmResUb, softmaxMaxUb, softmaxSumUb, this->softmaxExpUb, shapeInfo);  // Calculate the entire block
     } else {
-        this->SoftmaxComputeFirstTail(mmResUb, softmaxMaxUb, softmaxSumUb, this->softmaxExpUb, shapeInfo); // 计算尾块
+        this->SoftmaxComputeFirstTail(mmResUb, softmaxMaxUb, softmaxSumUb, this->softmaxExpUb, shapeInfo); // Calculate the tail block
     }
 
-    // 设定bmm2计算参数
+    // Set BMM2 calculation parameters
     this->Bmm2Compute(this->valueOffset, mmResUb);
-    // 执行一次计算
+    // Perform a calculation once
     this->bmm2.template Iterate<false>();
 
-    // 最后一个Inner Step处理
+    // The final Inner Step processing
     if (isLast) {
         LocalTensor<mmOutputType> bmm2ResUb = this->tempBmm2Queue.template AllocTensor<mmOutputType>();
         if (this->tilingData->promptAttentionBaseParams.headSize ==
             this->tilingData->promptAttentionBaseParams.alignedHeadSize) {
                 this->bmm2.template GetTensorC<false>(bmm2ResUb, false, false);
         } else {
-            // 适配D非对齐场景，GetTensorC 拷贝到ub时，使能模板参数dopad，并传入原始宽高
+            // Adapt to non aligned scenarios in D, enable template parameter to do pad when copying to ub with GetTensorC, and pass in the original width and height
             this->bmm2.template GetTensorC<false, true>(bmm2ResUb, false, false,
                 this->singleProcessSOuterSize, this->tilingData->promptAttentionBaseParams.headSize);
         }
 
-        // 释放API内部资源
+        // Release internal resources of API
         this->bmm2.End();
-        // 将softmax结果刷新到bmm2UB
+        // Refresh softmax results to bmm2UB
         this->Bmm2UpdateDivNoTail(bmm2ResUb, softmaxSumUb, this->softmaxExpUb);
 
         event_t enQueEvtID = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE3));
         SetFlag<HardEvent::V_MTE3>(enQueEvtID);
         WaitFlag<HardEvent::V_MTE3>(enQueEvtID);
 
-         // UB 内存copy 到GM, 此处不需要 Enque/deque???
+         // Copy UB memory to GM, no Enque/deque required here???
         this->DataCopyOutWithBNSD(bmm2ResUb);
         this->tempBmm2Queue.FreeTensor(bmm2ResUb);
     }
@@ -258,7 +258,7 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT
 
     SoftMaxShapeInfo shapeInfo = {this->singleProcessSOuterSize, this->singleProcessSInnerSize,
                                   this->singleProcessSOuterSize, this->singleProcessSInnerSize};
-    // 计算softmax中间结果： softmaxExp,softmaxMaxUb, softmaxSumUb
+    // Calculate the intermediate result of softmax: softmaxExp, softmaxMaxUb, softmaxSumUb
     if (this->IsSoftmaxFlashBasic()
         && this->singleProcessSInnerBmmTail == this->singleProcessSInnerSize
         && this->singleProcessSOuterSize % 8 == 0) {
@@ -267,14 +267,14 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT
         this->SoftmaxComputeTail(mmResUb, softmaxMaxUb, softmaxSumUb, softmaxExpUb, shapeInfo);
     }
 
-    //// 计算bmm2: atten*V分块
-    // 获取计算bmm2的ub内存
+    //// Calculate bmm2: atten*V block
+    // Retrieve the UB memory for calculating BMM2
     LocalTensor<mmOutputType> bmm2ResUb;
     if (isSecond) {
-        // 第二次从TBuf<> 分配tensor
+        // Second time allocating tensor from TBuf<>
         bmm2ResUb = this->tempBmm2Ub.template Get<mmOutputType>(this->bmm2ResUbSize);
     } else {
-        // 二次之后从VECOUT Queue 分配Tensor
+        // After the second round, allocate Tensor from VECOUT Queue
         bmm2ResUb = this->tempBmm2Queue.template AllocTensor<mmOutputType>();
     }
 
@@ -283,16 +283,16 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT
         this->tilingData->promptAttentionBaseParams.alignedHeadSize) {
             this->bmm2.template GetTensorC<false>(bmm2ResUb, false, false);
     } else {
-        // 将C矩阵copy到bmm2ResUb, 适配D非对齐场景，GetTensorC 拷贝到ub时，使能模板参数dopad，并传入原始宽高
+        // Copy the C matrix to bmm2ResUb, adapt to D non aligned scenes, and enable the template parameter dopad when copying the GetTensorC to ub, and pass in the original width and height
         this->bmm2.template GetTensorC<false, true>(bmm2ResUb, false, false,
             this->singleProcessSOuterSize, this->tilingData->promptAttentionBaseParams.headSize);
     }
 
-    // 结束上一次计算，释放api内部资源
+    // End the previous calculation and release internal resources of the API
     this->bmm2.End();
-    // 设置bmm2计算的cube参数
+    // Set the cube parameters for calculating BMM2
     this->Bmm2Compute(this->valueOffset, mmResUb);
-    // 执行一次计算
+    // Perform a calculation once
     this->bmm2.template Iterate<false>();
 
     if(!isSecond) {
@@ -309,7 +309,7 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT
             this->tilingData->promptAttentionBaseParams.alignedHeadSize) {
                 this->bmm2.template GetTensorC<false>(bmm2ResUb, false, false);
         } else {
-            // 将C矩阵copy到bmm2ResUb, 适配D非对齐场景，GetTensorC 拷贝到ub时，使能模板参数dopad，并传入原始宽高
+            // Copy the C matrix to bmm2ResUb, adapt to D non aligned scenes, and enable the template parameter dopad when copying the GetTensorC to ub, and pass in the original width and height
             this->bmm2.template GetTensorC<false, true>(bmm2ResUb, false, false,
                 this->singleProcessSOuterSize, this->tilingData->promptAttentionBaseParams.headSize);
         }
@@ -317,7 +317,7 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT
         this->bmm2.End();
         this->Bmm2UpdateAdd(bmm2ResUb);
 
-        // 最后一次刷新SoftMax
+        // Last refresh of SoftMax
         pipe_barrier(PIPE_V);
         LocalTensor<mmOutputType> bmm2ResPreUb = this->tempBmm2Ub.template Get<mmOutputType>(this->bmm2ResUbSize);
         this->Bmm2UpdateDivNoTail(bmm2ResPreUb, softmaxSumUb, softmaxExpUb);
@@ -435,7 +435,7 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDTail<T, U, FORMAT
     }
     int sNum = this->tilingData->promptAttentionBaseParams.dimNumOfseq;
 
-    // 临时复用
+    // Temporary reuse
     // CoreHeadNumTail to coreNStart
     // actualS1 to coreNEnd
     // actualCoreNums to coreSidStart

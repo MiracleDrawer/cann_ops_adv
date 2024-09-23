@@ -71,7 +71,7 @@ int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& 
     strides[i] = shape[i + 1] * strides[i + 1];
   }
  
-  // Call the aclCreateTensor interface to create aclSensor.
+  // Call the aclCreateTensor interface to create aclTensor.
   *tensor = aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, aclFormat::ACL_FORMAT_ND,
                             shape.data(), shape.size(), *deviceAddr);
   return 0;
@@ -91,10 +91,10 @@ int main() {
   std::vector<int64_t> attenShape = {1, 1, 1, 2}; // B 1 S1 S2
   std::vector<int64_t> outShape = {1, 2, 1, 16}; // BNSD
   //antiquant params
-  std::vector<int64_t> keyAntiquantScaleShape = {1, 2, 1, 16}; 
-  std::vector<int64_t> keyAntiquantOffsetShape = {1, 2, 1, 16}; 
-  std::vector<int64_t> valueAntiquantScaleShape = {1, 2, 1, 16}; 
-  std::vector<int64_t> valueAntiquantOffsetShape = {1, 2, 1, 16};
+  std::vector<int64_t> keyAntiquantScaleShape = {1, 2, 1, 16}; // 1, N, 1, D
+  std::vector<int64_t> keyAntiquantOffsetShape = {1, 2, 1, 16}; // 1, N, 1, D
+  std::vector<int64_t> valueAntiquantScaleShape = {1, 2, 1, 16}; // 1, N, 1, D
+  std::vector<int64_t> valueAntiquantOffsetShape = {1, 2, 1, 16}; // 1, N, 1, D
 
   void *queryDeviceAddr = nullptr;
   void *keyDeviceAddr = nullptr;
@@ -124,10 +124,10 @@ int main() {
   int64_t attenShapeSize = GetShapeSize(attenShape); // B 1 S1 S2
   int64_t outShapeSize = GetShapeSize(outShape); // BNSD
   //antiquant params
-  int64_t keyAntiquantScaleShapeSize = GetShapeSize(keyAntiquantScaleShape); 
-  int64_t keyAntiquantOffsetShapeSize = GetShapeSize(keyAntiquantOffsetShape); 
-  int64_t valueAntiquantScaleShapeSize = GetShapeSize(valueAntiquantScaleShape); 
-  int64_t valueAntiquantOffsetShapeSize = GetShapeSize(valueAntiquantOffsetShape); 
+  int64_t keyAntiquantScaleShapeSize = GetShapeSize(keyAntiquantScaleShape); // 1, N, 1, D
+  int64_t keyAntiquantOffsetShapeSize = GetShapeSize(keyAntiquantOffsetShape); // 1, N, 1, D
+  int64_t valueAntiquantScaleShapeSize = GetShapeSize(valueAntiquantScaleShape); // 1, N, 1, D
+  int64_t valueAntiquantOffsetShapeSize = GetShapeSize(valueAntiquantOffsetShape); // 1, N, 1, D
 
   std::vector<uint16_t> queryHostData(queryShapeSize, 0x3C00);
   std::vector<uint8_t> keyHostData(keyShapeSize, 1);
@@ -177,8 +177,8 @@ int main() {
   int64_t numHeads=2; // N
   int64_t numKeyValueHeads = numHeads;
   double scaleValue= 1 / sqrt(16); // 1/sqrt(d)
-  int64_t preTokens = 65535;
-  int64_t nextTokens = 65535;
+  int64_t preTokens = 2147483647;  
+  int64_t nextTokens = 2147483647;  
   std::string sLayerOut = "BNSD";
   int64_t sparseMode = 0;
   int64_t innerPrecise = 1;

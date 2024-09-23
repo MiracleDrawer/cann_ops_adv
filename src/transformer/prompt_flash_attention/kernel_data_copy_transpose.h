@@ -1,5 +1,5 @@
 /**
-* Copyright (c) 2023-2024 Huawei Technologies Co., Ltd.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2024. All rights reserved.
  * This file is a part of the CANN Open Software.
  * Licensed under CANN Open Software License Agreement Version 1.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@
 using namespace AscendC;
 
 enum class CopyTransposeType {
-    TRANSPOSE_TYPE_NONE,  // 默认值
+    TRANSPOSE_TYPE_NONE,  // Default value
     TRANSPOSE_NZ2ND_0213, // { shape:[B, A1, A3 / 16, A2 / 16, 16, 16], format:"NZ"} -->{ shape:[B, A2, A1, A3],
                           // ori_shape:[B, A2, A1, A3], format:"ND"}
     TRANSPOSE_NZ2NZ_0213, // { shape:[B, A1, A3 / 16, A2 / 16, 16, 16], format:"NZ"}-->{ shape:[B, A2, A3 / 16, A1 / 16,
@@ -79,7 +79,7 @@ using TransposeParams = struct TransposeParams {
     int64_t nIndex;
     int64_t sIndex;
     int64_t hNIndex;
-}; // 切分后的小块在原有大块里的位置索引
+}; // Index the position of the segmented small block within the original large block
 
 template <typename T>
 __aicore__ inline void DataCopyTranspose(const GlobalTensor<T> &dstGlobal, const LocalTensor<T> &srcLocal,

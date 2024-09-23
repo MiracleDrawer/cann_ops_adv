@@ -71,7 +71,7 @@ int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& 
     strides[i] = shape[i + 1] * strides[i + 1];
   }
  
-  // Call the aclCreateTensor interface to create aclSensor.
+  // Call the aclCreateTensor interface to create aclTensor.
   *tensor = aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, aclFormat::ACL_FORMAT_ND,
                             shape.data(), shape.size(), *deviceAddr);
   return 0;
@@ -85,12 +85,13 @@ int main() {
   CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Init acl failed. ERROR: %d\n", ret); return ret);
  
   // 2. To construct input and output, it is necessary to customize the construction according to the API interface.
-  std::vector<int64_t> queryShape = {1, 2, 1, 16}; // BNSD
-  std::vector<int64_t> keyShape = {1, 2, 128, 16}; // BNSD
-  std::vector<int64_t> valueShape = {1, 2, 128, 16}; // BNSD
-  std::vector<int64_t> attenShape = {1, 1, 1, 128}; // B 1 S1 S2
-  std::vector<int64_t> outShape = {1, 2, 1, 16}; // BNSD
-  std::vector<int64_t> blockTableShape = {1, 1};
+  std::vector<int64_t> queryShape = {4, 5, 1, 128}; // BNSD
+  std::vector<int64_t> keyShape = {64, 5, 128, 128}; // [Blocknum,KVN,blocksize,D]
+  std::vector<int64_t> valueShape = {64, 5, 128, 128}; // [Blocknum,KVN,blocksize,D]
+  std::vector<int64_t> attenShape = {4, 1, 1, 2048}; // B 1 S1 S2
+  std::vector<int64_t> outShape = {4, 5, 1, 128}; // BNSD
+  std::vector<int64_t> blockTableShape = {4, 16}; //The length of the first dimension must be equal to B, 
+                                                  //and the length of the second dimension cannot be less than maxBlockNumPerSeq
   void *queryDeviceAddr = nullptr;
   void *keyDeviceAddr = nullptr;
   void *valueDeviceAddr = nullptr;
@@ -145,8 +146,8 @@ int main() {
   int64_t numHeads=2; // N
   int64_t numKeyValueHeads = numHeads;
   double scaleValue= 1 / sqrt(16); // 1/sqrt(d)
-  int64_t preTokens = 65535;
-  int64_t nextTokens = 65535;
+  int64_t preTokens = 2147483647;
+  int64_t nextTokens = 2147483647;
   std::string sLayerOut = "BNSD";
   int64_t sparseMode = 0;
   int64_t innerPrecise = 1;

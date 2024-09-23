@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2023-2024 Huawei Technologies Co., Ltd.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2024. All rights reserved.
  * This file is a part of the CANN Open Software.
  * Licensed under CANN Open Software License Agreement Version 1.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -335,7 +335,7 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDNoTail<T, U, FORM
     }
     int sNum = this->tilingData->promptAttentionBaseParams.dimNumOfseq;
 
-    // 临时复用
+    // Temporary reuse
     // CoreHeadNumTail to coreNStart
     // actualS1 to coreNEnd
     // actualCoreNums to coreSidStart

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2023-2024 Huawei Technologies Co., Ltd.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2024. All rights reserved.
  * This file is a part of the CANN Open Software.
  * Licensed under CANN Open Software License Agreement Version 1.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -70,6 +70,7 @@ public:
                                 __gm__ uint8_t* keySharedPrefix, __gm__ uint8_t* valueSharedPrefix, __gm__ uint8_t* actualSharedPrefixLen,
                                 __gm__ uint8_t* attentionOut, __gm__ uint8_t* softmaxLse, __gm__ uint8_t* workspace,
                                 const PromptFlashAttentionTilingData* __restrict tiling, __gm__ uint8_t* gmTiling, TPipe* tPipe);
+    __aicore__ inline void InitMsd(__gm__ uint8_t* key_antiquant_scale, __gm__ uint8_t* key_antiquant_offset, __gm__ uint8_t* value_antiquant_scale, __gm__ uint8_t* value_antiquant_offset);
     using T = typename PFAT::inputType;
     using U = typename PFAT::maskType;
     using O = typename PFAT::outputType;
@@ -380,7 +381,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::Init(__gm__ u
                                 tilingData->promptAttentionBaseParams.batchSize != 1) ?
                                 0 : accumSOuterTilingNums[0];
 
-    if (tilingData->promptAttentionBaseParams.sparseMode == 99) { // 近似计算
+    if (tilingData->promptAttentionBaseParams.sparseMode == 99) { // approximate calculation
         isHighPrecision_ = false;
     }
     pipe->InitBuffer(a1Buf_, tilingData->promptAttentionTensorSizeRect.scmTmpSize * sizeof(mmOutputType));
@@ -424,6 +425,11 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::Init(__gm__ u
         queryStride = tilingData->promptAttentionBaseParams.headSize;
         keyValueStride = tilingData->promptAttentionBaseParams.headSize;
     }
+}
+
+template<typename PFAT>
+__aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::InitMsd(__gm__ uint8_t* key_antiquant_scale, __gm__ uint8_t* key_antiquant_offset, __gm__ uint8_t* value_antiquant_scale, __gm__ uint8_t* value_antiquant_offset) {
+    return;
 }
 
 template<typename PFAT>
@@ -615,7 +621,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::Bmm2UpdateDiv
     int32_t headLoop = tilingData->promptAttentionBaseParams.headSize / softmaxTypeByteNum;
     constexpr int32_t REPEAT_DATA_NUM = 256 / sizeof(softmaxType);
     BinaryRepeatParams repeatParams;
-    // 连续计算默认值
+    // Default values of continuous calculation
     repeatParams.src0BlkStride = 1;
     repeatParams.src0RepStride = 8;
     repeatParams.src1BlkStride = 1;
@@ -653,7 +659,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::Bmm2UpdateDiv
     int32_t headLoop = tilingData->promptAttentionBaseParams.headSize / softmaxTypeByteNum;
     constexpr int32_t REPEAT_DATA_NUM = 256 / sizeof(softmaxType);
     BinaryRepeatParams repeatParams;
-    // 连续计算默认值
+    // Default values of continuous calculation
     repeatParams.src0BlkStride = 1;
     repeatParams.src0RepStride = 8;
     repeatParams.src1BlkStride = 1;
@@ -727,7 +733,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::ComputeOffset
     if constexpr (PFAT::layout == PFALayoutNZ::BSH) {
         int sInnerOffsetDataSize = sInnerLoopIdx * singleProcessSInnerSize;
         ComputeAttenMaskOffset(sInnerLoopIdx, isLast);
-        // 这里不能更新tensorBOffset，会把原来设置的值刷掉
+        // tensorBOffset cannot be updated here, as it will erase the previously set values
         valueOffset = valueCoreOffset + sInnerOffsetDataSize * MultiHeadKV;
         tensorAOffset = tensorACoreOffset;
     } else { // BNSD
@@ -741,7 +747,7 @@ template<typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::DataCopyTransposeOut(LocalTensor<mmOutputType>& bmm2ResUb) {
     if ((PFAT::layout == PFALayoutNZ::BSH) ||
         (PFAT::layout == PFALayoutNZ::BNSD && this->tilingData->promptAttentionBaseParams.isBSNDOut == 1)) {
-        // 这里拷贝需要考虑BNSD到BSH的转换和NZ到ND的转换
+        // Copying here requires consideration of BNSD to BSH conversion and NZ to ND conversion
         int32_t outerSize = isOuterTail_ ? singleProcessSOuterSizeTailAlign : singleProcessSOuterSize;
         struct DataCopyParams dataCopyParams;
         dataCopyParams.blockCount = isOuterTail_ ? singleProcessSOuterSizeTail : singleProcessSOuterSize;;

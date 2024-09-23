@@ -19,7 +19,8 @@
 using namespace ge;
 using namespace AscendC;
 namespace optiling {
-ge::graphStatus TilingPrepareForIncreFlashAttention(gert::TilingParseContext *context) {
+ge::graphStatus TilingPrepareForIncreFlashAttention(gert::TilingParseContext *context)
+{
     (void)context;
     return ge::GRAPH_SUCCESS;
 }
@@ -27,4 +28,4 @@ IMPL_OP_OPTILING(IncreFlashAttention)
     .Tiling(TilingIncreFlashAttention)
     .TilingParse<IncreFlashAttentionCompileInfo>(TilingPrepareForIncreFlashAttention)
     .TilingInputsDataDependency({5}, {gert::TilingPlacement::TILING_ON_HOST, gert::TilingPlacement::TILING_ON_AICPU});
-}  // namespace optiling
+} // namespace optiling

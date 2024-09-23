@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2023 Huawei Technologies Co., Ltd.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2024. All rights reserved.
  * This file is a part of the CANN Open Software.
  * Licensed under CANN Open Software License Agreement Version 1.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ extern "C" {
 #endif
 
 /**
- * @brief aclnnPromptFlashAttentionV3的第一段接口，根据具体的计算流程，计算workspace大小。
+ * @brief The first interface of aclnnPromptFlashAttentionV3 is used to calculate the workspace size based on the specific calculation process.
  * @domain aclnn_ops_infer
 */
 __attribute__ ((visibility("default"))) aclnnStatus aclnnPromptFlashAttentionV3GetWorkspaceSize(
@@ -47,7 +47,7 @@ __attribute__ ((visibility("default"))) aclnnStatus aclnnPromptFlashAttentionV3G
     aclOpExecutor **executor);
 
 /**
- * @brief aclnnPromptFlashAttentionV3的第二段接口，用于执行计算。
+ * @brief The second interface of aclnnPromptFlashAttentionV3 is used to perform calculations.
 */
 __attribute__ ((visibility("default"))) aclnnStatus aclnnPromptFlashAttentionV3(
     void *workspace,

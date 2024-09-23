@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2023-2024 Huawei Technologies Co., Ltd.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2024. All rights reserved.
  * This file is a part of the CANN Open Software.
  * Licensed under CANN Open Software License Agreement Version 1.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -77,7 +77,7 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDNoTailKVNZ<T, U, 
     this->b1Local_ = this->b1Buf_.template Get<mmOutputType>();
     this->b2Local_ = this->b2Buf_.template Get<mmOutputType>();
     if (this->isOuterLoopStart_) {
-        // L1驻留 SetTensorA获取L1即可
+        // L1 Residency SetTensorA to Obtain L1
         this->CopyND2NZOnTheFly(this->b1Local_, this->keyGm[this->tensorBCoreOffset], this->singleProcessSInnerSize, 
             this->tilingData->promptAttentionBaseParams.headSize, this->tilingData->promptAttentionBaseParams.headSize, true);      
     }
@@ -155,7 +155,7 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDNoTailKVNZ<T, U, 
     }
     int sNum = this->tilingData->promptAttentionBaseParams.dimNumOfseq;
 
-    // 临时复用
+    // Temporary reuse
     // CoreHeadNumTail to coreNStart
     // actualS1 to coreNEnd
     // actualCoreNums to coreSidStart

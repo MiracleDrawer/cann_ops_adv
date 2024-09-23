@@ -16,12 +16,21 @@
 |
 |—— fused_infer_attention_score       # FIA算子样例目录
 |   |—— CMakeLists.txt                # 样例编译和添加测试用例的配置文件，由上级CMakeLists.txt调用
-|   |—— test_fused_infer_attention_score_v2_ifa_antiquant.cpp        # FIA伪量化接口测试用例代码
-|   |—— test_fused_infer_attention_score_v2_ifa_leftpad.cpp          # FIA左padding接口测试用例代码
-|   |—— test_fused_infer_attention_score_v2_ifa_Lse.cpp              # FIA Lse接口测试用例代码
-|   |—— test_fused_infer_attention_score_v2_ifa_PA.cpp               # FIA page attention接口测试用例代码
-|   |—— test_fused_infer_attention_score_v2_ifa_postquant.cpp        # FIA后量化接口测试用例代码
-|   |—— test_fused_infer_attention_score_v2_ifa_system_prefix.cpp    # FIA prefix接口测试用例代码
+|   |—— test_fused_infer_attention_score_v2_ifa_antiquant.cpp        # FIA的IFA分支下伪量化接口测试用例代码
+|   |—— test_fused_infer_attention_score_v2_ifa_leftpad.cpp          # FIA的IFA分支下左padding接口测试用例代码
+|   |—— test_fused_infer_attention_score_v2_ifa_Lse.cpp              # FIA的IFA分支下Lse接口测试用例代码
+|   |—— test_fused_infer_attention_score_v2_ifa_PA.cpp               # FIA的IFA分支下page attention接口测试用例代码
+|   |—— test_fused_infer_attention_score_v2_ifa_postquant.cpp        # FIA的IFA分支下后量化接口测试用例代码
+|   |—— test_fused_infer_attention_score_v2_ifa_system_prefix.cpp    # FIA的IFA分支下prefix接口测试用例代码
+|   |—— test_fused_infer_attention_score_v2_pfa_innerprecise2.cpp    # FIA的PFA分支下innerprecise=2接口测试用例代码
+|   |—— test_fused_infer_attention_score_v2_pfa_left_padding.cpp     # FIA的PFA分支下左padding接口测试用例代码
+|   |—— test_fused_infer_attention_score_v2_pfa_lse.cpp              # FIA的PFA分支下lse接口测试用例代码
+|   |—— test_fused_infer_attention_score_v2_pfa_page_attention.cpp   # FIA的PFA分支下page attention接口测试用例代码
+|   |—— test_fused_infer_attention_score_v2_pfa_pse.cpp              # FIA的PFA分支下pse接口测试用例代码
+|   |—— test_fused_infer_attention_score_v2_pfa_sparse2.cpp          # FIA的PFA分支下sparse=2接口测试用例代码
+|   |—— test_fused_infer_attention_score_v2_pfa_system_prefix.cpp    # FIA的PFA分支下prefix接口测试用例代码
+|   |—— test_fused_infer_attention_score_v2_pfa_msd.cpp              # FIA的PFA分支下msd接口测试用例代码
+|   |—— test_fused_infer_attention_score_v2_pfa_tensorlist.cpp       # FIA的PFA分支下tensorlist接口测试用例代码
 |   |—— test_fused_infer_attention_score_v2.cpp                      # FIAV2接口测试用例代码
 |   |—— test_fused_infer_attention_score.cpp                         # FIAV1接口测试用例代码
 |   |—— run_fia_case.sh                                              # 执行CMakeLists.txt中配置的测试用例：在主目录下运行 bash build.sh -e -p xxx(装包路径到latest) --disable-check-compatible(版本不对时可以加)

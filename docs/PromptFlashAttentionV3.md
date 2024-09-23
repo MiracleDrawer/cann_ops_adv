@@ -32,7 +32,7 @@
     其中Q和K<sup>T</sup>的乘积代表输入x的注意力，为避免该值变得过大，通常除以d的开根号进行缩放，并对每行进行softmax归一化，与V相乘后得到一个n\*d的矩阵。
 
 ## 实现原理
-该算子是全量计算场景（PromptFlashAttention）和增量计算场景（IncreFlashAttention）的融合算子，详细实现原理可参考[PromptFlashAttention](PromptFlashAttention.md)及[IncreFlashAttentionV4](IncreFlashAttention.md)。
+该算子是全量计算场景（PromptFlashAttention）和增量计算场景（IncreFlashAttention）的融合算子，详细实现原理可参考[PromptFlashAttention](PromptFlashAttention.md)及[IncreFlashAttentionV4](IncreFlashAttentionV4.md)。
 
 ## 算子执行接口
 
@@ -64,15 +64,15 @@
 
   - actualSeqLengthsKv（aclIntArray\*，计算输入）：Host侧的aclIntArray，可传入nullptr，代表不同batch中key/value的有效Sequence Length。数据类型支持INT64。限制：该入参中每个batch的有效Sequence Length应该不大于key/value中对应batch的Sequence Length，**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持nullptr**。
 
-  - deqScale1（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持UINT64、FLOAT32。[数据格式](common/数据格式.md)支持ND（参考），表示BMM1后面反量化的量化因子，支持per-tensor。 如不使用该功能时可传入nullptr，**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持nullptr**。
+  - deqScale1（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持UINT64、FLOAT32。[数据格式](common/数据格式.md)支持ND（参考），表示BMM1后面的反量化因子，支持per-tensor。 如不使用该功能时可传入nullptr，**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持nullptr**。
 
-  - quantScale1（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持FLOAT32。[数据格式](common/数据格式.md)支持ND（参考），表示BMM2前面量化的量化因子，支持per-tensor。 如不使用该功能时可传入nullptr，**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持nullptr**。
+  - quantScale1（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持FLOAT32。[数据格式](common/数据格式.md)支持ND（参考），表示BMM2前面的量化因子，支持per-tensor。 如不使用该功能时可传入nullptr，**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持nullptr**。
 
-  - deqScale2（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持UINT64、FLOAT32。[数据格式](common/数据格式.md)支持ND（参考），表示BMM2后面量化的量化因子，支持per-tensor。 如不使用该功能时可传入nullptr，**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持nullptr**。
+  - deqScale2（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持UINT64、FLOAT32。[数据格式](common/数据格式.md)支持ND（参考），表示BMM2后面的反量化因子，支持per-tensor。 如不使用该功能时可传入nullptr，**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持nullptr**。
 
-  - quantScale2（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持FLOAT32和BFLOAT16。[数据格式](common/数据格式.md)支持ND（参考），表示输出量化的量化因子，支持per-tensor，per-channel。 如不使用该功能时可传入nullptr，**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持nullptr**。
+  - quantScale2（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持FLOAT32和BFLOAT16。[数据格式](common/数据格式.md)支持ND（参考），表示输出的量化因子，支持per-tensor，per-channel。 如不使用该功能时可传入nullptr，**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持nullptr**。
 
-  - quantOffset2（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持FLOAT32和BFLOAT16。[数据格式](common/数据格式.md)支持ND（参考），表示输出量化的量化偏移，支持per-tensor，per-channel。 如不使用该功能时可传入nullptr，**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持nullptr**。
+  - quantOffset2（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持FLOAT32和BFLOAT16。[数据格式](common/数据格式.md)支持ND（参考），表示输出的量化偏移，支持per-tensor，per-channel。 如不使用该功能时可传入nullptr，**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持nullptr**。
 
   - numHeads（int64\_t，计算输入）：Host侧的int，代表query的head个数，数据类型支持INT64。
 
@@ -87,7 +87,7 @@
      **说明：**
      query、key、value数据排布格式支持从多种维度解读，其中B（Batch）表示输入样本批量大小、S（Seq-Length）表示输入样本序列长度、H（Head-Size）表示隐藏层的大小、N（Head-Num）表示多头数、D（Head-Dim）表示隐藏层最小的单元尺寸，且满足D=H/N。
 
-  - numKeyValueHeads（int64\_t，计算输入）：Host侧的int，代表key、value中head个数，用于支持GQA（Grouped-Query Attention，分组查询注意力）场景，数据类型支持INT64。用户不特意指定时可传入默认值0，表示key/value和query的head个数相等。限制：在BNSD场景下，需要与shape中的key/value的N轴shape值相同，且需要满足numHeads整除numKeyValueHeads，numHeads与numKeyValueHeads的比值不能大于64，否则报错，**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持默认值0**。
+  - numKeyValueHeads（int64\_t，计算输入）：Host侧的int，代表key、value中head个数，用于支持GQA（Grouped-Query Attention，分组查询注意力）场景，数据类型支持INT64。用户不特意指定时可传入默认值0，表示key/value和query的head个数相等。限制：需要满足numHeads整除numKeyValueHeads，numHeads与numKeyValueHeads的比值不能大于64，且在BSND、BNSD、BNSD_BSND场景下，需要与shape中的key/value的N轴shape值相同，否则报错，**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持默认值0**。
 
   - sparseMode（int64\_t，计算输入）：Host侧的int，表示sparse的模式。数据类型支持INT64，**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持默认值0**。
     -  sparseMode为0时，代表defaultMask模式，如果attenmask未传入则不做mask操作，忽略preTokens和nextTokens（内部赋值为INT\_MAX）；如果传入，则需要传入完整的attenmask矩阵（S1 \* S2），表示preTokens和nextTokens之间的部分需要计算。
@@ -124,7 +124,7 @@
   说明：
   第一段接口完成入参校验，若出现以下错误码，则对应原因为：
   -  返回161001（ACLNN_ERR_PARAM_NULLPTR）：如果传入参数是必选输入，输出或者必选属性，且是空指针，则返回161001。
-  -  返回161002（ACLNN_ERR_PARAM_INVALID）：query、key、value、paddingMask、attenMask、attentionOut的数据类型和数据格式不在支持的范围内。
+  -  返回161002（ACLNN_ERR_PARAM_INVALID）：query、key、value、pseShift、attenMask、attentionOut的数据类型和数据格式不在支持的范围内。
 
 ## aclnnPromptFlashAttentionV3
 
@@ -147,11 +147,11 @@
         -   支持B轴小于等于65536(64k)，输入类型包含INT8时D轴非32对齐或输入类型为FLOAT16或BFLOAT16时D轴非16对齐时，B轴仅支持到128；
         -   支持N轴小于等于256；
         -   S支持小于等于20971520（20M）。部分长序列场景下，如果计算量过大可能会导致pfa算子执行超时（aicore error类型报错，errorStr为:timeout or trap error），此场景下建议做S切分处理，注：这里计算量会受B、S、N、D等的影响，值越大计算量越大。典型的会超时的长序列(即B、S、N、D的乘积较大)场景包括但不限于： 
-              (1)B=1,Q_N=20,Q_S=2097152,D = 256,KV_N=1,KV_S=2097152;
-              (2)B=1,Q_N=2,Q_S=20971520,D = 256,KV_N=2,KV_S=20971520;
-              (3)B=20,Q_N=1,Q_S=2097152,D = 256,KV_N=1,KV_S=2097152;
-              (4)B=1,Q_N=10,Q_S=2097152,D = 512,KV_N=1,KV_S=2097152。
-        -   支持D轴小于等于512。
+              -   (1)B=1,Q_N=20,Q_S=2097152,D = 256,KV_N=1,KV_S=2097152;
+              -   (2)B=1,Q_N=2,Q_S=20971520,D = 256,KV_N=2,KV_S=20971520;
+              -   (3)B=20,Q_N=1,Q_S=2097152,D = 256,KV_N=1,KV_S=2097152;
+              -   (4)B=1,Q_N=10,Q_S=2097152,D = 512,KV_N=1,KV_S=2097152。
+        -   支持D轴小于等于512。inputLayout为BSH或者BSND时，要求N*D小于65535。
     -   Atlas推理系列产品（Ascend310P处理器）中的加速卡： 
         -   支持B轴小于等于128；
         -   支持N轴小于等于256；   
@@ -183,19 +183,19 @@
 
 ```c++
 REG_OP(PromptFlashAttention)
-    .INPUT(query, TensorType({DT_FLOAT16, DT_FLOAT32, DT_BF16, DT_INT8}))
-    .INPUT(key, TensorType({DT_FLOAT16, DT_FLOAT32, DT_BF16, DT_INT8}))
-    .INPUT(value, TensorType({DT_FLOAT16, DT_FLOAT32, DT_BF16, DT_INT8}))
-    .OPTIONAL_INPUT(pse_shift, TensorType({DT_FLOAT16, DT_FLOAT32, DT_BF16}))
+    .INPUT(query, TensorType({DT_FLOAT16, DT_BF16, DT_INT8}))
+    .INPUT(key, TensorType({DT_FLOAT16, DT_BF16, DT_INT8}))
+    .INPUT(value, TensorType({DT_FLOAT16, DT_BF16, DT_INT8}))
+    .OPTIONAL_INPUT(pse_shift, TensorType({DT_FLOAT16, DT_BF16}))
     .OPTIONAL_INPUT(atten_mask, TensorType({DT_FLOAT16, DT_BOOL, DT_INT8, DT_UINT8}))
     .OPTIONAL_INPUT(actual_seq_lengths, TensorType({DT_INT64}))
     .OPTIONAL_INPUT(actual_seq_lengths_kv, TensorType({DT_INT64}))
     .OPTIONAL_INPUT(deq_scale1, TensorType({DT_UINT64, DT_FLOAT32}))
     .OPTIONAL_INPUT(quant_scale1, TensorType({DT_FLOAT32}))
     .OPTIONAL_INPUT(deq_scale2, TensorType({DT_UINT64, DT_FLOAT32}))
-    .OPTIONAL_INPUT(quant_scale2, TensorType({DT_FLOAT32}))
-    .OPTIONAL_INPUT(quant_offset2, TensorType({DT_FLOAT32}))
-    .OUTPUT(attention_out, TensorType({DT_FLOAT16, DT_FLOAT32, DT_BF16, DT_INT8}))
+    .OPTIONAL_INPUT(quant_scale2, TensorType({DT_FLOAT32, DT_BF16}))
+    .OPTIONAL_INPUT(quant_offset2, TensorType({DT_FLOAT32, DT_BF16}))
+    .OUTPUT(attention_out, TensorType({DT_FLOAT16, DT_BF16, DT_INT8}))
     .REQUIRED_ATTR(num_heads, Int)
     .ATTR(scale_value, Float, 1.0)
     .ATTR(pre_tokens, Int, 2147483647)

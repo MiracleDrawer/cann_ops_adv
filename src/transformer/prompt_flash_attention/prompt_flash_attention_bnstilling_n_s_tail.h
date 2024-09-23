@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2023-2024 Huawei Technologies Co., Ltd.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2024. All rights reserved.
  * This file is a part of the CANN Open Software.
  * Licensed under CANN Open Software License Agreement Version 1.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -128,7 +128,7 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSTail<T, U, FORMAT, O, M>:
     LocalTensor<U> attenMaskUb = this->attenMaskQueue.template AllocTensor<U>();
     attenMaskUb.SetSize(this->singleProcessSOuterSize * sinnerSize);
     DataCopyExtParams intriParams;
-    intriParams.blockCount = this->singleProcessSOuterSize; // 此处应该是非对齐
+    intriParams.blockCount = this->singleProcessSOuterSize; // This should be non aligned
 
     intriParams.blockLen = sinnerSize * sizeof(U);
 
@@ -199,7 +199,7 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSTail<T, U, FORMAT, O, M>:
             this->tilingData->promptAttentionBaseParams.alignedHeadSize) {
                 this->bmm2.template GetTensorC<false>(bmm2ResUb, false, false);
         } else {
-            // 将C矩阵copy到bmm2ResUb, 适配D非对齐场景，GetTensorC 拷贝到ub时，使能模板参数dopad，并传入原始宽高
+            // Copy the C matrix to bmm2ResUb, adapt to D non aligned scenes, and enable the template parameter dopad when copying the GetTensorC to ub, and pass in the original width and height
             this->bmm2.template GetTensorC<false, true>(bmm2ResUb, false, false,
                 this->singleProcessSOuterSize, this->tilingData->promptAttentionBaseParams.headSize);
         }
@@ -286,7 +286,7 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSTail<T, U, FORMAT, O, M>:
             this->tilingData->promptAttentionBaseParams.alignedHeadSize) {
                 this->bmm2.template GetTensorC<false>(bmm2ResUb, false, false);
         } else {
-            // 将C矩阵copy到bmm2ResUb, 适配D非对齐场景，GetTensorC 拷贝到ub时，使能模板参数dopad，并传入原始宽高
+            // Copy the C matrix to bmm2ResUb, adapt to D non aligned scenes, and enable the template parameter dopad when copying the GetTensorC to ub, and pass in the original width and height
             this->bmm2.template GetTensorC<false, true>(bmm2ResUb, false, false,
                 this->singleProcessSOuterSize, this->tilingData->promptAttentionBaseParams.headSize);
         }
@@ -404,7 +404,7 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSTail<T, U, FORMAT, O, M>:
     }
     int sNum = this->tilingData->promptAttentionBaseParams.dimNumOfseq;
 
-    // 临时复用
+    // Temporary reuse
     // CoreHeadNumTail to coreNStart
     // actualS1 to coreNEnd
     // actualCoreNums to coreSidStart

@@ -37,7 +37,13 @@
 
 typedef void(*IfaKernelFunc) IFA_KERNEL_PARAM;
 
-extern "C" __global__ __aicore__ void incre_flash_attention IFA_KERNEL_PARAM;
+extern "C" __global__ __aicore__ void incre_flash_attention_fp16_fp16 IFA_KERNEL_PARAM;
+
+extern "C" __global__ __aicore__ void incre_flash_attention_fp16_int8 IFA_KERNEL_PARAM;
+
+extern "C" __global__ __aicore__ void incre_flash_attention_bf16_bf16 IFA_KERNEL_PARAM;
+
+extern "C" __global__ __aicore__ void incre_flash_attention_bf16_int8 IFA_KERNEL_PARAM;
 
 using namespace ops::adv::tests::ifa;
 using TensorIntf = ops::adv::tests::utils::TensorIntf;
@@ -144,6 +150,20 @@ bool IfaCase::InitParam()
 
 bool IfaCase::InitOpInfo()
 {
+    auto *ifaKernelFunc = (void *)incre_flash_attention_fp16_fp16;
+
+    if (mParam.qDataType == ge::DataType::DT_FLOAT16) {
+        if (mParam.outDataType == ge::DataType::DT_INT8) {
+            ifaKernelFunc = (void *)incre_flash_attention_fp16_int8;
+        }
+    } else if (mParam.qDataType == ge::DataType::DT_BF16) {
+        if (mParam.outDataType == ge::DataType::DT_INT8) {
+            ifaKernelFunc = (void *)incre_flash_attention_bf16_int8;
+        } else {
+            ifaKernelFunc = (void *)incre_flash_attention_bf16_bf16;
+        }
+    }
+
     bool rst = mCtx.SetOpName("IncreFlashAttention");
     rst = rst && mCtx.SetDeterministic(false);
     rst = rst && mCtx.SetInputs({&query, &key, &value, &pseShift, &attenMask, &actualSeqLengths, &deqScale1,
@@ -157,7 +177,7 @@ bool IfaCase::InitOpInfo()
                                 {"block_size", mParam.blockSize},
                                 {"inner_precise", mParam.innerPrecise}});
     rst = rst && mCtx.SetKernelRunCbf(RunIncreFlashAttention);
-    rst = rst && mCtx.SetKernelMainFunc((void *)incre_flash_attention);
+    rst = rst && mCtx.SetKernelMainFunc(ifaKernelFunc);
     rst = rst && mOpInfo.SetContext(&mCtx);
     return rst;
 }

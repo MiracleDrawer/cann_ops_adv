@@ -50,8 +50,9 @@ __attribute__((visibility("default"))) aclnnStatus aclnnIncreFlashAttentionGetWo
  * param [in] stream : acl stream.
  * @return aclnnStatus: 返回状态码
  */
-__attribute__ ((visibility("default"))) aclnnStatus aclnnIncreFlashAttention(void* workspace, uint64_t workspaceSize,
-    aclOpExecutor* executor, const aclrtStream stream);
+__attribute__((visibility("default"))) aclnnStatus aclnnIncreFlashAttention(void *workspace, uint64_t workspaceSize,
+                                                                            aclOpExecutor *executor,
+                                                                            const aclrtStream stream);
 
 #ifdef __cplusplus
 }

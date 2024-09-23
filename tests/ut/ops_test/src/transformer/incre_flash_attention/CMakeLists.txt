@@ -27,12 +27,20 @@ set(_IFA_TargetPrivateLinkLibrariesExt
 )
 aux_source_directory(${CMAKE_SOURCE_DIR}/src/transformer/incre_flash_attention _IFA_KernelSourcesExt)
 
+set(_IFA_KernelPrivateCompileDefinitionsExt
+        KernelCtrlParam incre_flash_attention,incre_flash_attention_FIAS fp16_fp16 ORIG_DTYPE_QUERY=DT_FLOAT16 ORIG_DTYPE_ATTENTION_OUT=DT_FLOAT16
+        KernelCtrlParam incre_flash_attention,incre_flash_attention_FIAS fp16_int8 ORIG_DTYPE_QUERY=DT_FLOAT16 ORIG_DTYPE_ATTENTION_OUT=DT_INT8
+        KernelCtrlParam incre_flash_attention,incre_flash_attention_FIAS bf16_bf16 ORIG_DTYPE_QUERY=DT_BF16 ORIG_DTYPE_ATTENTION_OUT=DT_BF16
+        KernelCtrlParam incre_flash_attention,incre_flash_attention_FIAS bf16_int8 ORIG_DTYPE_QUERY=DT_BF16 ORIG_DTYPE_ATTENTION_OUT=DT_INT8
+)
+
 OpsTest_Level2_AddOp(
         SUB_SYSTEM                              transformer
         BRIEF                                   Ifa
         SNAKE                                   incre_flash_attention
         KERNEL_TILING_DATA_DEF_H                ${_IFA_KernelTilingDataDefH}
         KERNEL_SOURCES_EXT                      ${_IFA_KernelSourcesExt}
+        KERNEL_PRIVATE_COMPILE_DEFINITIONS_EXT  ${_IFA_KernelPrivateCompileDefinitionsExt}
         TILING_SOURCES_EXT                      ${_IFA_TilingSourcesExt}
         UTEST_COMMON_PRIVATE_LINK_LIBRARIES_EXT ${_IFA_TargetPrivateLinkLibrariesExt}
 )

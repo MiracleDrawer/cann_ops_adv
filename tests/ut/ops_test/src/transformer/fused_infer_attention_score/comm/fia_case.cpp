@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2024 Huawei Technologies Co., Ltd.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2024. All rights reserved.
  * This file is a part of the CANN Open Software.
  * Licensed under CANN Open Software License Agreement Version 1.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -119,7 +119,7 @@ bool FiaCase::InitOpInfo()
                                  &keySharedPrefix,
                                  &valueSharedPrefix,
                                  &actualSharedPrefixLen});
-
+    rst = rst && mCtx.SetTilingDataMaxSize(4096);   
     rst = rst && mCtx.SetOutputs({&attentionOut, &softmaxLse});
     rst = rst && mCtx.SetAttrs({{"num_head", mParam.numHeads},
                                 {"scale_value", mParam.scaleValue},
@@ -129,10 +129,12 @@ bool FiaCase::InitOpInfo()
                                 {"num_key_value_heads", mParam.kvNumHeads},
                                 {"sparse_mode", mParam.sparse_mode},
                                 {"inner_precise", mParam.innerPrecise},
+                                {"block_size", mParam.blockSize},
                                 {"antiquant_mode", mParam.antiquant_mode},
                                 {"softmax_lse_flag", mParam.softmax_lse_flag},
                                 {"key_antiquant_mode", mParam.key_antiquant_mode},
                                 {"value_antiquant_mode", mParam.value_antiquant_mode}});
+
     rst = rst && mCtx.SetKernelRunCbf(RunFusedInferAttentionScore);
     rst = rst && mCtx.SetKernelMainFunc((void *)fused_infer_attention_score);
     rst = rst && mOpInfo.SetContext(&mCtx);

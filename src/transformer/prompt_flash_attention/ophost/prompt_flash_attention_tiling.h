@@ -1,5 +1,5 @@
 /**
-* Copyright (c) 2023-2024 Huawei Technologies Co., Ltd.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2024. All rights reserved.
  * This file is a part of the CANN Open Software.
  * Licensed under CANN Open Software License Agreement Version 1.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -36,6 +36,8 @@ constexpr uint32_t BOOLSIZE = 1;
 
 constexpr int HIGH_PRECISION = 0;
 constexpr int HIGH_PERFORMANCE = 1;
+constexpr uint32_t MSD_HIGH_PERFORMANCE_EXPEND_NUM = 2;
+constexpr uint32_t MSD_HIGH_PRECISION_EXPEND_NUM = 3;
 
 const uint32_t MAX_BATCH = 256U;
 struct PromptFlashAttentionCompileInfo {
@@ -70,6 +72,12 @@ struct ContextParamsForPFATiling
     const gert::Tensor* keySharedPrefix;
     const gert::Tensor* valueSharedPrefix;
     const gert::Tensor* actualSharedPrefixLen;
+
+    const gert::Tensor* KeyAntiquantScale;
+    const gert::Tensor* valueAntiquantScale;
+    const gert::Tensor* KeyAntiquantOffset;
+    const gert::Tensor* valueAntiquantOffset;
+
     ge::DataType inputDataType;
     ge::DataType kDataType;
     ge::DataType vDataType;
@@ -93,11 +101,21 @@ struct ContextParamsForPFATiling
     const gert::StorageShape* blockTableShape;
     const gert::StorageShape* outputShape;
     const gert::StorageShape* lseoutputShape;
+
+    const gert::StorageShape* KeyAntiquantScaleShape;
+    const gert::StorageShape* valueAntiquantScaleShape;
+    const gert::StorageShape* KeyAntiquantOffsetShape;
+    const gert::StorageShape* valueAntiquantOffsetShape;
+    ge::DataType KeyAntiquantScaleType;
+    ge::DataType valueAntiquantScaleType;
+    ge::DataType KeyAntiquantOffsetType;
+    ge::DataType valueAntiquantOffsetType;
+
     const int64_t* innerPrecisePtr;
     const int32_t* headsNumber;
     const int32_t* sparseMode;
-    const int32_t* preToken;
-    const int32_t* nextToken;
+    const int64_t* preToken;
+    const int64_t* nextToken;
     const float* scaleValue;
     const int32_t* blockSize;
     const char* layout;
@@ -117,7 +135,14 @@ struct ContextParamsForPFATiling
     uint32_t isBSNDOut;
     const bool *softmaxLseFlag;
     bool isSoftMaxLseEnable;
-    uint32_t fromTilingSink;    // 表明是否是“从tiling下沉中计算workspace的步骤进入”的flag
+    uint32_t fromTilingSink;    // Flag indicating whether it is the step to enter the workspace calculation from tiling sinking
+
+    bool hasKeyAntiquantScale;
+    bool hasValueAntiquantScale;
+    uint32_t isMsd;
+    const int64_t* keyAntiquantMode;
+    const int64_t* valueAntiquantMode;
+    bool hasKeyAntiquantOffset;
 };
 
 BEGIN_TILING_DATA_DEF(PromptAttentionBaseParams)
@@ -157,6 +182,8 @@ BEGIN_TILING_DATA_DEF(PromptAttentionBaseParams)
   TILING_DATA_FIELD_DEF(uint32_t, isLayoutSH);
   TILING_DATA_FIELD_DEF(uint32_t, isActualSeqLengthsNull);
   TILING_DATA_FIELD_DEF(uint32_t, isActualSeqLengthsKVNull);
+  TILING_DATA_FIELD_DEF(uint32_t, actualSeqLengthsSize);
+  TILING_DATA_FIELD_DEF(uint32_t, actualSeqLengthsKVSize);
   TILING_DATA_FIELD_DEF(uint32_t, deqScaleFlag);
   TILING_DATA_FIELD_DEF(uint32_t, deqScale2Flag);
   TILING_DATA_FIELD_DEF(uint32_t, isAntiPerchannel);
@@ -171,12 +198,16 @@ BEGIN_TILING_DATA_DEF(PromptAttentionBaseParams)
   TILING_DATA_FIELD_DEF(uint32_t, isActualSharedPrefixLenNull);
   TILING_DATA_FIELD_DEF(uint32_t, isQHasLeftPadding);
   TILING_DATA_FIELD_DEF(uint32_t, isKVHasLeftPadding);
+  TILING_DATA_FIELD_DEF(int64_t, keyAntiquantMode);
+  TILING_DATA_FIELD_DEF(int64_t, valueAntiquantMode);
+  TILING_DATA_FIELD_DEF(uint32_t, hasKeyAntiquantOffset);
+  TILING_DATA_FIELD_DEF(uint32_t, isMsd);
 
 END_TILING_DATA_DEF;
 REGISTER_TILING_DATA_CLASS(PromptAttentionBaseParamsOp, PromptAttentionBaseParams)
 
 BEGIN_TILING_DATA_DEF(PromptAttentionSeqParams)
-  // 临时复用
+  // Temporary reuse
   TILING_DATA_FIELD_DEF_ARR(uint32_t, 50, CoreHeadNumTail);       // coreNStart
   TILING_DATA_FIELD_DEF_ARR(uint32_t, 50, actualS1);              // coreNEnd
   TILING_DATA_FIELD_DEF_ARR(uint32_t, 50, actualCoreNums);        // coreSidStart
@@ -218,6 +249,19 @@ BEGIN_TILING_DATA_DEF(PromptAttentionSingleCoreTensorSize)
   TILING_DATA_FIELD_DEF(uint32_t, mm1TmpUbSize);
   TILING_DATA_FIELD_DEF(uint32_t, mm2TmpUbSize);
   TILING_DATA_FIELD_DEF(uint32_t, kvAntiquantUbSize);
+  TILING_DATA_FIELD_DEF(uint32_t, bmm2ResUbMsdSize);
+  TILING_DATA_FIELD_DEF(uint32_t, tempBmm2QueueMsdSize);
+  TILING_DATA_FIELD_DEF(uint32_t, msdInQueueSize);
+  TILING_DATA_FIELD_DEF(uint32_t, msdQRowSumBuffSize);
+  TILING_DATA_FIELD_DEF(uint32_t, msdAMaxTmpBuffSize);
+  TILING_DATA_FIELD_DEF(uint32_t, msdAMaxResBuffSize);
+  TILING_DATA_FIELD_DEF(uint32_t, msdSoftmaxResAmaxBuffSize);
+  TILING_DATA_FIELD_DEF(uint32_t, msdSoftmaxRowSumScaleBuffSize);
+  TILING_DATA_FIELD_DEF(uint32_t, msdScaleBuffSize);
+  TILING_DATA_FIELD_DEF(uint32_t, msdOffsetBuffSize);
+  TILING_DATA_FIELD_DEF(uint32_t, msdTmpMm1BuffSize);
+  TILING_DATA_FIELD_DEF(uint32_t, msdTmpMm2BuffSize);
+  TILING_DATA_FIELD_DEF(uint32_t, msdOutQueueSize);
 END_TILING_DATA_DEF;
 REGISTER_TILING_DATA_CLASS(PromptAttentionSingleCoreTensorSizeOp, PromptAttentionSingleCoreTensorSize)
 
@@ -267,11 +311,11 @@ protected:
     ge::graphStatus ConvertContextToPFAParams(gert::TilingContext* context, ContextParamsForPFATiling& contextKeyParams);
     ge::graphStatus TilingGetTilingKeyAttentionAscendC(uint64_t& tilingKey, ContextParamsForPFATiling& contextKeyParams,
                                                        bool useNewTiling, PromptFlashAttentionTilingData& tilingData);
-    ge::graphStatus PromptFlashAttentionSplitNS(ContextParamsForPFATiling& contextKeyParams, PromptFlashAttentionTilingData& tilingData, uint32_t coreNum, std::vector<int64_t>& actualSeqLengths);
+    ge::graphStatus PromptFlashAttentionSplitNS(ContextParamsForPFATiling& contextKeyParams, PromptFlashAttentionTilingData& tilingData, uint32_t curCoreNum, std::vector<int64_t>& actualSeqLengths);
     ge::graphStatus PromptFlashAttentionSplitNSNew(ContextParamsForPFATiling& contextKeyParams, PromptFlashAttentionTilingData& tilingData, uint32_t curCoreNum, std::vector<int64_t>& actualSeqLengths,
                                                     std::vector<int64_t>& actualSeqLengthsKV, int64_t actualSharedPrefixLen, bool useBalanceTiling);
     void GetPreNextTokensLeftUp(PromptFlashAttentionTilingData& tilingData, uint32_t actualSeqLength, uint32_t actualSeqLengthKV, int64_t& preTokensLeftUp, int64_t& nextTokensLeftUp);
-    bool EnableSplitSeqOneN(PromptFlashAttentionTilingData& tilingData, const ContextParamsForPFATiling& contextKeyParams);
+    bool EnableSplitSeqOneN(PromptFlashAttentionTilingData& tilingData, const ContextParamsForPFATiling& contextKeyParams, uint32_t hDivN);
     void PromptFlashAttentionSplitSeqOneN(PromptFlashAttentionTilingData& tilingData, uint32_t curCoreNum, bool isVectorCore);
     bool EnableMTE2BmmPipe(PromptFlashAttentionTilingData& tilingData, matmul_tiling::MatmulApiTiling& bmm,
                            TCubeTiling& bmmTilingData, uint32_t sOuterFactor, uint32_t sInnerFactor);
@@ -318,7 +362,7 @@ protected:
     void GetMatMulType(matmul_tiling::DataType &mmInputType, matmul_tiling::DataType &mmOutputType);
     ge::graphStatus CheckKeyValueParamsConsistency(const ContextParamsForPFATiling& contextKeyParams);
     bool CheckActualSeqLength(ContextParamsForPFATiling& contextKeyParams, uint32_t b, uint32_t sQ, uint32_t sKV,
-                              const gert::Tensor* actualSeqLenQ, const gert::Tensor* actualSeqLenKV, InputLayout inLayout);
+                              const gert::Tensor* actualSeqLenQ, const gert::Tensor* actualSeqLenKV, InputLayout inLayout, PromptFlashAttentionTilingData& tilingData);
     bool CheckPseShiftTypeAndShape(ContextParamsForPFATiling& contextKeyParams, const gert::StorageShape *pseShiftShape,
                                    uint32_t b, uint32_t n, uint32_t s1, uint32_t s2);
     bool CheckPATypeAndShape(ContextParamsForPFATiling& contextKeyParams, const gert::Tensor* actualSeqLenKV,
@@ -328,7 +372,7 @@ protected:
     bool CheckAntiquantParamsShape(ContextParamsForPFATiling& contextKeyParams, const gert::StorageShape* antiquantScaleShape,
                                    const gert::StorageShape* antiquantOffsetShape, const uint32_t n, const uint32_t d, const uint32_t h,
                                    PromptFlashAttentionTilingData& tilingData);
-    ge::graphStatus CheckPostQuantParams(const ContextParamsForPFATiling& contextKeyParams, uint32_t h, uint32_t n);
+    ge::graphStatus CheckPostQuantParams(const ContextParamsForPFATiling& contextKeyParams, uint32_t h, uint32_t n) const;
     ge::graphStatus PromptFlashAttentionCVDiffSetTensorSize(PromptFlashAttentionTilingData& tilingData,
         PromptAttentionSingleCoreTensorSize& tensorSize, uint32_t sOuterFactor,
         uint32_t sInnerFactor, uint32_t softmaxSOuterFactor);
@@ -353,6 +397,8 @@ protected:
                                   const std::vector<int64_t>& actualSeqLengthsKV, size_t lenDims);
     ge::graphStatus GetAndCheckEmptyQueryShape(ContextParamsForPFATiling& contextKeyParams, const gert::StorageShape *queryShape) const;
     void UpdateTilingKeyFlag(ContextParamsForPFATiling& contextKeyParams, uint64_t& tilingKey);
+    int64_t PromptFlashAttentionSetMsdUbSize(PromptFlashAttentionTilingData& tilingData, PromptAttentionSingleCoreTensorSize& tensorSize);
+  
     protected:
         ContextParamsForPFATiling* contextKeyParamsPtr = nullptr;
         int64_t ubSizeRemain = 1;
@@ -360,6 +406,7 @@ protected:
         bool isSInnerNoTail = true;
         bool isDNoTail = true;
         bool enableKvAntiquant = false;
+        bool enableMsd = false;
         bool enableQuantBF16 = false;
         bool enableMatmulNorm = false;
         bool enablePA = false;
@@ -383,14 +430,14 @@ protected:
         uint32_t pseShiftS1 = 0;
         uint32_t pseShiftS2 = 0;
         uint32_t usePseShift = 0;
-        uint32_t tmpS2 = 0;  // PA场景下无S2轴，用改变量归一PA和非PA场景的S2长度
+        uint32_t tmpS2 = 0;  // In the PA scenario, there is no S2 axis. Use the change amount to normalize the S2 length in both PA and non PA scenarios
         int32_t blockTableDim2 = 1;
         int32_t PABlockNumSum = 1;
         uint32_t maskTypeByteNum;
         uint32_t maxQuerySeq = 0;
         int64_t apiTmpSize = 1;
         uint32_t softmaxDataTypeNZ_ = FLOAT32SIZE;
-        uint32_t softmaxDataTypeSize = FLOAT32SIZE; // bf16通过fp32来进行计算
+        uint32_t softmaxDataTypeSize = FLOAT32SIZE; // BF16 calculates through FP32
         platform_ascendc::SocVersion curShortSocName;
         uint32_t dataTypeSize_ = 4;
         uint32_t layoutType = 0;
@@ -398,7 +445,7 @@ protected:
         platform_ascendc::PlatformAscendC ascendcPlatform;
         TilingMod tilingMod = TilingMod::CVSAME;
         uint32_t splitD = 0;
-        uint32_t splitS2 = 1; // 在D轴切分时才可能为0
+        uint32_t splitS2 = 1; // It can only be 0 when the D axis is split
         uint64_t innerPrecise = HIGH_PERFORMANCE;
         size_t defaultSysWorkspaceSize;
         matmul_tiling::PlatformInfo ascendPlatformInfo;

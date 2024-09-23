@@ -1,5 +1,5 @@
 /**
-* Copyright (c) 2024 Huawei Technologies Co., Ltd.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2024. All rights reserved.
  * This file is a part of the CANN Open Software.
  * Licensed under CANN Open Software License Agreement Version 1.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ static const size_t QUERY_INDEX = 0;
 static const size_t KEY_INDEX = 1;
 static const size_t VALUE_INDEX = 2;
 
-graphStatus PromptHostExecuteFunc(OpExecuteContext* host_api_ctx)
+static graphStatus PromptHostExecuteFunc(OpExecuteContext* host_api_ctx)
 {
   OPS_ERR_IF(host_api_ctx == nullptr,
     OPS_LOG_E("aclnnfallback", "host_api_ctx is null"), return GRAPH_FAILED);
@@ -76,8 +76,8 @@ graphStatus PromptHostExecuteFunc(OpExecuteContext* host_api_ctx)
   auto attrs = host_api_ctx->GetAttrs();
   const uint32_t* get_num_heads = attrs->GetAttrPointer<uint32_t>(0);
   const float* scaleValue = attrs->GetAttrPointer<float>(1);
-  const uint32_t* get_pre_tokens = attrs->GetAttrPointer<uint32_t>(2);
-  const uint32_t* get_next_tokens = attrs->GetAttrPointer<uint32_t>(3);
+  const int64_t* get_pre_tokens = attrs->GetAttrPointer<int64_t>(2);
+  const int64_t* get_next_tokens = attrs->GetAttrPointer<int64_t>(3);
   const char* layout = attrs->GetAttrPointer<char>(4);
   const uint32_t* get_kvHeadNum = attrs->GetAttrPointer<uint32_t>(5);
   const uint32_t* get_sparseMode = attrs->GetAttrPointer<uint32_t>(6);
@@ -91,7 +91,7 @@ graphStatus PromptHostExecuteFunc(OpExecuteContext* host_api_ctx)
   int64_t sparseMode = *get_sparseMode;
   int64_t innerPrecise = *get_innerPrecise;
 
-  if (innerPrecise < 0 || innerPrecise > 3) {   // innerPrecise = 2,3对应行无效的高精度和高性能
+  if (innerPrecise < 0 || innerPrecise > 3) {   // innerPrecise=2,3 corresponds to high-precision mode with invalid rows.
     OPS_LOG_E("aclnnfallback", "invalid innerPrecise(%ld). Only support 0~3 now.", innerPrecise);
     return GRAPH_FAILED;
   }

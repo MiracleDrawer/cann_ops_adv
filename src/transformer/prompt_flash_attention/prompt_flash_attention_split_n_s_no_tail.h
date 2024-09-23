@@ -342,7 +342,7 @@ __aicore__ inline void PromptFlashAttentionSplitNSNoTail<T, U, FORMAT, O, M>::Co
     int formerNum = sOuterBlockNum % s1;
     for (uint32_t loopNIdx = 0; loopNIdx < coreHeadNum; loopNIdx++) {
         this->batchNOffset = nGropOffeset + loopNIdx;
-        // 偶数次N循环时 curSidx 反转
+        // When the number of cycles N is even, reverse curSidx.
         if (loopNIdx % 2 != 0) {
             curSIdx = s1 - curSIdx - 1;
         }
@@ -367,12 +367,12 @@ __aicore__ inline void PromptFlashAttentionSplitNSNoTail<T, U, FORMAT, O, M>::Co
                                                                                      int seqIdx, int s1, int curSIdx) {
     this->batchNOffset = nGropOffeset;
 
-    this->loopSNum = sOuterBlockNum / s1 / 2;  // 为了负载均衡，需要镜像计算Souter
+    this->loopSNum = sOuterBlockNum / s1 / 2;  // For load balancing, Souter mirror computing is required.
     int loopStart = this->loopSNum * curSIdx;
     for (uint32_t sOuterLoopIdx = loopStart; sOuterLoopIdx < loopStart + this->loopSNum; sOuterLoopIdx++) {
-        // 计算一个Souter
+        // Computing one Souter.
         computeSingleS(sOuterLoopIdx, seqIdx);
-        // 镜像计算下一个Souter
+        // Mirror computing the next Souter.
         uint32_t mirroredSouterLoopIdex = sOuterBlockNum - sOuterLoopIdx - 1;
         computeSingleS(mirroredSouterLoopIdex, seqIdx);
     }
@@ -421,7 +421,7 @@ __aicore__ inline void PromptFlashAttentionSplitNSNoTail<T, U, FORMAT, O, M>::Co
 
         this->GetSingleCoreParam(sIdx);
         this->singleProcessSOuterSize = this->singleProcessSOuterSizeWhole;
-        // n=1, s方向每个核处理的数据都是偶数个Souter
+        // n=1. In the s direction, each core processes an even number of Souter.
         if (coreHeadNum == 1 && s1 > 1 && sOuterBlockNum % s1 == 0 && sOuterBlockNum / s1 % 2 == 0) {
             ComputeEachCoreSLoop(sOuterBlockNum, nGropOffeset, sIdx, s1, curSIdx);
         }

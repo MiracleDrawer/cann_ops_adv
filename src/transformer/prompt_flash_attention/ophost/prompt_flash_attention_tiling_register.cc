@@ -1,5 +1,5 @@
 /**
-* Copyright (c) 2024 Huawei Technologies Co., Ltd.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2024. All rights reserved.
  * This file is a part of the CANN Open Software.
  * Licensed under CANN Open Software License Agreement Version 1.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ using namespace AscendC;
 namespace optiling {
 constexpr uint32_t ACTUAL_SEQ_Q_INDEX_PFA = 5;
 constexpr uint32_t ACTUAL_SEQ_KV_INDEX_PFA = 6;
-ge::graphStatus TilingPrepareForPromptFlashAttention(gert::TilingParseContext* context) {
+static ge::graphStatus TilingPrepareForPromptFlashAttention(gert::TilingParseContext* context) {
     auto platformInfoPtr = context->GetPlatformInfo();
     OPS_ERR_IF(platformInfoPtr == nullptr,
                     OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "platformInfoPtr is null!"),
@@ -52,5 +52,5 @@ ge::graphStatus TilingPrepareForPromptFlashAttention(gert::TilingParseContext* c
 IMPL_OP_OPTILING(PromptFlashAttention)
     .TilingInputsDataDependency({ACTUAL_SEQ_Q_INDEX_PFA, ACTUAL_SEQ_KV_INDEX_PFA})
     .Tiling(TilingPromptFlashAttention)
-    .TilingParse<PromptFlashAttentionCompileInfo>(TilingPrepareForPromptFlashAttention); // 向框架注册入口函数
+    .TilingParse<PromptFlashAttentionCompileInfo>(TilingPrepareForPromptFlashAttention); // Register entrance functions to the framework
 }  // namespace optiling

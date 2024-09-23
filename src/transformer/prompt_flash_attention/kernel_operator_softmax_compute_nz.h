@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2023-2024 Huawei Technologies Co., Ltd.
+ * Copyright (c) Huawei Technologies Co., Ltd. 2024. All rights reserved.
  * This file is a part of the CANN Open Software.
  * Licensed under CANN Open Software License Agreement Version 1.0 (the "License").
  * Please refer to the License for details. You may not use this file except in compliance with the License.
@@ -41,8 +41,8 @@ __aicore__ inline void ReduceMaxLastNZImplPFA(const LocalTensor<half>& dst, cons
             { 1, 1, 1, DEFAULT_REPEAT_STRIDE, DEFAULT_REPEAT_STRIDE, DEFAULT_REPEAT_STRIDE });
         PipeBarrier<PIPE_V>();
     }
-    SetVectorMask<half, MaskMode::COUNTER>(0, reduceParam.srcM * 16);
-    BlockReduceMax<half, false>(dst, dst, 1, MASK_PLACEHOLDER, 1, 1, 8);
+    SetVectorMask<half, MaskMode::COUNTER>(0, reduceParam.srcM * 16);   // 16: FLOAT_NUM_PER_BLK
+    BlockReduceMax<half, false>(dst, dst, 1, MASK_PLACEHOLDER, 1, 1, 8);    // 8: DEFAULT_REPEAT_STRIDE * B16_BYTE_SIZE
     SetMaskNorm();
     ResetMask();
 
@@ -50,7 +50,7 @@ __aicore__ inline void ReduceMaxLastNZImplPFA(const LocalTensor<half>& dst, cons
 
     uint8_t repeat = reduceParam.srcM / 16;
     for (uint8_t i = 0; i < repeat; i++) {
-        Muls<half, false>(tmpBuffer[i * 128 * 2], dst[i * 16], 1.0, MASK_PLACEHOLDER, 2, { 1, 0, DEFAULT_REPEAT_STRIDE, 0 });
+        Muls<half, false>(tmpBuffer[i * 128 * 2], dst[i * 16], 1.0, MASK_PLACEHOLDER, 2, { 1, 0, DEFAULT_REPEAT_STRIDE, 0 });   // 2: FLOAT_REPEAT_SIZE
     }
     PipeBarrier<PIPE_V>();
     uint64_t dstList[NCHW_CONV_ADDR_LIST_SIZE];
@@ -87,15 +87,15 @@ __aicore__ inline void ReduceSumLastNZImplPFA(const LocalTensor<half>& dst, cons
         PipeBarrier<PIPE_V>();
     }
 
-    SetVectorMask<half, MaskMode::COUNTER>(0, reduceParam.srcM * 16);
-    BlockReduceSum<half, false>(dst, dst, reduceParam.srcM / 8, MASK_PLACEHOLDER, 1, 1, 8);
+    SetVectorMask<half, MaskMode::COUNTER>(0, reduceParam.srcM * 16);    // 16: FLOAT_NUM_PER_BLK
+    BlockReduceSum<half, false>(dst, dst, reduceParam.srcM / 8, MASK_PLACEHOLDER, 1, 1, 8);     // 8: Align 8 elements
     SetMaskNorm();
     ResetMask();
 
     PipeBarrier<PIPE_V>();
     uint8_t repeat = reduceParam.srcM / 16;
     for (uint8_t i = 0; i < repeat; i++) {
-        Muls<half, false>(tmpBuffer[i * 128 * 2], dst[i * 16], 1.0, MASK_PLACEHOLDER, 2, { 1, 0, DEFAULT_REPEAT_STRIDE, 0 });
+        Muls<half, false>(tmpBuffer[i * 128 * 2], dst[i * 16], 1.0, MASK_PLACEHOLDER, 2, { 1, 0, DEFAULT_REPEAT_STRIDE, 0 });     // 2: FLOAT_REPEAT_SIZE
     }
     PipeBarrier<PIPE_V>();
     uint64_t dstList[NCHW_CONV_ADDR_LIST_SIZE];

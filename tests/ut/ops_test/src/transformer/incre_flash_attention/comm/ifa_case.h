@@ -21,6 +21,7 @@
 #include "tests/utils/op_info.h"
 #include "tests/utils/context.h"
 #include "tests/utils/tensor.h"
+#include "tests/utils/tensor_list.h"
 #include <exe_graph/runtime/tiling_context.h>
 #include <register/op_impl_registry.h>
 
@@ -29,6 +30,7 @@ class IfaCase : public ops::adv::tests::utils::Case {
     using OpInfo = ops::adv::tests::utils::OpInfo;
     using Context = ops::adv::tests::utils::Context;
     using Tensor = ops::adv::tests::utils::Tensor;
+    using TensorList = ops::adv::tests::utils::TensorList;
 
 public:
     enum class PseShiftShapeType {
