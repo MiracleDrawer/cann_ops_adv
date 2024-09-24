@@ -126,10 +126,10 @@
 
     返回aclnnStatus状态码，具体参见[aclnn返回码](common/aclnn返回码.md)。
 
-    **说明：**
+    ```
     第一段接口完成入参校验，若出现以下错误码，则对应原因为：
-    
-    -  返回161001（ACLNN\_ERR\_PARAM\_NULLPTR）：传入的query、key、value、attentionOut是空指针。
+    -  返回161001（ACLNN_ERR_PARAM_NULLPTR）：传入的query、key、value、attentionOut是空指针。
+    ```
 
 ## aclnnFusedInferAttentionScore
 

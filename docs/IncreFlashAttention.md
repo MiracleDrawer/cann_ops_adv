@@ -7,11 +7,11 @@
 - Atlas A2 训练系列产品
 - Atlas 推理系列产品（Ascend 310P处理器）中的加速卡
 
-产品形态详细说明请参见[昇腾产品形态说明](https://www.hiascend.com/document/redirect/CannCommunityProductForm)
+产品形态详细说明请参见[昇腾产品形态说明](https://www.hiascend.com/document/redirect/CannCommunityProductForm)。
 
 ## 实现原理
 
-详细实现原理参考[IFA设计](./common/IFA算子设计介绍.md)
+详细实现原理参考[IFA设计](./common/IFA算子设计介绍.md)。
 
 ## 接口原型
 

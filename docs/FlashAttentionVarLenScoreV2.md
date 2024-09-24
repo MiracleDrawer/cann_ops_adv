@@ -19,7 +19,7 @@ Atlas A2 训练系列产品
 
    - psetype=其他取值时，公式如下：
      $$
-     attention\\_out=Dropout(Softmax(Mask(scale*(query*key^T) + pse),atten\\_mask),keep\\_prob)*value
+     attention\_out=Dropout(Softmax(Mask(scale*(query*key^T) + pse),atten\_mask),keep\_prob)*value
      $$
 
 ## 实现原理

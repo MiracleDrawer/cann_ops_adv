@@ -16,17 +16,17 @@ Atlas A2 训练系列产品
     已知注意力的正向计算公式为：
 
     $$
-    Y=Dropout(Softmax(Mask(\frac{QK^T+pse}{\sqrt{d}}),atten\\_mask),keep\\_prob)V
+    Y=Dropout(Softmax(Mask(\frac{QK^T+pse}{\sqrt{d}}),atten\_mask),keep\_prob)V
     $$
 
     为方便表达，以变量$S$和$P$表示计算公式：
 
     $$
-    S=Mask(\frac{QK^T+pse}{\sqrt{d}},atten\\_mask)
+    S=Mask(\frac{QK^T+pse}{\sqrt{d}},atten\_mask)
     $$
 
     $$
-    P=Dropout(Softmax(S),keep\\_prob)
+    P=Dropout(Softmax(S),keep\_prob)
     $$
 
     $$
@@ -47,9 +47,6 @@ Atlas A2 训练系列产品
     dK=\frac{((dS)^T*Q)}{\sqrt{d}}
     $$
 
-    $$
-    d(pse)=dS*\sqrt{d}
-    $$
 
 ## 实现原理
 

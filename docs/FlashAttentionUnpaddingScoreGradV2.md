@@ -19,16 +19,16 @@ Atlas A2 训练系列产品
   已知注意力的正向计算公式（psetype=1时，与[FlashAttentionUnpaddingScoreGrad](./FlashAttentionUnpaddingScoreGrad.md)计算公式相同，psetype=其他取值公式如下）：
 
   $$
-  Y=Dropout(Softmax(Mask(\frac{QK^T}{\sqrt{d}}+pse),atten\\_mask),keep\\_prob)V
+  Y=Dropout(Softmax(Mask(\frac{QK^T}{\sqrt{d}}+pse),atten\_mask),keep\_prob)V
   $$
 
   为方便表达，以变量$S$和$P$表示计算公式：
 
   $$
-  S=Mask(\frac{QK^T}{\sqrt{d}}+pse),atten\\_mask
+  S=Mask(\frac{QK^T}{\sqrt{d}}+pse),atten\_mask
   $$
   $$
-  P=Dropout(Softmax(S),keep\\_prob)
+  P=Dropout(Softmax(S),keep\_prob)
   $$
   $$
   Y=PV
@@ -48,9 +48,6 @@ Atlas A2 训练系列产品
   dK=\frac{((dS)^T*Q)}{\sqrt{d}}
   $$
 
-  $$
-  d(pse)=dS*\sqrt{d}
-  $$
 
 ## 实现原理
 
@@ -170,8 +167,8 @@ Atlas A2 训练系列产品
 
      ```
      第一段接口完成入参校验，若出现以下错误码，则对应原因为：
-     - 返回161001（ACLNN\_ERR\_PARAM\_NULLPTR）：如果传入参数是必选输入，输出或者必选属性，且是空指针，则返回161001。
-     - 返回161002（ACLNN\_ERR\_PARAM\_INVALID）：query、keyIn、value、dy、pseShiftOptional、dropMaskOptional、paddingMaskOptional、attenMaskOptional、softmaxMaxOptional、softmaxSumOptional、softmaxInOptional、attentionInOptional、dqOut、dkOut、dvOut的数据类型和数据格式不在支持的范围内。
+     - 返回161001（ACLNN_ERR_PARAM_NULLPTR）：如果传入参数是必选输入，输出或者必选属性，且是空指针，则返回161001。
+     - 返回161002（ACLNN_ERR_PARAM_INVALID）：query、keyIn、value、dy、pseShiftOptional、dropMaskOptional、paddingMaskOptional、attenMaskOptional、softmaxMaxOptional、softmaxSumOptional、softmaxInOptional、attentionInOptional、dqOut、dkOut、dvOut的数据类型和数据格式不在支持的范围内。
      ```
 
 ### aclnnFlashAttentionUnpaddingScoreGradV2

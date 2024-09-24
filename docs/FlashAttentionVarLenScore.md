@@ -16,7 +16,7 @@ Atlas A2 训练系列产品
     注意力的正向计算公式如下：
 
     $$
-    attention\\_out=Dropout(Softmax(Mask(scale*(pse+query*key^T),atten\\_mask)),keep\\_prob)*value
+    attention\_out=Dropout(Softmax(Mask(scale*(pse+query*key^T),atten\_mask)),keep\_prob)*value
     $$
 
 
