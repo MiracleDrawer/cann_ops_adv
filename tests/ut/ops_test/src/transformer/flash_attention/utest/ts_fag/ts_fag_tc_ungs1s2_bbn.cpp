@@ -119,9 +119,9 @@ const auto Tc_Fag_Ungs1s2Bbn_BatchCase = ::testing::Values(
             "",                                                     /* DebugInfo */
             OpInfo(ControlInfo(true, RunKernelNotInPr),             /* RunTiling, RunKernel */
                    ExpectInfo(true,                                 /* ExpectSuccess */
-                              10000000000000003199UL,               /* ExpectTilingKey */
+                              10000000000010003199UL,               /* ExpectTilingKey */
                               ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
-            FaParam(16, 16, 1, 2, 2, 64,                            /* B, N2, G, S1, S2, D */
+            FaParam(16, 16, 1, 4, 4, 64,                            /* B, N2, G, S1, S2, D */
                     ge::DataType::DT_FLOAT16, LayoutType::BSH,      /* Dtype, Layout */
                     0.08838f, 0.8f, 2048, 2048,                     /* Scale, KeepProb, PreTokens, NxtTokens */
                     0, 0,                                           /* InnerPrecise, SparseMode */

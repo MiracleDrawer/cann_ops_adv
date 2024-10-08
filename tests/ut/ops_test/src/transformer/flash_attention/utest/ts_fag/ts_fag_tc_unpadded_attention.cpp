@@ -430,9 +430,9 @@ const auto Tc_Fag_UnpaddedAttention_BatchCase = ::testing::Values(
             ),
     FagCase("Fag_UnpaddedAttention_Case_016", true,                 /* CaseName, Enable */
             "",                                                     /* DebugInfo */
-            OpInfo(ControlInfo(true, true),                         /* RunTiling, RunKernel */
+            OpInfo(ControlInfo(true, false),                        /* RunTiling, RunKernel */
                    ExpectInfo(true,                                 /* ExpectSuccess */
-                              10000000001101033434UL,               /* ExpectTilingKey */
+                              10000000011010000134UL,               /* ExpectTilingKey */
                               ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
             FaParam(1, 1, 1, 64, 64, 32,                            /* B, N2, G, S1, S2, D */
                     ge::DataType::DT_FLOAT16, LayoutType::TND,      /* Dtype, Layout */

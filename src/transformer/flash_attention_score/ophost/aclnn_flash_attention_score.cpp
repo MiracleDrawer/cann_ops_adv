@@ -42,6 +42,9 @@ static const int64_t PSE_INNER_MUL_ADD_SQRT = 3;
 static const int64_t HEAD_DIM_72 = 72;
 static const int64_t HEAD_DIM_88 = 88;
 static const int64_t SEQ_LEN_1024 = 1024;
+static const int64_t TND_UNPAD_MAX_S2 = 1024;
+static const int64_t TND_UNPAD_MAX_S1_SUM = 160 * 1024;
+static const int64_t TND_UNPAD_MAX_DDIM = 96;
 
 struct AxesInfo {
     int64_t b;
@@ -233,13 +236,59 @@ void SetShapeInfoForSbh(int64_t alignedH1Size, FaShapeInfo &shapeInfo)
     }
 }
 
-bool IsNeedPad(const FaShapeInfo &shapeInfo)
+static int64_t GetSumIntArrayMaxValue(const aclIntArray *intArrayValue)
+{
+    // 获取targetLengthsList中的最大值
+    int64_t maxLength = 0;
+    int64_t tmpMaxLength = 0;
+    if (intArrayValue->Size() == 1) {
+        maxLength = static_cast<int64_t>((*intArrayValue)[0]);
+        return maxLength;
+    }
+    maxLength = static_cast<int64_t>((*intArrayValue)[0]);
+    for (size_t i = 1; i < intArrayValue->Size(); ++i) {
+        tmpMaxLength = static_cast<int64_t>((*intArrayValue)[i]) - static_cast<int64_t>((*intArrayValue)[i - 1]);
+        if (tmpMaxLength > maxLength) {
+            maxLength = tmpMaxLength;
+        }
+    }
+    return maxLength;
+}
+
+bool IsNeedPad(const FaShapeInfo &shapeInfo, const aclIntArray *actualSeqQLenOptional,
+               const aclIntArray *actualSeqKvLenOptional)
 {
     if ((shapeInfo.axes.d == HEAD_DIM_72 || shapeInfo.axes.d == HEAD_DIM_88) &&
          shapeInfo.axes.s2 <= SEQ_LEN_1024 && shapeInfo.inputLayout != InputLayout::BNSD &&
          shapeInfo.inputLayout != InputLayout::TND && shapeInfo.axes.n1 == shapeInfo.axes.n2 &&
          shapeInfo.needTranspose == false) {
         return false;
+    }
+
+    if (shapeInfo.inputLayout == InputLayout::TND) {
+        if (shapeInfo.axes.d >= TND_UNPAD_MAX_DDIM) {
+            return true;
+        }
+        int64_t sKvLenMax = 0;
+        int64_t sQLenSum = 0;
+        if (actualSeqQLenOptional != nullptr && actualSeqKvLenOptional != nullptr &&
+            actualSeqQLenOptional->Size() == actualSeqKvLenOptional->Size()) {
+            sKvLenMax = GetSumIntArrayMaxValue(actualSeqKvLenOptional);
+            sQLenSum = actualSeqQLenOptional->Size() >= 1 ?
+                       static_cast<int64_t>((*actualSeqQLenOptional)[actualSeqQLenOptional->Size() - 1]) : 0;
+        }
+
+        if (sKvLenMax == 0 || sQLenSum == 0) {
+            // 走原来逻辑是否pad
+            OP_LOGD("Fa aclnn TND case sKvLenMax(%ld) or sQLenSum(%ld) is 0.", sKvLenMax, sQLenSum);
+            return true;
+        }
+
+        if ((sKvLenMax <= TND_UNPAD_MAX_S2) && (sQLenSum < TND_UNPAD_MAX_S1_SUM)) {
+            // 去除pad
+            OP_LOGD("Fa aclnn TND case do not do pad dimD operation.");
+            return false;
+        }
     }
     return true;
 }
@@ -284,7 +333,8 @@ aclnnStatus InputDtypeCheck(const aclTensor *query, const aclTensor *key, const 
 }
 
 aclnnStatus AnalysisInput(const aclTensor *query, const aclTensor *key, char *inputLayout, int64_t headNum,
-                          FaShapeInfo &shapeInfo)
+                          FaShapeInfo &shapeInfo, const aclIntArray *actualSeqQLenOptional = nullptr,
+                          const aclIntArray *actualSeqKvLenOptional = nullptr)
 {
     if (headNum <= 0) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "head_num must > 0, but got %ld", headNum);
@@ -321,7 +371,7 @@ aclnnStatus AnalysisInput(const aclTensor *query, const aclTensor *key, char *in
         SetShapeInfoForSbh(alignedH1Size, shapeInfo);
     }
 
-    if (!IsNeedPad(shapeInfo)) {
+    if (!IsNeedPad(shapeInfo, actualSeqQLenOptional, actualSeqKvLenOptional)) {
         shapeInfo.needPad = false;
         shapeInfo.padNum = 0;
         shapeInfo.needReshape = false;
@@ -622,7 +672,8 @@ aclnnStatus aclnnFlashAttentionVarLenScoreGetWorkspaceSize(
         return ACLNN_ERR_PARAM_INVALID;
     }
     FaShapeInfo shapeInfo;
-    CHECK_RET(AnalysisInput(query, key, inputLayout, headNum, shapeInfo) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(AnalysisInput(query, key, inputLayout, headNum, shapeInfo, actualSeqQLenOptional,
+                            actualSeqKvLenOptional) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
 
     aclOpExecutor *l0Executor = uniqueExecutor.get();
 
@@ -787,7 +838,8 @@ aclnnStatus aclnnFlashAttentionVarLenScoreV2GetWorkspaceSize(
     FaShapeInfo shapeInfo;
     CHECK_RET(InputDtypeCheck(query, key, value, realShiftOptional, pseTypeOptional) == ACLNN_SUCCESS,
               ACLNN_ERR_PARAM_INVALID);
-    CHECK_RET(AnalysisInput(query, key, inputLayout, headNum, shapeInfo) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
+    CHECK_RET(AnalysisInput(query, key, inputLayout, headNum, shapeInfo, actualSeqQLenOptional,
+                            actualSeqKvLenOptional) == ACLNN_SUCCESS, ACLNN_ERR_PARAM_INVALID);
 
     aclOpExecutor *l0Executor = uniqueExecutor.get();
 

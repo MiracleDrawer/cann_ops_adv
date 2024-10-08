@@ -165,6 +165,8 @@ protected:
     void GetCommS1S2OuterInfo(const int64_t prefixN, std::vector<std::pair<int64_t, int64_t>> &s1ValidIdx);
     void PrintShapeInfo();
     ge::graphStatus GetBaseShapeInfo();
+    ge::graphStatus ProcessTndToBsh();
+    bool tnd2bsh = false;
 
 private:
     FuzzyBaseInfoParams fBaseParams;

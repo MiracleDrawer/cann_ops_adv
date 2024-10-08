@@ -144,6 +144,7 @@ protected:
     void PrintShapeInfo();
     ge::graphStatus GetBaseShapeInfo();
     void DoPreSfmgTiling();
+    void AdjustCvInner();
 
 private:
     SameAbFuzzyBaseInfoParams fBaseParams;

@@ -447,8 +447,8 @@ __aicore__ inline void FlashAttentionVarLenScore<implMode, layOutType, hasPse, h
         extraInfo.realSplitN = CeilDiv(extraInfo.s1RealSize, extraInfo.vec1S1BaseSize);
     }
 
-    if (this->dSize > 64) {
-        extraInfo.vec2S1BaseSize = 64 * 128 / this->dSize;
+    if (this->dSizeAlign16 > 64) {
+        extraInfo.vec2S1BaseSize = 64 * 128 / this->dSizeAlign16;
     } else {
         extraInfo.vec2S1BaseSize = extraInfo.s1RealSize;
     }

@@ -1314,7 +1314,6 @@ __aicore__ inline void
                 } else {
                     mm1.template IterateBatch<true>(matmulResultBuffer2[i * n * g * sQ * sKV], n * g, n, false);
                 }
-
             }
         }
         mm1.End();

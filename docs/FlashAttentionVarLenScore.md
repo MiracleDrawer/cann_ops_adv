@@ -142,6 +142,8 @@ Atlas A2 训练系列产品
 - sparseModeOptional为1、2、3、4、6、7、8时，应传入对应正确的attenMaskOptional，否则将导致计算结果错误。当attenMaskOptional输入为None时，sparseModeOptional、preTokensOptional、nextTokensOptional参数不生效，固定为全计算。
 - attenMaskOptional输入不支持补pad，即attenMaskOptional中不能存在某一行全1的场景。
 - actualSeqQLenOptional输入支持某个Batch上的S长度为0，此时不支持可选输入realShiftOptional，假设真实的S长度为\[2,2,0,2,2\]，则传入的actualSeqQLenOptional为\[2,4,4,6,8\]。不支持某个batch中Sq不为0，但是Skv为0的场景。
+- sparse_mode=7时，不支持可选输入realShiftOptional。
+- sparse_mode=8时，当每个sequence的q、kv等长时支持可选输入realShiftOptional，针对全局做pse生成。支持q方向进行外切，需要外切前每个sequence的q、kv等长，外切后传入的actualSeqQLenOptional[0] - actualSeqKvLenOptional[0] + qStartIdxOptional - kvStartIdxOptional == 0（本功能属实验性功能）。
 
 ## 算子原型
 

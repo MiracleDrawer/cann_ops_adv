@@ -1412,8 +1412,19 @@ FlashAttentionScoreGradS1s2Bn2gs1s2<T1, T2, IS_ATTEN_MASK, IS_PSE, IS_DROP, MM_O
         pseInfo.s2AlignedSize = s2ExtendAlign;
         pseInfo.s2StartIdx = s2VBegin;
         LocalTensor<T2> noCastedPseUb = ubBuffer.GetWithOffset<T2>(0 / sizeof(T2), 0);
+        bool innerAlibiFlag = false; // alibi核内生成相关配置，仅在LAYOUT=TND，SparseMode=8时生效
+        if constexpr (INPUT_LAYOUT == TND) {
+            if (sparseMode == 8 && pseInfo.boIdx != 0) {
+                innerAlibiFlag = true;
+            }
+        }
+
         if (pseInfo.pseType == (uint32_t)PseTypeEnum::PSE_INNER_MUL_ADD_TYPE ||
             pseInfo.pseType == (uint32_t)PseTypeEnum::PSE_INNER_MUL_ADD_SQRT_TYPE) {
+            if (innerAlibiFlag) {
+                pseInfo.kvStartIdx = 0;
+                pseInfo.qStartIdx = 0;
+            }
             PseSlopeCopyIn<T2, true>(noCastedPseUb, pseUb, pseSlope, this->pseAlibiGm, pseInfo);
         } else {
             if constexpr (!IsSameType<T1, float>::value) {

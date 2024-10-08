@@ -700,6 +700,18 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::GetShapeAttrsInfo()
         return ge::GRAPH_FAILED;
     }
 
+    auto pse = context_->GetOptionalInputDesc(PSE_SHIFT);
+    if (td_.opInfo.get_layout() == static_cast<uint32_t>(InputLayout::TND)){
+        tnd2bsh = (td_.opInfo.get_B() * td_.opInfo.get_S1() == tmpData_.t1) &&
+                  (td_.opInfo.get_B() * td_.opInfo.get_S2() == tmpData_.t2) &&
+                  (td_.opInfo.get_S1() == td_.opInfo.get_S2());
+        if (context_->GetDeterministic() != 1 && pse == nullptr &&
+            tnd2bsh && !(sparseMode == RIGHT_DOWN_CASUAL_BAND || sparseMode == BAND_LEFT_UP_CASUAL)) {
+            tmpData_.layout = static_cast<uint32_t>(InputLayout::BSH);
+            td_.opInfo.set_layout(static_cast<uint32_t>(InputLayout::BSH));
+        }
+    }
+
     td_.opInfo.set_preTokens(*context_->GetAttrs()->GetAttrPointer<int>(PRE_TOKENS));
     td_.opInfo.set_nextTokens(*context_->GetAttrs()->GetAttrPointer<int>(NEXT_TOKENS));
     if (attrs->GetAttrNum() > static_cast<size_t>(PSETYPE)) {
@@ -756,7 +768,7 @@ void FlashAttentionScoreGradTilingS1s2Bn2::NMDStrategy()
             baseNmm = std::min(BASE_LEN_128, AlignData(static_cast<uint32_t>(td_.opInfo.get_S2()), FRACTAL_NUM));
             needSetFixSplit = true;
         } else if (td_.opInfo.get_S2() > S_LEN_512 && td_.opInfo.get_S2() < S_LEN_1024 &&
-                   l2CacheSize > B4_L2_CACHESIZE) { // B4带宽及L2降了一半，不使能这个优化
+                   l2CacheSize > B4_L2_CACHESIZE) { // 特殊场景，受L2限制，不使能这个优化
             mmRatio = MM_RATIO_8; // S2方向满配比，减少S2方向数据重复搬运
         }
     }
@@ -960,20 +972,29 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::DoBlockTiling()
     int64_t nNums = td_.opInfo.get_B() * td_.opInfo.get_N2();
     int64_t formerCoreProcessNNums = CeilCommon(nNums, aicoreParams_.blockDim);
     int64_t remainCoreNum = formerCoreProcessNNums * aicoreParams_.blockDim - nNums;
+
     td_.opInfo.set_usedCoreNum(aicoreParams_.blockDim);
-    if (td_.opInfo.get_layout() == static_cast<uint32_t>(InputLayout::TND)) {
-        if (nNums < static_cast<int64_t>(aicoreParams_.blockDim)) {
-            // 需要给出真实使用的core数，用于bN2idxStarts，bN2idxEnds的检索
-            td_.opInfo.set_usedCoreNum(nNums);
+    td_.opInfo.set_castUsedCoreNum(aicoreParams_.blockDim); // for pre & post process
+    if (nNums < static_cast<int64_t>(aicoreParams_.blockDim)) {
+        if (td_.opInfo.get_layout() == static_cast<uint32_t>(InputLayout::TND)) {
+                // 需要给出真实使用的core数，用于bN2idxStarts，bN2idxEnds的检索
+                td_.opInfo.set_usedCoreNum(nNums);
+                td_.opInfo.set_castUsedCoreNum(nNums);
+        } else {
+            // 非TND
+            int64_t minS = std::min(td_.opInfo.get_S1(), td_.opInfo.get_S2());
+            if (nNums * minS * td_.opInfo.get_D() / aicoreParams_.blockDim * tmpData_.dataTypeSize < 8 * 1024) {
+                // 后处理ub利用率严重不足时，减少核启动
+                td_.opInfo.set_usedCoreNum(nNums);
+                td_.opInfo.set_castUsedCoreNum(nNums);
+                needAdjustBlockDim = true;
+            }
         }
     }
+
     td_.opInfo.set_formerCoreNum(aicoreParams_.blockDim - remainCoreNum);
     td_.opInfo.set_formerCoreProcessNNum(formerCoreProcessNNums);
     td_.opInfo.set_remainCoreProcessNNum(formerCoreProcessNNums - 1);
-    td_.opInfo.set_castUsedCoreNum(aicoreParams_.blockDim);
-    if (nNums < static_cast<int64_t>(aicoreParams_.blockDim)) {
-        td_.opInfo.set_castUsedCoreNum(nNums);
-    }
 
     // 确定性计算下的TND对应的分核策略
     if (td_.opInfo.get_layout() == static_cast<uint32_t>(InputLayout::TND)) {
@@ -1289,8 +1310,9 @@ void FlashAttentionScoreGradTilingS1s2Bn2::DoPreTiling()
 
 ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::GetWorkspaceSize()
 {
+    int64_t launchBlockDims = needAdjustBlockDim ? td_.opInfo.get_usedCoreNum() : aicoreParams_.blockDim;
     // Tiling传递的内存大小、起始地址，统一为字节数，单位为B
-    auto blockdim = CalcTschBlockDim(aicoreParams_.blockDim, aicoreParams_.aicNum, aicoreParams_.blockDim);
+    auto blockdim = CalcTschBlockDim(launchBlockDims, aicoreParams_.aicNum, aicoreParams_.blockDim);
     OPS_ERR_IF(blockdim == 0,
                OPS_REPORT_VECTOR_INNER_ERR(context_,
                                            "blockdim is 0, aicNum is %lu, aivNum is %lu.", aicoreParams_.aicNum,
@@ -1406,7 +1428,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::GetLayoutInfo()
         td_.opInfo.set_layout(static_cast<uint32_t>(InputLayout::BNSD));
     } else if (strcmp(inputLayout, BSND_STR) == 0) {
         td_.opInfo.set_layout(static_cast<uint32_t>(InputLayout::BSND));
-    } else if (strcmp(inputLayout, TND_STR) == 0 && context_->GetDeterministic() == 1) {
+    } else if (strcmp(inputLayout, TND_STR) == 0) {
         td_.opInfo.set_layout(static_cast<uint32_t>(InputLayout::TND));
     } else {
         OPS_LOG_W(context_, "FlashAttentionScoreGradTilingS1s2Bn2 unsupported layout");
@@ -1512,6 +1534,10 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::SetBaseInfo(const gert::Sh
         std::vector<int64_t> actualSeqKvlen;
         const int64_t *qValue = actualSeqQlenTensor->GetData<int64_t>();
         const int64_t *kvValue = actualSeqKvlenTensor->GetData<int64_t>();
+        OPS_ERR_IF(
+            (qValue == nullptr || kvValue == nullptr),
+            OPS_REPORT_VECTOR_INNER_ERR(context_, "qValue or kvValue is nullptr."),
+            return ge::GRAPH_FAILED);
         int64_t tempN2 = keyShape.GetDim(DIM_1);
         for (size_t i = 0; i < seqQShapeSize; i++) {
             int64_t qSeqLen = (i == 0 ? qValue[i] : (qValue[i] - qValue[i - 1]));
@@ -1520,10 +1546,12 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2::SetBaseInfo(const gert::Sh
             tmpData_.actualSeqKvlen.push_back(kvSeqLen);
             int64_t s1s2Product = tmpData_.actualSeqQlen[i] * tmpData_.actualSeqKvlen[i];
             tmpData_.sumS1S2Product += s1s2Product;
-
+            int64_t s1s2ProductAlign = s1s2Product;
+            s1s2ProductAlign = CeilCommon(tmpData_.actualSeqQlen[i], BASE_LEN_64) *
+                CeilCommon(tmpData_.actualSeqKvlen[i], BASE_LEN_64);
             // 将s1*s2的权重，按照B*N2的大小进行摊开存储，摊开顺序是先N2再B
             for (int64_t n2 = 0; n2 < tempN2; n2++) {
-                tmpData_.s1s2Weight.push_back(s1s2Product);
+                tmpData_.s1s2Weight.push_back(s1s2ProductAlign);
             }
         }
 

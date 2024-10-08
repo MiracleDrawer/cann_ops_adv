@@ -27,6 +27,11 @@ public:
 
     bool IsCapable() override
     {
+        if (tnd2bsh) {
+            OPS_LOG_I("FlashAttentionScoreGradTilingUnpaddedAttension is not support tnd to bsh.");
+            return false;
+        }
+
         auto actualSeqQLenTensor = context_->GetOptionalInputTensor(ACTUAL_SEQ_Q_LEN);
         if (actualSeqQLenTensor != nullptr && actualSeqQLenTensor->GetShapeSize() != 0) {
             OPS_LOG_D("FlashAttentionScoreGradTilingUnpaddedAttension hit");

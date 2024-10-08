@@ -125,13 +125,13 @@ public:
     __aicore__ inline void SyncALLCores();
     __aicore__ inline void GetSeqQlenKvlenByBidx(int64_t bIdx, int64_t &actualSeqQlen, int64_t &actualSeqKvlen);
 
-    using aType1 = MatmulType<TPosition::GM, CubeFormat::ND, T1, false, LayoutMode::NONE>;
-    using bType1 = MatmulType<TPosition::GM, CubeFormat::ND, T1, true, LayoutMode::NONE>;
+    using aType1 = MatmulType<TPosition::GM, CubeFormat::ND, T1, false, LayoutMode::NONE, true>;
+    using bType1 = MatmulType<TPosition::GM, CubeFormat::ND, T1, true, LayoutMode::NONE, true>;
     using cType1 = MatmulType<TPosition::GM, MM_OUT_FORMAT, T2>;
     using biasType1 = MatmulType<TPosition::GM, CubeFormat::ND, float>;
 
-    using aType2 = MatmulType<TPosition::GM, MM_OUT_FORMAT, T1, true, LayoutMode::NONE>;
-    using bType2 = MatmulType<TPosition::GM, CubeFormat::ND, T1, false, LayoutMode::NONE>;
+    using aType2 = MatmulType<TPosition::GM, MM_OUT_FORMAT, T1, true, LayoutMode::NONE, true>;
+    using bType2 = MatmulType<TPosition::GM, CubeFormat::ND, T1, false, LayoutMode::NONE, true>;
     using cType2 = MatmulType<TPosition::GM, MM2_OUT_FORMAT, float>;
     using biasType2 = MatmulType<TPosition::GM, CubeFormat::ND, float>;
 
@@ -891,10 +891,6 @@ template <typename T1, typename T2, const uint32_t IS_ATTEN_MASK, const uint32_t
 __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<T1, T2, IS_ATTEN_MASK, IS_PSE, IS_DROP, MM_OUT_FORMAT,
                                                            INPUT_LAYOUT, MM2_OUT_FORMAT, IS_DTM>::DTMComputeMMDqkv(DBParams& dbParam, int64_t nextBlockId)
 {
-    if (cBlockIdx % 2 != 0) {
-        return;
-    }
-
     pingpongIdx = dbParam.taskId % 2;
     int64_t dqOffset = 0;
     int64_t dkvOffset = 0;
@@ -920,12 +916,12 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<T1, T2, IS_ATTE
     uint64_t dqOutMStride = dbParam.actualS1Len;
     uint64_t dkvOutMStride = dbParam.actualS2Len;
     if (dbParam.dqGroupId[cCubeBlockIdx] != OUTIDX) { //mm写出到dqDtmWsGm上
-        dqOffset = pingpongIdx * cubeCoreNum * s1CvInner * d + cCubeBlockIdx * s1CvInner * d;
+        dqOffset = pingpongIdx * cubeCoreNum * s1CvInner * dAlign + cCubeBlockIdx * s1CvInner * dAlign;
         dqKc = d;
         dqOutMStride = dbParam.s1CvExtend;
     }
     if (dbParam.kvGroupId[cCubeBlockIdx] != OUTIDX) {
-        dkvOffset = pingpongIdx * cubeCoreNum * s2CvInner * d + cCubeBlockIdx * s2CvInner * d;
+        dkvOffset = pingpongIdx * cubeCoreNum * s2CvInner * dAlign + cCubeBlockIdx * s2CvInner * dAlign;
         dkvKc = d;
         dkvOutMStride = dbParam.s2CvExtend;
     }
@@ -1003,10 +999,6 @@ template <typename T1, typename T2, const uint32_t IS_ATTEN_MASK, const uint32_t
 __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<T1, T2, IS_ATTEN_MASK, IS_PSE, IS_DROP, MM_OUT_FORMAT,
                                                            INPUT_LAYOUT, MM2_OUT_FORMAT, IS_DTM>::ComputeMMDqkv(DBParams& dbParam, int64_t nextBlockId)
 {
-    if (cBlockIdx % 2 != 0) {
-        return;
-    }
-
     pingpongIdx = dbParam.taskId % 2;
     int64_t dqOffset = 0;
     int64_t dkvOffset = 0;
@@ -1147,28 +1139,23 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<T1, T2, IS_ATTE
     LocalTensor<float> resBuf = unifiedBuffer.GetWithOffset<float>(singleCoreDataNum, 0);
     LocalTensor<float> inBuf = unifiedBuffer.GetWithOffset<float>(singleCoreDataNum, singleCoreDataNum * sizeof(float));
 
-    int64_t dExtend = d;
-    if constexpr (MM2_OUT_FORMAT == CubeFormat::NZ) {
-        dExtend = dAlign;
-    }
-
     event_t curEventId = EVENT_ID7;
-
     // 按gs1方向连续分核，dk、dv需要累加的数据是连续的
     for (int8_t groupId = 0; groupId < cubeCoreNum; groupId++) {
-        if (dbParam.blockIdArr[groupId] == -1) {  //后面的核没有数据
+        if (dbParam.blockIdArr[groupId] == -1) {  // 后面的核没有数据
             break;
         }
         if (dbParam.kvGroupId[groupId] < groupId && dbParam.kvGroupId[groupId] != OUTIDX) {
             continue;
         }
-        set_flag(PIPE_MTE3, PIPE_V, curEventId);
-        wait_flag(PIPE_MTE3, PIPE_V, curEventId);
+        SetFlag<HardEvent::MTE3_V>(curEventId);
+        WaitFlag<HardEvent::MTE3_V>(curEventId);
         Duplicate<float>(resBuf, 0.0, singleCoreDataNum);
+        pipe_barrier(PIPE_V);
         int64_t blockId = -1;
         int64_t maxS2Extend = 0;
         for (int8_t coreId = groupId; coreId < cubeCoreNum; coreId++) {
-            if (dbParam.blockIdArr[coreId] == -1) { //后面的核没有数据
+            if (dbParam.blockIdArr[coreId] == -1) { // 后面的核没有数据
                 break;
             }
             if (groupId == dbParam.kvGroupId[coreId]) {
@@ -1182,31 +1169,43 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<T1, T2, IS_ATTE
                 maxS2Extend = maxS2Extend > s2CalcExtend ? maxS2Extend : s2CalcExtend;
 
                 if constexpr (MM2_OUT_FORMAT == CubeFormat::NZ) {
+                    if (s2CalcExtend != s2CalcInner) {
+                        pipe_barrier(PIPE_V);
+                        Duplicate<float>(inBuf, 0.0, singleCoreDataNum);
+                        SetFlag<HardEvent::V_MTE2>(curEventId);
+                        WaitFlag<HardEvent::V_MTE2>(curEventId);
+                    }
                     uint64_t srcOffset = pingpongIdx * cubeCoreNum * s2CvInner * dAlign + coreId * s2CvInner * dAlign +
                                      cBlockIdx % vecBlockNum * s2CalcInner * C0_SIZE;
                     AscendC::DataCopyExtParams intriParams;
                     intriParams.blockCount = dAlign / C0_SIZE;
                     intriParams.blockLen = s2CalcExtend * C0_SIZE * sizeof(float);
                     intriParams.srcStride = dbParam.s2CvExtendArr[coreId] * C0_SIZE * sizeof(float) - intriParams.blockLen;
-                    intriParams.dstStride = 0; // 间隔一个block，防止bank冲突
+                    intriParams.dstStride = (s2CalcInner - s2CalcExtend) * C0_SIZE / 8;
                     intriParams.rsv = 0;
                     DataCopyPad(inBuf, srcTensor[srcOffset], intriParams, {false, 0, 0, 0});
 
+                    SetFlag<HardEvent::MTE2_V>(curEventId);
+                    WaitFlag<HardEvent::MTE2_V>(curEventId);
+                    Add(resBuf, resBuf, inBuf, s2CalcInner * dAlign);
+                    SetFlag<HardEvent::V_MTE2>(curEventId);  // 循环间的反向同步
+                    WaitFlag<HardEvent::V_MTE2>(curEventId);
+
                 } else {
                     uint64_t srcOffset = pingpongIdx * cubeCoreNum * s2CvInner * dAlign + coreId * s2CvInner * dAlign +
-                                     cBlockIdx % vecBlockNum * s2CalcInner * dExtend;
-                    DataCopy(inBuf, srcTensor[srcOffset], s2CalcExtend * dExtend);
-                }
+                                     cBlockIdx % vecBlockNum * s2CalcInner * d;
+                    DataCopy(inBuf, srcTensor[srcOffset], s2CalcExtend * d);
 
-                set_flag(PIPE_MTE2, PIPE_V, curEventId);
-                wait_flag(PIPE_MTE2, PIPE_V, curEventId);
-                Add(resBuf, resBuf, inBuf, s2CalcExtend * dExtend);
-                set_flag(PIPE_V, PIPE_MTE2, curEventId);   // 循环间的反向同步
-                wait_flag(PIPE_V, PIPE_MTE2, curEventId);
+                    SetFlag<HardEvent::MTE2_V>(curEventId);
+                    WaitFlag<HardEvent::MTE2_V>(curEventId);
+                    Add(resBuf, resBuf, inBuf, s2CalcExtend * d);
+                    SetFlag<HardEvent::V_MTE2>(curEventId);  // 循环间的反向同步
+                    WaitFlag<HardEvent::V_MTE2>(curEventId);
+                }
             }
         }
         //copyOut
-        if (blockId != -1 & maxS2Extend != 0) {
+        if (blockId != -1 && maxS2Extend != 0) {
             IndexParams idx;
             GetIndex(blockId, idx);
             uint64_t dstOffset = 0;
@@ -1242,13 +1241,14 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<T1, T2, IS_ATTE
                     copyOutDstStride = n2 * d - d;
                 }
             }
-            set_flag(PIPE_V, PIPE_MTE3, curEventId);
-            wait_flag(PIPE_V, PIPE_MTE3, curEventId);
+            SetFlag<HardEvent::V_MTE3>(curEventId);
+            WaitFlag<HardEvent::V_MTE3>(curEventId);
             SetAtomicAdd<float>();
             if constexpr (MM2_OUT_FORMAT == CubeFormat::NZ) {
                 DataCopyPad(dstTensor[dstOffset], resBuf, 
                             {static_cast<uint16_t>(dAlign / C0_SIZE), 
-                            static_cast<uint32_t>(maxS2Extend * C0_SIZE * sizeof(float)), 0,
+                            static_cast<uint32_t>(maxS2Extend * C0_SIZE * sizeof(float)),
+                            static_cast<uint32_t>((s2CalcInner - maxS2Extend) * C0_SIZE / 8),
                             static_cast<uint32_t>(copyOutDstStride * sizeof(float)), 0});
             } else {
                 DataCopyPad(dstTensor[dstOffset], resBuf, 
@@ -1273,13 +1273,7 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<T1, T2, IS_ATTE
     LocalTensor<float> dqRes = unifiedBuffer.GetWithOffset<float>(singleCoreDataNum, 0);
     LocalTensor<float> inBuf = unifiedBuffer.GetWithOffset<float>(singleCoreDataNum, singleCoreDataNum * sizeof(float));
 
-    int64_t dExtend = d;
-    if constexpr (MM2_OUT_FORMAT == CubeFormat::NZ) {
-        dExtend = dAlign;
-    }
-
     event_t curEventId = EVENT_ID7;
-
     for (int8_t groupId = 0; groupId < cubeCoreNum; groupId++) {
         if (dbParam.blockIdArr[groupId] == -1) {  //后面的核没有数据
             break;
@@ -1287,9 +1281,10 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<T1, T2, IS_ATTE
         if (dbParam.dqGroupId[groupId] < groupId && dbParam.dqGroupId[groupId] != OUTIDX) {
             continue;
         }
-        set_flag(PIPE_MTE3, PIPE_V, curEventId);
-        wait_flag(PIPE_MTE3, PIPE_V, curEventId);
+        SetFlag<HardEvent::MTE3_V>(curEventId);
+        WaitFlag<HardEvent::MTE3_V>(curEventId);
         Duplicate<float>(dqRes, 0.0, singleCoreDataNum);
+        pipe_barrier(PIPE_V);
         int64_t blockId = -1;
         int64_t maxS1Extend = 0;
         for (int8_t coreId = groupId; coreId < cubeCoreNum; coreId++) {
@@ -1298,7 +1293,6 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<T1, T2, IS_ATTE
             }
             if (groupId == dbParam.dqGroupId[coreId]) {
                 blockId = dbParam.blockIdArr[coreId];
-                // uint32_t s1CalcInner = (dbParam.s1CvExtendArr[coreId] + vecBlockNum - 1) / vecBlockNum;
                 uint32_t usedCoreNum = (dbParam.s1CvExtendArr[coreId] + s1CalcInner - 1) / s1CalcInner;
                 if (cBlockIdx % vecBlockNum >= usedCoreNum) {
                     continue;
@@ -1308,29 +1302,39 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<T1, T2, IS_ATTE
                 maxS1Extend = maxS1Extend > s1CalcExtend ? maxS1Extend : s1CalcExtend;
 
                 //copyOut & add
-
                 if constexpr (MM2_OUT_FORMAT == CubeFormat::NZ) {
+                    if (s1CalcExtend != s1CalcInner) {
+                        pipe_barrier(PIPE_V);  // 循环间的反向同步
+                        Duplicate<float>(inBuf, 0.0, singleCoreDataNum);
+                        SetFlag<HardEvent::V_MTE2>(curEventId);
+                        WaitFlag<HardEvent::V_MTE2>(curEventId);
+                    }
                     uint64_t srcOffset = pingpongIdx * cubeCoreNum * s1CvInner * dAlign + coreId * s1CvInner * dAlign +
                                      cBlockIdx % vecBlockNum * s1CalcInner * C0_SIZE;
                     AscendC::DataCopyExtParams intriParams;
                     intriParams.blockCount = dAlign / C0_SIZE;
                     intriParams.blockLen = s1CalcExtend * C0_SIZE * sizeof(float);
                     intriParams.srcStride = dbParam.s1CvExtendArr[coreId] * C0_SIZE * sizeof(float) - intriParams.blockLen;
-                    intriParams.dstStride = 0; // 间隔一个block，防止bank冲突
+                    intriParams.dstStride = (s1CalcInner - s1CalcExtend) * C0_SIZE / 8;  // ub内按整块大小放置
                     intriParams.rsv = 0;
                     DataCopyPad(inBuf, dqDtmWsGm[srcOffset], intriParams, {false, 0, 0, 0});
+                    SetFlag<HardEvent::MTE2_V>(curEventId);
+                    WaitFlag<HardEvent::MTE2_V>(curEventId);
+                    Add(dqRes, dqRes, inBuf, s1CalcInner * dAlign);
+                    SetFlag<HardEvent::V_MTE2>(curEventId);  // 循环间的反向同步
+                    WaitFlag<HardEvent::V_MTE2>(curEventId);
 
                 } else {
                     uint64_t srcOffset = pingpongIdx * cubeCoreNum * s1CvInner * dAlign + coreId * s1CvInner * dAlign +
                                      cBlockIdx % vecBlockNum * s1CalcInner * d;
                     DataCopy(inBuf, dqDtmWsGm[srcOffset], s1CalcExtend * d);
-                }
 
-                set_flag(PIPE_MTE2, PIPE_V, curEventId);
-                wait_flag(PIPE_MTE2, PIPE_V, curEventId);
-                Add(dqRes, dqRes, inBuf, s1CalcExtend * dExtend);
-                set_flag(PIPE_V, PIPE_MTE2, curEventId);  // 循环间的反向同步
-                wait_flag(PIPE_V, PIPE_MTE2, curEventId);
+                    SetFlag<HardEvent::MTE2_V>(curEventId);
+                    WaitFlag<HardEvent::MTE2_V>(curEventId);
+                    Add(dqRes, dqRes, inBuf, s1CalcExtend * d);
+                    SetFlag<HardEvent::V_MTE2>(curEventId);  // 循环间的反向同步
+                    WaitFlag<HardEvent::V_MTE2>(curEventId);
+                }
             }
         }
         //copyOut
@@ -1373,13 +1377,14 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<T1, T2, IS_ATTE
                 }
             }
 
-            set_flag(PIPE_V, PIPE_MTE3, curEventId);
-            wait_flag(PIPE_V, PIPE_MTE3, curEventId);
+            SetFlag<HardEvent::V_MTE3>(curEventId);
+            WaitFlag<HardEvent::V_MTE3>(curEventId);
             SetAtomicAdd<float>();
             if constexpr (MM2_OUT_FORMAT == CubeFormat::NZ) {
                 DataCopyPad(dqWorkSpaceGm[dstOffset], dqRes, 
                             {static_cast<uint16_t>(dAlign / C0_SIZE), 
-                            static_cast<uint32_t>(maxS1Extend * C0_SIZE * sizeof(float)), 0,
+                            static_cast<uint32_t>(maxS1Extend * C0_SIZE * sizeof(float)),
+                            static_cast<uint32_t>((s1CalcInner - maxS1Extend) * C0_SIZE / 8),
                             static_cast<uint32_t>(copyOutDstStride * sizeof(float)), 0});
             } else {
                 DataCopyPad(dqWorkSpaceGm[dstOffset], dqRes,
@@ -1426,7 +1431,7 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<T1, T2, IS_ATTE
         isFinish = CalcValidBlock(blockStartIdx, startCoreId, dbParams[0]);
     }
     dbParams[0].taskId = 0;
-    if (dbParams[0].blockId != -1 && cBlockIdx % 2 == 0) {
+    if (dbParams[0].blockId != -1) {
         ComputeMM1(dbParams[0]);
     }
 }
@@ -1438,20 +1443,20 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<T1, T2, IS_ATTE
 {
     int64_t taskId = 1;
     // 确定性计算多两个循环，非确定性计算多一个循环
-    int8_t extraLoop = 1;
+    int8_t extraLoopNum = 1;
     if constexpr (IS_DTM == ENABLE) {
-        extraLoop = 2;
+        extraLoopNum = 2;
     }
 
-    bool subCoreIsValid = cBlockIdx % 2 == 0;
-    int64_t startOffset = cBlockIdx / 2 * 2 * 512;
-    GM_ADDR startAddr = workspaceAddr;
-    GroupBarrier<PipeMode::MTE3_MODE> blockBar(startAddr + startOffset, 2, 2);
+    bool subCoreIsValid = true;
+    int64_t startOffset = cBlockIdx / 2 * 2 * 512;    // 软同步workspace偏移
+    GM_ADDR startGmAddr = workspaceAddr;
+    GroupBarrier<PipeMode::MTE3_MODE> blockBar(startGmAddr + startOffset, 2, 2);
 
-    while(extraLoop >= 0) {
+    while(extraLoopNum >= 0) {
         bool isFinish = false;
         int64_t startCoreId = 0;
-        while (!isFinish) {
+        while (!isFinish) {    // 计算分核
             isFinish = CalcValidBlock(blockStartIdx, startCoreId, dbParams[taskId % 3]);
         }
         dbParams[taskId % 3].taskId = taskId;
@@ -1466,11 +1471,7 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<T1, T2, IS_ATTE
         }
 
         if (taskId > 0 && dbParams[(taskId - 1) % 3].blockId != -1) {
-            blockBar.Arrive(cBlockIdx % 2);
-            blockBar.Wait(cBlockIdx % 2);
-            ComputeVec(dbParams[(taskId - 1) % 3]);   //vec
-            blockBar.Arrive(cBlockIdx % 2);
-            blockBar.Wait(cBlockIdx % 2);
+            ComputeVec(dbParams[(taskId - 1) % 3]);    // vec compute
             // ---非确定性计算---
             if constexpr (IS_DTM != ENABLE) {
                 ComputeMMDqkv(dbParams[(taskId - 1) % 3], dbParams[(taskId) % 3].blockId); //mm dq dk dv
@@ -1497,7 +1498,7 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<T1, T2, IS_ATTE
 
         taskId++;
         if (blockStartIdx == -1) {
-            extraLoop -= 1;
+            extraLoopNum -= 1;
         }
     }
     // -----确定性计算，最后做一次全核同步，保证所有核的atomicAdd做完-----
@@ -2068,7 +2069,7 @@ FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<T1, T2, IS_ATTEN_MASK, IS_PSE, IS_DROP
         int64_t compressMode = TilingData->s1s2BNGS1S2BaseParams.attenMaskCompressMode;
         pipe_barrier(PIPE_V);
 
-        if (compressMode == 4) { // 4: prefix compress
+        if (compressMode == 4) {   // 4: prefix compress
             if (prefixCompressCanSimplify == false) {
                 LocalTensor<uint8_t> attenMaskUbPreuint8 =
                     unifiedBuffer.GetWithOffset<uint8_t>(8 * 1024 / sizeof(uint8_t), TMP_UB_OFFSET + ubTmpBufferOffset);
@@ -2096,7 +2097,7 @@ FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<T1, T2, IS_ATTEN_MASK, IS_PSE, IS_DROP
             CalcAttenMaskBool(vecClc2Buffer, attenMaskUbuint8, s1ExtendSubGraph, s2ExtendAlign, 1);
         }
 
-        if ((compressMode == 3 || unpadUseBand) && AttenBandMode == AttenMaskCompress::All) { // 3: band
+        if ((compressMode == 3 || unpadUseBand) && AttenBandMode == AttenMaskCompress::All) {   // 3: band
             set_flag(PIPE_V, PIPE_MTE2, curEventId);
             wait_flag(PIPE_V, PIPE_MTE2, curEventId);
             CopyInAttenMaskBool(attenMaskUbuint8, attenMaskOffsetPre, s1ExtendSubGraph, s2Extend);
@@ -2192,7 +2193,7 @@ FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<T1, T2, IS_ATTEN_MASK, IS_PSE, IS_DROP
         wait_flag(PIPE_MTE3, PIPE_MTE2, curEventId);
     }
 
-    if (preS1Idx != curS1Idx) { // copyIn sfmg
+    if (preS1Idx != curS1Idx) {    // copyIn sfmg
         preS1Idx = curS1Idx;
         LocalTensor<float> sfmgClc3 = unifiedBuffer.GetWithOffset<float>(SFMG_UB_SIZE / sizeof(float), SFMG_UB_OFFSET);
         DataCopy(sfmgClc3, sfmgWorkspaceGm[sfmgOffset + curS1Idx * s1VecSize * 8], s1ExtendSubGraph * 8);
@@ -2330,7 +2331,7 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<T1, T2, IS_ATTE
         }
     }
 
-    uint32_t s2AlignFactor = BLOCK_SIZE / 2; // float32 also align to 16.
+    uint32_t s2AlignFactor = BLOCK_SIZE / 2;   // float32 also align to 16.
     if constexpr (IS_DROP == ENABLE || IS_ATTEN_MASK == ENABLE) {
         // last dim 32B align
         s2AlignFactor = BLOCK_SIZE / sizeof(uint8_t);
@@ -2380,24 +2381,24 @@ __aicore__ inline void FlashAttentionScoreGradS1s2Bn2gs1s2SameAB<T1, T2, IS_ATTE
             sfmgOffset = n2 * g * ((__gm__ int64_t *)actual_seq_qlen_addr)[dbParam.bIdx - 1] * 8;
         }
         sfmgOffset += ((dbParam.n2Idx * g + dbParam.gIdx) * dbParam.actualS1Len + dbParam.s1oIdx * s1CvInner) * 8;
-        // s1Outer = (dbParam.actualS1Len + s1CvInner - 1) / s1CvInner;
-        // s2Outer = (dbParam.actualS2Len + s2CvInner - 1) / s2CvInner;
     } else {
         sfmgOffset = (((dbParam.bIdx * n2 + dbParam.n2Idx) * g + dbParam.gIdx) * s1 + dbParam.s1oIdx * s1CvInner) * 8;
     }
 
     int32_t loopSize = s1VecLoop * s2VecLoop;
-    int32_t halfLoopSize = 0;
+    int32_t halfLoop = 0;
     if constexpr (MM_OUT_FORMAT == CubeFormat::NZ) {
-        halfLoopSize = (s2VecLoop / 2) * s1VecLoop;
+        halfLoop = (s2VecLoop / 2) * s1VecLoop;
     } else {
-        halfLoopSize = (s1VecLoop / 2) * s2VecLoop;
+        halfLoop = (s1VecLoop / 2) * s2VecLoop;
     }
 
-    vecLoopStart = cSubIdx ? halfLoopSize : 0 ;
-    vecLoopEnd = cSubIdx ? loopSize : halfLoopSize ;
+    vecLoopStart = cSubIdx ? halfLoop : 0;
+    vecLoopEnd = cSubIdx ? loopSize : halfLoop;
 
     preS1Idx = -1;
+    set_flag(PIPE_MTE3, PIPE_MTE2, EVENT_ID6);
+    wait_flag(PIPE_MTE3, PIPE_MTE2, EVENT_ID6);
     for (int32_t i = vecLoopStart, loopCnt = 0; i < vecLoopEnd; i++, loopCnt++) {
         int32_t curS1Idx;
         int32_t curS2Idx;

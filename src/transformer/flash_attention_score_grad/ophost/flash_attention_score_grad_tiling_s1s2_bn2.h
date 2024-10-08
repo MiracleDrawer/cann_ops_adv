@@ -128,6 +128,8 @@ private:
     uint32_t mmRatio{0};
     bool needSplitD{false};
     bool needSetFixSplit{false};
+    bool needAdjustBlockDim{false};
+    bool tnd2bsh{false};
     uint32_t attenMaskCompressMode{0};
     int64_t attenMaskS1Size{0};
     int64_t attenMaskS2Size{0};

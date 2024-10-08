@@ -105,6 +105,14 @@ enum class AttenMaskComputeMode {
     PREFIX_N_COMPUTE_MODE
 };
 
+struct Nz2NdInfo {
+    int64_t ndFirstAxisRealSize;
+    int64_t ndFirstAxisBaseSize;
+    int64_t ndFirstAxisLoopSize;
+    int64_t ndLastAxis;
+    int64_t loopIdx;
+};
+
 __aicore__ inline bool IsBasicBlockInSoftMax(int32_t srcM, int32_t srcK)
 {
     return srcM % SOFTMAX_M_ALIGNED_SIZE == 0 && srcK % SOFTMAX_K_ALIGNED_SIZE == 0;
@@ -190,6 +198,70 @@ __aicore__ inline int64_t ComputeOffsetForPrefixRectangle(const int64_t &delta, 
     } else {
         return attenMaskS2Size * attenMaskS2Size + attenMaskS2Size / 2 - delta; // 2048 * 2048 + (1024 - delta)
     }
+}
+
+template <typename T>
+__aicore__ inline void NzToNd(Nz2NdInfo &nz2NdInfo, const GlobalTensor<T> &bmmResGm, LocalTensor<T> &tempUb,
+                              LocalTensor<T> &bmmResUb)
+{
+    // 1.将bmm1结果由GM搬至UB，每块数据在UB上间隔1个block，防止BANK冲突
+    DataCopyParams dataCopyParams;
+    int64_t nzFirstAxis = CeilDiv(nz2NdInfo.ndLastAxis, 16L);
+    dataCopyParams.blockCount = nzFirstAxis;
+    dataCopyParams.blockLen = nz2NdInfo.ndFirstAxisLoopSize * 2;
+    dataCopyParams.srcStride = (nz2NdInfo.ndFirstAxisRealSize - nz2NdInfo.ndFirstAxisLoopSize) * 2;
+    dataCopyParams.dstStride = 1;
+    int64_t bmmResOffset = nz2NdInfo.loopIdx * nz2NdInfo.ndFirstAxisBaseSize * 16;
+    int64_t innerLoop = nzFirstAxis / 8L;
+    int64_t innerRemain = nzFirstAxis % 8L;
+
+    CopyRepeatParams repeatParams;
+    repeatParams.srcStride = nz2NdInfo.ndFirstAxisLoopSize * 2 + 1;
+    repeatParams.dstStride = 2;
+    repeatParams.srcRepeatSize = 2;
+    repeatParams.dstRepeatSize = nz2NdInfo.ndLastAxis / 8;
+    int32_t outerLoop = nz2NdInfo.ndFirstAxisLoopSize / repeatMaxTimes;
+    int32_t outerRemain = nz2NdInfo.ndFirstAxisLoopSize % repeatMaxTimes;
+    int32_t outerBmmOffset = repeatMaxTimes * nz2NdInfo.ndLastAxis;
+    int32_t outerTempOffset = repeatMaxTimes * 16;
+    int64_t offsetJ = 128 * nz2NdInfo.ndFirstAxisLoopSize + 64;
+    DataCopy(tempUb, bmmResGm[bmmResOffset], dataCopyParams);
+
+    // 2.使用vcopy进行transpose，[S2/16, vec1S1Base * 16 + 8] -> [vec1S1Base, S2/16 , 16]
+    event_t eventIdMte2ToV = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_V));
+    SetFlag<HardEvent::MTE2_V>(eventIdMte2ToV);
+    WaitFlag<HardEvent::MTE2_V>(eventIdMte2ToV);
+    for (int64_t outerIndex = 0; outerIndex < outerLoop; ++outerIndex) {
+        for (int64_t i = 0; i < 2; ++i) {
+            for (int64_t j = 0; j < innerLoop; ++j) {
+                Copy(bmmResUb[outerIndex * outerBmmOffset + j * 128 + i * 8],
+                     tempUb[outerIndex * outerTempOffset + j * offsetJ + i * 8], repeatMaxSize,
+                     repeatMaxTimes, repeatParams);
+            }
+            if (likely(innerRemain)) {
+                Copy(bmmResUb[outerIndex * outerBmmOffset + innerLoop * 128 + i * 8],
+                     tempUb[outerIndex * outerTempOffset + innerLoop * offsetJ + i * 8], innerRemain * 8,
+                     repeatMaxTimes, repeatParams);
+            }
+        }
+    }
+    if (likely(outerRemain)) {
+        for (int64_t i = 0; i < 2; ++i) {
+            for (int64_t j = 0; j < innerLoop; ++j) {
+                Copy(bmmResUb[outerLoop * outerBmmOffset + j * 128 + i * 8],
+                     tempUb[outerLoop * outerTempOffset + j * offsetJ + i * 8], repeatMaxSize, outerRemain,
+                     repeatParams);
+            }
+            if (likely(innerRemain)) {
+                Copy(bmmResUb[outerLoop * outerBmmOffset + innerLoop * 128 + i * 8],
+                     tempUb[outerLoop * outerTempOffset + innerLoop * offsetJ + i * 8], innerRemain * 8,
+                     outerRemain, repeatParams);
+            }
+        }
+    }
+    uint32_t bmm1ResUbShape[] = {static_cast<uint32_t>(nz2NdInfo.ndFirstAxisLoopSize),
+                                 static_cast<uint32_t>(nz2NdInfo.ndLastAxis)};
+    bmmResUb.SetShapeInfo(ShapeInfo(2, bmm1ResUbShape, DataFormat::ND));
 }
 
 #endif // FLASH_ATTENTION_SCORE_COMMON_H

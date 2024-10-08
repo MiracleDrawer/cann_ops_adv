@@ -106,8 +106,12 @@ public:
     using b2Type = MatmulType<TPosition::GM, CubeFormat::ND, INPUT_T, false, LayoutMode::NONE, enableL1Reuse>;
     using bias2Type = MatmulType<TPosition::GM, CubeFormat::ND, float>;
     using c2Type = MatmulType<TPosition::GM, CubeFormat::ND, T>;
-
-    matmul::Matmul<a2Type, b2Type, c2Type, bias2Type, GetMmCfg(enableL1Reuse)> bmm2;
+    using c2NzType = MatmulType<TPosition::GM, CubeFormat::NZ, T>;
+    using modeTypemm2 = typename AscendC::Conditional<
+          (IsSameType<T, INPUT_T>::value == false && layOutType == LayOutTypeEnum::LAYOUT_TND),
+          matmul::Matmul<a2Type, b2Type, c2NzType, bias2Type, GetMmCfg(enableL1Reuse)>,
+          matmul::Matmul<a2Type, b2Type, c2Type, bias2Type, GetMmCfg(enableL1Reuse)>>::type;
+    modeTypemm2 bmm2;
 
 protected:
     __aicore__ inline void InitInput(__gm__ uint8_t *query, __gm__ uint8_t *key, __gm__ uint8_t *value,
@@ -143,7 +147,6 @@ protected:
                                                    SplitExtraInfo &extraInfo);
     __aicore__ inline int64_t ComputeAttenMaskOffset(SplitExtraInfo &extraInfo, int64_t loopIdx);
     __aicore__ inline int64_t ComputeOffsetForNoCompress(SplitExtraInfo &extraInfo, int64_t loopIdx);
-    __aicore__ inline void NzToNd(SplitExtraInfo &extraInfo, LocalTensor<T> &bmm1ResUb, int64_t loopIdx);
     __aicore__ inline void GetBmm1Result(SplitExtraInfo &extraInfo, LocalTensor<T> &bmm1ResUb, int64_t loopIdx);
     __aicore__ inline void ComputeAttenMask(SelectWithBytesMaskShapeInfo &shapeInfo, LocalTensor<T> &bmm1ResUb,
                                             LocalTensor<uint8_t> &maskUb, const uint8_t maskType, event_t vWaitMte2);
@@ -1119,6 +1122,7 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
     event_t eventIdMte2ToV = static_cast<event_t>(GetTPipePtr()->AllocEventID<HardEvent::MTE2_V>());
     event_t eventIdVToMte2A = static_cast<event_t>(GetTPipePtr()->AllocEventID<HardEvent::V_MTE2>());
     event_t eventIdVToMte2B = static_cast<event_t>(GetTPipePtr()->AllocEventID<HardEvent::V_MTE2>());
+    event_t eventIdVToMte2C = static_cast<event_t>(GetTPipePtr()->AllocEventID<HardEvent::V_MTE2>());
     event_t eventIdMte3ToV = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE3_V));
     event_t eventIdVToMte3 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE3));
     event_t eventIdDropMte3ToMte2;
@@ -1136,6 +1140,12 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
         }
         if (loopIdx > 0) {
             WaitFlag<HardEvent::V_MTE2>(eventIdVToMte2B);
+        } else {
+            if constexpr (IsSameType<T, INPUT_T>::value == false && layOutType == LayOutTypeEnum::LAYOUT_TND) {
+                event_t eventIdVToMte2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE2));
+                SetFlag<HardEvent::V_MTE2>(eventIdVToMte2);
+                WaitFlag<HardEvent::V_MTE2>(eventIdVToMte2);
+            }
         }
 
         // FP32场景，需要等待vec1上一轮输出搬完
@@ -1173,10 +1183,20 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
             this->pseInfo.vec1S1RealSize = extraInfo.vec1S1RealSize;
             this->pseInfo.s2RealSize = extraInfo.s2RealSize;
             this->pseInfo.needCast = true;
+            bool innerAlibiFlag = false; // alibi核内生成相关配置，仅在LAYOUT=TND，SparseMode=8时生效
+            if constexpr (layOutType == LayOutTypeEnum::LAYOUT_TND) {
+                if (this->tilingData->inputParams.sparseType == static_cast<uint8_t>(SparseModeEnum::BAND_LEFT_UP_CAUSAL) && this->pseInfo.boIdx != 0) {
+                    innerAlibiFlag = true;
+                }
+            }
 
             if (this->pseInfo.pseType == (uint32_t)PseTypeEnum::PSE_INNER_MUL_ADD_TYPE ||
                 this->pseInfo.pseType == (uint32_t)PseTypeEnum::PSE_INNER_MUL_ADD_SQRT_TYPE) {
                 LocalTensor<half> pseUb = this->pseTBuf.template Get<half>();
+                if (innerAlibiFlag) {
+                    this->pseInfo.kvStartIdx = 0;
+                    this->pseInfo.qStartIdx = 0;
+                }
                 PseSlopeCopyIn<T, hasPse>(commonTBuf, pseUb, this->pseSlope, this->pseAlibiGm, this->pseInfo);
             } else {
                 LocalTensor<INPUT_T> pseUb = this->pseTBuf.template Get<INPUT_T>();
@@ -1213,6 +1233,8 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
                 event_t eventIdMte3ToMte2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE3_MTE2));
                 SetFlag<HardEvent::MTE3_MTE2>(eventIdMte3ToMte2);
                 WaitFlag<HardEvent::MTE3_MTE2>(eventIdMte3ToMte2);
+                SetFlag<HardEvent::V_MTE2>(eventIdVToMte2C);
+                WaitFlag<HardEvent::V_MTE2>(eventIdVToMte2C);
                 this->CopyInAttenMask(extraInfo, loopIdx, this->attenMaskOffsetPre, true);
                 LocalTensor<uint8_t> secondTimeMaskUb;
                 uint8_t maskType;
@@ -1334,6 +1356,7 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
     GetTPipePtr()->ReleaseEventID<HardEvent::MTE2_V>(eventIdMte2ToV);
     GetTPipePtr()->ReleaseEventID<HardEvent::V_MTE2>(eventIdVToMte2A);
     GetTPipePtr()->ReleaseEventID<HardEvent::V_MTE2>(eventIdVToMte2B);
+    GetTPipePtr()->ReleaseEventID<HardEvent::V_MTE2>(eventIdVToMte2C);
     if constexpr (hasPse == true) {
         if constexpr (hasDrop == true) {
             if constexpr (!IsSameType<T, INPUT_T>::value) {
@@ -1592,79 +1615,19 @@ template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool ha
           typename T, bool isBasicBlock, CubeFormat bmm1Format, bool enableL1Reuse>
 __aicore__ inline void
 FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
-                              enableL1Reuse>::NzToNd(SplitExtraInfo &extraInfo, LocalTensor<T> &bmm1ResUb,
-                                                     int64_t loopIdx)
-{
-    // 1.将bmm1结果由GM搬至UB，每块数据在UB上间隔1个block，防止BANK冲突
-    LocalTensor<T> temp = this->stage1PongBuf.template Get<T>(); // i.a 32k
-    DataCopyParams dataCopyParams;
-    int64_t s21 = CeilDiv(extraInfo.s2AlignedSize, 16L);
-    dataCopyParams.blockCount = s21;
-    dataCopyParams.blockLen = extraInfo.vec1S1RealSize * 2;                           // block
-    dataCopyParams.srcStride = (extraInfo.s1RealSize - extraInfo.vec1S1RealSize) * 2; // block
-    dataCopyParams.dstStride = 1;
-    int64_t bmm1ResOffset = loopIdx * extraInfo.vec1S1BaseSize * 16;
-    int64_t s2InnerLoop = s21 / 8L;
-    int64_t s2InnerRemain = s21 % 8L;
-    CopyRepeatParams repeatParams;
-    repeatParams.srcStride = extraInfo.vec1S1RealSize * 2 + 1;
-    repeatParams.dstStride = 2;
-    repeatParams.srcRepeatSize = 2;
-    repeatParams.dstRepeatSize = extraInfo.s2AlignedSize / 8;
-    int32_t s1OuterLoop = extraInfo.vec1S1RealSize / repeatMaxTimes;
-    int32_t s1OuterRemain = extraInfo.vec1S1RealSize % repeatMaxTimes;
-    int32_t s1OuterBmm1Offset = repeatMaxTimes * extraInfo.s2AlignedSize;
-    int32_t s1OuterTempOffset = repeatMaxTimes * 16;
-    int64_t offsetJ = 128 * extraInfo.vec1S1RealSize + 64;
-
-    DataCopy(temp, this->mm1Res[extraInfo.taskIdMod2][bmm1ResOffset], dataCopyParams);
-
-    // 2.使用vcopy进行transpose，[S2/16, vec1S1Base * 16 + 8] -> [vec1S1Base, S2/16 , 16]
-    event_t eventID = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_V));
-    set_flag(PIPE_MTE2, PIPE_V, eventID);
-    wait_flag(PIPE_MTE2, PIPE_V, eventID);
-    for (int64_t outerIndex = 0; outerIndex < s1OuterLoop; ++outerIndex) {
-        for (int64_t i = 0; i < 2; ++i) {
-            for (int64_t j = 0; j < s2InnerLoop; ++j) {
-                Copy(bmm1ResUb[outerIndex * s1OuterBmm1Offset + j * 128 + i * 8],
-                     temp[outerIndex * s1OuterTempOffset + j * offsetJ + i * 8], repeatMaxSize, repeatMaxTimes,
-                     repeatParams);
-            }
-            if (likely(s2InnerRemain)) {
-                Copy(bmm1ResUb[outerIndex * s1OuterBmm1Offset + s2InnerLoop * 128 + i * 8],
-                     temp[outerIndex * s1OuterTempOffset + s2InnerLoop * offsetJ + i * 8], s2InnerRemain * 8,
-                     repeatMaxTimes, repeatParams);
-            }
-        }
-    }
-    if (likely(s1OuterRemain)) {
-        for (int64_t i = 0; i < 2; ++i) {
-            for (int64_t j = 0; j < s2InnerLoop; ++j) {
-                Copy(bmm1ResUb[s1OuterLoop * s1OuterBmm1Offset + j * 128 + i * 8],
-                     temp[s1OuterLoop * s1OuterTempOffset + j * offsetJ + i * 8], repeatMaxSize, s1OuterRemain,
-                     repeatParams);
-            }
-            if (likely(s2InnerRemain)) {
-                Copy(bmm1ResUb[s1OuterLoop * s1OuterBmm1Offset + s2InnerLoop * 128 + i * 8],
-                     temp[s1OuterLoop * s1OuterTempOffset + s2InnerLoop * offsetJ + i * 8], s2InnerRemain * 8,
-                     s1OuterRemain, repeatParams);
-            }
-        }
-    }
-    uint32_t bmm1ResUbShape[] = {static_cast<uint32_t>(extraInfo.vec1S1RealSize),
-                                 static_cast<uint32_t>(extraInfo.s2AlignedSize)};
-    bmm1ResUb.SetShapeInfo(ShapeInfo(2, bmm1ResUbShape, DataFormat::ND));
-}
-template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
-          typename T, bool isBasicBlock, CubeFormat bmm1Format, bool enableL1Reuse>
-__aicore__ inline void
-FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
                               enableL1Reuse>::GetBmm1Result(SplitExtraInfo &extraInfo, LocalTensor<T> &bmm1ResUb,
                                                             int64_t loopIdx)
 {
     if constexpr (bmm1Format == CubeFormat::NZ) {
         if (extraInfo.needNz2Nd == 1) {
-            NzToNd(extraInfo, bmm1ResUb, loopIdx);
+            Nz2NdInfo nz2NdInfo;
+            nz2NdInfo.ndFirstAxisRealSize = extraInfo.s1RealSize;
+            nz2NdInfo.ndFirstAxisBaseSize = extraInfo.vec1S1BaseSize;
+            nz2NdInfo.ndFirstAxisLoopSize = extraInfo.vec1S1RealSize;
+            nz2NdInfo.ndLastAxis = extraInfo.s2AlignedSize;
+            nz2NdInfo.loopIdx = loopIdx;
+            LocalTensor<T> tempUb = this->stage1PongBuf.template Get<T>();
+            NzToNd(nz2NdInfo, this->mm1Res[extraInfo.taskIdMod2], tempUb, bmm1ResUb);
             return;
         }
     }
@@ -1945,14 +1908,13 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
             bmm2LastS2RealSize = extraInfo.s2AlignedSize;
         }
     } else {
-        this->bmm2.SetOrgShape(extraInfo.s1Size, this->mm2Kb, extraInfo.s2AlignedSize, this->mm2Kb, this->dSize);
+        this->bmm2.SetOrgShape(extraInfo.s1RealSize, this->mm2Kb, extraInfo.s2AlignedSize, this->mm2Kb, this->dSize);
     }
-
 
     this->bmm2.SetTensorA(this->stage1Res[extraInfo.taskIdMod2]);
 
     this->bmm2.SetTensorB(this->valueGm[vCoreOffset]);
-    this->bmm2.SetTail(-1, -1, extraInfo.s2RealSize);
+    this->bmm2.SetTail(extraInfo.s1RealSize, this->dSize, extraInfo.s2RealSize);
 
     if constexpr (enableL1Reuse) {
         this->bmm2.template IterateAll<false>(this->mm2Res[extraInfo.taskIdMod2], false, false, true,
@@ -1992,27 +1954,45 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
         SetFlag<HardEvent::MTE3_MTE2>(eventIdMte3ToMte2);
         WaitFlag<HardEvent::MTE3_MTE2>(eventIdMte3ToMte2);
         int64_t dAlign8 = (this->dSize + 7) / 8 * 8;
-        if (likely(this->dSizeAlign16 == this->dSize)) {
-            DataCopy(stage2BufTensor, this->mm2Res[extraInfo.taskIdMod2][mm2ResOffset], mm2ResCalcSize);
-        } else {
-            DataCopyParams dataCopyParams;
-            DataCopyPadParams dataCopyPadParams;
-            dataCopyParams.blockCount = extraInfo.vec2S1RealSize;
-            dataCopyParams.dstStride = 0;
-            dataCopyParams.srcStride = 0;
-            dataCopyParams.blockLen = this->dSize * 4;
-            dataCopyPadParams.rightPadding = this->dSizeAlign16 - this->dSize;
-            dataCopyPadParams.paddingValue = 0;
-            if (dataCopyPadParams.rightPadding > blockSize) {
-                // 8对齐场景，内部vector需要16对齐，我们在data copy的时候需要手动补0
-                dataCopyPadParams.rightPadding -= blockSize;
-                dataCopyParams.dstStride = 1;
-                Duplicate<T>(stage2BufTensor[dAlign8], 0, blockSize, extraInfo.vec2S1RealSize, 0,
-                             this->dSizeAlign16 * sizeof(T) / blockBytes);
-            }
-            DataCopyPad(stage2BufTensor, this->mm2Res[extraInfo.taskIdMod2][mm2ResOffset], dataCopyParams, dataCopyPadParams);
+        if constexpr (IsSameType<T, INPUT_T>::value == false && layOutType == LayOutTypeEnum::LAYOUT_TND) {
+            Nz2NdInfo nz2NdInfo;
+            nz2NdInfo.ndFirstAxisRealSize = extraInfo.s1RealSize;
+            nz2NdInfo.ndFirstAxisBaseSize = extraInfo.vec2S1BaseSize;
+            nz2NdInfo.ndFirstAxisLoopSize = extraInfo.vec2S1RealSize;
+            nz2NdInfo.ndLastAxis = this->dSizeAlign16;
+            nz2NdInfo.loopIdx = s1oIdx;
+            event_t eventIdVToMTE2 = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE2));
+            SetFlag<HardEvent::V_MTE2>(eventIdVToMTE2);
+            WaitFlag<HardEvent::V_MTE2>(eventIdVToMTE2);
+            LocalTensor<T> tempUb = this->stage1PongBuf.template Get<T>();
+            NzToNd(nz2NdInfo, this->mm2Res[extraInfo.taskIdMod2], tempUb, stage2BufTensor);
             mm2ResCalcSize = extraInfo.vec2S1RealSize * dSizeAlign16;
             mm2ResOffset = s1oIdx * extraInfo.vec2S1BaseSize * dSizeAlign16;
+            pipe_barrier(PIPE_V);
+        } else {
+            if (likely(this->dSizeAlign16 == this->dSize)) {
+                DataCopy(stage2BufTensor, this->mm2Res[extraInfo.taskIdMod2][mm2ResOffset], mm2ResCalcSize);
+            } else {
+                DataCopyParams dataCopyParams;
+                DataCopyPadParams dataCopyPadParams;
+                dataCopyParams.blockCount = extraInfo.vec2S1RealSize;
+                dataCopyParams.dstStride = 0;
+                dataCopyParams.srcStride = 0;
+                dataCopyParams.blockLen = this->dSize * 4;
+                dataCopyPadParams.rightPadding = this->dSizeAlign16 - this->dSize;
+                dataCopyPadParams.paddingValue = 0;
+                if (dataCopyPadParams.rightPadding > blockSize) {
+                    // 8对齐场景，内部vector需要16对齐，我们在data copy的时候需要手动补0
+                    dataCopyPadParams.rightPadding -= blockSize;
+                    dataCopyParams.dstStride = 1;
+                    Duplicate<T>(stage2BufTensor[dAlign8], 0, blockSize, extraInfo.vec2S1RealSize, 0,
+                                 this->dSizeAlign16 * sizeof(T) / blockBytes);
+                }
+                DataCopyPad(stage2BufTensor, this->mm2Res[extraInfo.taskIdMod2][mm2ResOffset], dataCopyParams,
+                            dataCopyPadParams);
+                mm2ResCalcSize = extraInfo.vec2S1RealSize * dSizeAlign16;
+                mm2ResOffset = s1oIdx * extraInfo.vec2S1BaseSize * dSizeAlign16;
+            }
         }
 
         if (vec2LoopLimit > 1) {
@@ -2157,6 +2137,11 @@ FlashAttentionScoreS1s2Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, I
     DataCopyParams dataCopyParams;
     dataCopyParams.blockLen = this->dSize * sizeof(INPUT_T);
     dataCopyParams.srcStride = 0;
+    if constexpr (IsSameType<INPUT_T, float>::value) {
+        if (this->dSizeAlign16 - this->dSize >= blockSize) {
+            dataCopyParams.srcStride = 1;
+        }
+    }
     int64_t dstStride = 0;
     int64_t attenOutOffset = this->dSize;
     int64_t datacopyOffset = this->dSize;

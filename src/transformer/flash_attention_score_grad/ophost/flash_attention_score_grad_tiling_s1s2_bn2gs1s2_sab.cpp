@@ -144,7 +144,7 @@ uint64_t FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::GetTilingKey() const
         isDeterministic = 1;
         // s小于基本块大小时，可以走回非确定性模板
         if (fBaseParams.s1 <= fBaseParams.s1CvInner &&
-            fBaseParams.s2 <= fBaseParams.s2CvInner) {
+            fBaseParams.s2 <= fBaseParams.s2CvInner && fBaseParams.g == 1) {
             isDeterministic = 0;
         }
     }
@@ -934,13 +934,14 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::DoOpTiling()
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::DoSplit()
+void FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::AdjustCvInner()
 {
-    fBaseParams.s1CvInner = SAMEAB_S1_BASE;
-    fBaseParams.s2CvInner = SAMEAB_S2_BASE;
-
     // calculate best cvInner
     if (fBaseParams.isSparse == false && fBaseParams.s2 < 4 * SAMEAB_S1_BASE) {
+        if (fBaseParams.d == 64 && fBaseParams.s1 >= fBaseParams.s1CvInner && fBaseParams.s2 >= fBaseParams.s2CvInner) {
+            // D=64时，mmbaseN=256, s1/s2足够大，不需要调整基本块
+            return;
+        }
         // fuzzy for base cvInner
         uint32_t baseS1;
         uint32_t baseS2;
@@ -970,6 +971,14 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::DoSplit()
         fBaseParams.s1CvInner = baseS1;
         fBaseParams.s2CvInner = baseS2;
     }
+}
+
+ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::DoSplit()
+{
+    fBaseParams.s1CvInner = SAMEAB_S1_BASE;
+    fBaseParams.s2CvInner = SAMEAB_S2_BASE;
+
+    AdjustCvInner();
 
     OPS_LOG_D(context_, "FAGTiling sameAB s1CvInner is %u s2CvInner is %u.", fBaseParams.s1CvInner, fBaseParams.s2CvInner);
 

@@ -270,6 +270,42 @@ const auto Tc_Fag_Sab_BatchCase = ::testing::Values(
                     {},                                             /* ActualSeqQTensorData */
                     {}),                                            /* ActualSeqKVTensorData */
             FagCase::kTemplatePriority_Us1s2_Bbn2gs1s2_sab          /* TilingTemplatePriority */
+            ),
+    FagCase("Fag_Sab_Case_009", true,                              /* CaseName, Enable */
+            "",                                                     /* DebugInfo */
+            OpInfo(ControlInfo(true, true, true),                   /* RunTiling, RunKernel, Deterministic */
+                   ExpectInfo(true,                                 /* ExpectSuccess */
+                              ExpectInfo::kInvalidTilingKey,        /* ExpectTilingKey */
+                              ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
+            FaParam(1, 1, 2, 144, 1024, 72,                         /* B, N2, G, S1, S2, D */
+                    ge::DataType::DT_FLOAT16, LayoutType::BSH,      /* Dtype, Layout */
+                    0.08838f, 1.0f, 65536, 0,                   /* Scale, KeepProb, PreTokens, NxtTokens */
+                    1, 0,                                           /* InnerPrecise, SparseMode */
+                    PseShapeType::NONE,                             /* PseShapeType */
+                    DropMaskShapeType::NONE,                        /* DropMaskShapeType */
+                    PaddingMaskShapeType::NONE,                     /* PaddingMaskShapeType */
+                    AttenMaskShapeType::S1_S2,                      /* AttentionMaskShapeType */
+                    ge::DataType::DT_BOOL,                          /* AttentionMaskDtype */
+                    PrefixShapeType::NONE),                         /* PrefixShapeType */
+            FagCase::kTemplatePriority_Us1s2_Bbn2gs1s2_sab          /* TilingTemplatePriority */
+            ),
+    FagCase("Fag_Sab_Case_010", true,                               /* CaseName, Enable */
+            "",                                                     /* DebugInfo */
+            OpInfo(ControlInfo(true, true, true),                   /* RunTiling, RunKernel, Deterministic */
+                   ExpectInfo(true,                                 /* ExpectSuccess */
+                              ExpectInfo::kInvalidTilingKey,        /* ExpectTilingKey */
+                              ExpectInfo::kInvalidTilingBlockDim)), /* ExpectTilingBlockDim */
+            FaParam(1, 1, 2, 32, 1024, 64,                         /* B, N2, G, S1, S2, D */
+                    ge::DataType::DT_FLOAT16, LayoutType::BSH,      /* Dtype, Layout */
+                    0.08838f, 1.0f, 65536, 0,                       /* Scale, KeepProb, PreTokens, NxtTokens */
+                    1, 0,                                           /* InnerPrecise, SparseMode */
+                    PseShapeType::NONE,                             /* PseShapeType */
+                    DropMaskShapeType::NONE,                        /* DropMaskShapeType */
+                    PaddingMaskShapeType::NONE,                     /* PaddingMaskShapeType */
+                    AttenMaskShapeType::S1_S2,                      /* AttentionMaskShapeType */
+                    ge::DataType::DT_BOOL,                          /* AttentionMaskDtype */
+                    PrefixShapeType::NONE),                         /* PrefixShapeType */
+            FagCase::kTemplatePriority_Us1s2_Bbn2gs1s2_sab          /* TilingTemplatePriority */
             )
 );
 INSTANTIATE_TEST_SUITE_P(Fag, Ts_Fag_Ascend910B2_Sab, Tc_Fag_Sab_BatchCase);

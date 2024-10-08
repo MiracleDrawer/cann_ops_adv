@@ -98,6 +98,7 @@ constexpr int64_t TND_S2_AVG_70 = 70;
 constexpr int64_t TND_S2_AVG_80 = 80;
 constexpr int64_t TND_S2_CV_128 = 128;
 constexpr int64_t TND_D_128 = 128;
+constexpr int64_t TND_NZ_IN_MAX_D = 256;
 const char* templateNameS1S2 = "FlashAttentionScoreGradTilingS1s2Bn2gs1s2";
 
 bool FlashAttentionScoreGradTilingS1s2Bn2gs1s2::IsCapable()
@@ -408,6 +409,24 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::ProcessPseInfo(const 
         } else {
             OPS_LOG_E(context_, "pse inner mode, unsupported pse shape");
             return ge::GRAPH_FAILED;
+        }
+        OPS_ERR_IF(fBaseParams.sparseMode == RIGHT_DOWN_CASUAL_BAND,
+                OPS_REPORT_VECTOR_INNER_ERR(context_, "INNER Pse alibi only support BAND_LEFT_UP_CAUSAL sparse type."), return ge::GRAPH_FAILED);
+        if (fBaseParams.sparseMode == BAND_LEFT_UP_CASUAL) {
+            for (int64_t i = 0; i < fBaseParams.b; i++) {
+                if (i == 0) {
+                    if (fBaseParams.actualSeqQlen[i] - fBaseParams.actualSeqKvlen[i] + fBaseParams.qStartIdx - fBaseParams.kvStartIdx == 0) {
+                        continue;
+                    } else {
+                        OPS_LOG_E(context_, "INNER Pse alibi only support when actualSeqQLen and actualSeqKvLen are equal.");
+                        return ge::GRAPH_FAILED;
+                    }
+                }
+                if (fBaseParams.actualSeqQlen[i]  != fBaseParams.actualSeqKvlen[i]) {
+                    OPS_LOG_E(context_, "INNER Pse alibi only support when actualSeqQLen and actualSeqKvLen are equal.");
+                    return ge::GRAPH_FAILED;
+                }
+            }
         }
     } else if (pseShapeDim == PSE_DIM_NUM_1 && isTnd) {
         auto dim0 = pseShape->GetStorageShape().GetDim(DIM_0);
@@ -822,7 +841,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetShapeAttrsInfo()
     }
 
     fBaseParams.mm1IsNZOut = (fBaseParams.s2 % S2_NZ_SIZE != 0 && fBaseParams.s2 < MM12_ND2NZ_SIZE
-            && queryType != ge::DT_FLOAT);
+            && queryType != ge::DT_FLOAT && fBaseParams.d <= TND_NZ_IN_MAX_D);
     fBaseParams.mm2IsNZOut =  queryType != ge::DT_FLOAT && ((fBaseParams.d == 72) || (fBaseParams.d == 80)
         || (fBaseParams.d == 88) || (fBaseParams.d == 96));  // d为72, 80, 88, 96时支持NZ输出
     fBaseParams.dataBlockNum = BYTE_BLOCK / fBaseParams.dataTypeSize;
@@ -865,6 +884,12 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::GetShapeAttrsInfo()
     }
 
     ret = ProcessTokensInfo();
+    if (ret != ge::GRAPH_SUCCESS) {
+        PrintShapeInfo();
+        return ret;
+    }
+
+    ret = ProcessTndToBsh();
     if (ret != ge::GRAPH_SUCCESS) {
         PrintShapeInfo();
         return ret;
@@ -1253,7 +1278,13 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::DoLibApiTiling()
     mm3.SetShape(fBaseParams.s1Inner * fBaseParams.s1CvRatio, fBaseParams.d,
                  fBaseParams.s2Inner * fBaseParams.s2CvRatio);
     mm3.SetBias(false);
-    mm3.SetFixSplit(-1, -1, -1);
+    if (fBaseParams.mm1IsNZOut && fBaseParams.mm2IsNZOut) {
+        int64_t dAlign = (fBaseParams.d + FP16_BLOCK_NUMS - 1) / FP16_BLOCK_NUMS * FP16_BLOCK_NUMS;
+        uint32_t minBaseN = std::min(static_cast<uint32_t>(dAlign), FIX_BASEMN_256);
+        mm3.SetFixSplit(-1, minBaseN, -1);
+    } else {
+        mm3.SetFixSplit(-1, -1, -1);
+    }
     OPS_ERR_IF(mm3.GetTiling(tilingData.mm3TilingData) != 0,
               OPS_REPORT_VECTOR_INNER_ERR(context_, "matmul3 tilingData get fail."),
               return ge::GRAPH_FAILED);
@@ -1548,6 +1579,18 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::ProcessTokensInfo()
         }
     }
 
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2::ProcessTndToBsh(){
+    const char *inputLayout = context_->GetAttrs()->GetAttrPointer<char>(INPUT_LAYOUT);
+    auto pse = context_->GetOptionalInputDesc(PSE_SHIFT);
+    if (strcmp(inputLayout, "TND") == 0) {
+        tnd2bsh = (fBaseParams.b * fBaseParams.s1 == fBaseParams.t1) &&
+                  (fBaseParams.b * fBaseParams.s2 == fBaseParams.t2) &&
+                  (fBaseParams.s1 == fBaseParams.s2) && !(fBaseParams.sparseMode == RIGHT_DOWN_CASUAL_BAND ||
+                  fBaseParams.sparseMode == BAND_LEFT_UP_CASUAL) && pse == nullptr;
+    }
     return ge::GRAPH_SUCCESS;
 }
 

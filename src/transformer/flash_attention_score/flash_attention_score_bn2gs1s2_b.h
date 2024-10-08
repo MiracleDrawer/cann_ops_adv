@@ -1245,6 +1245,11 @@ __aicore__ inline void FlashAttentionScoreBn2gs1s2B<implMode, layOutType, hasPse
     dataCopyParams.blockLen = this->dSize * sizeof(INPUT_T);
     dataCopyParams.srcStride = 0;
     int64_t dstStride = 0;
+    if constexpr (IsSameType<INPUT_T, float>::value) {
+        if (this->dSizeAlign16 - this->dSize >= blockSize) {
+            dataCopyParams.srcStride = 1;
+        }
+    }
     int64_t attenOutOffset = this->dSize;
     int64_t biOffset = (extraInfo.biN2GoIdx / this->n2G) * this->n2GS1D;
     int64_t n2GOffset = this->s1Size * this->dSize;

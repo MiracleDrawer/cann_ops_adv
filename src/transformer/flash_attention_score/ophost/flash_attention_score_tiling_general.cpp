@@ -60,7 +60,7 @@ const int64_t S2_REUSE_SIZE_1024 = 1024L;
 const int64_t S1_REUSE_SIZE_3840 = 3840L;
 const int64_t D_SPECIFIC_SIZE = 64L;
 const int64_t BALANCE_LOAD_LIST_SIZE = 8L;
-constexpr int64_t cof[BALANCE_LOAD_LIST_SIZE] = {256, 384, 512, 640, 768, 896, 960, 1024};
+constexpr int64_t COF[BALANCE_LOAD_LIST_SIZE] = {256, 384, 512, 640, 768, 896, 960, 1024};
 const int64_t BMM1_BASICBLOCK_M_128 = 128L;
 const int64_t BMM1_BASICBLOCK_N_256 = 256L;
 const int64_t BMM1_BASICBLOCK_N_128 = 128L;
@@ -327,8 +327,7 @@ protected:
     virtual void CalcDBasicBlock();
     int64_t CalcMaxS1BasicBlockSize(int64_t actualD, const BufferNum &bufferNum) const;
     int64_t CalcMaxS2BasicBlockSize(const BufferNum &bufferNum, int64_t tmpS1BasicBlock) const;
-    virtual bool CalcUBSize(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
-                            int64_t tmpDBasicBlock, int64_t batch = 1) = 0;
+    virtual bool CalcUBSize(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock, int64_t batch = 1) = 0;
     bool IsBasicBlockInSoftMax(const ge::Shape &shape) const;
     virtual bool SetBmm1TilingInput(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
                                     int64_t batch, matmul_tiling::MatmulApiTiling &bmm1);
@@ -1486,7 +1485,7 @@ bool FlashAttentionScoreTilingBase::MatchTemplate()
     actualTemplate.splitD = dBasicBlock < alignedD ? 1 : 0;
 
     if (IsTemplateMatched()) {
-        (void)CalcUBSize(s1BasicBlock, s2BasicBlock, dBasicBlock);
+        (void)CalcUBSize(s1BasicBlock, s2BasicBlock);
         OPS_LOG_D(context_, "[%s]final basic block: [%ld, %ld, %ld], match template[%s].", templateName, s1BasicBlock,
                   s2BasicBlock, dBasicBlock, actualTemplate.ToString().c_str());
         return true;
@@ -1518,7 +1517,7 @@ void FlashAttentionScoreTilingBase::CalcS1S2BasicBlock(const BufferNum &bufferNu
 
             int64_t tmpDBasicBlock = expectTemplate.splitD == 1 ? std::min(tmpS2BasicBlock, alignedD) : alignedD;
             OPS_LOG_D(context_, "[%s]try basic block: [%ld, %ld]", templateName, tmpS1BasicBlock, tmpS2BasicBlock);
-            if (CalcUBSize(tmpS1BasicBlock, tmpS2BasicBlock, tmpDBasicBlock, 1) &&
+            if (CalcUBSize(tmpS1BasicBlock, tmpS2BasicBlock, 1) &&
                 SetMatMulTiling(tmpS1BasicBlock, tmpS2BasicBlock, tmpDBasicBlock)) {
                 break;
             }
@@ -1862,9 +1861,9 @@ bool FlashAttentionScoreTilingBase::InitSparseValidArray(std::vector<int64_t> &s
         int64_t s2BlkNum = CeilDivision(s2Size, s2BasicBlock);
         int64_t validS1Size = CeilDivision(s1SparseValidSize, s1BasicBlock);
         int64_t validS2Size = CeilDivision(s2SparseValidSize, s2BasicBlock);
-        int64_t invalid_row_sparse_ratio = INVALID_ROW_SPARSE_RATIO;
+        int64_t invalidRowSparseRatio = INVALID_ROW_SPARSE_RATIO;
         if (s2Size <= s2BasicBlock) {
-            invalid_row_sparse_ratio = 1;
+            invalidRowSparseRatio = 1;
         }
         for (int64_t i = 0; i < static_cast<int64_t>(sparseValidArray.size()); i++) {
             int64_t reduceBlk =
@@ -1873,7 +1872,7 @@ bool FlashAttentionScoreTilingBase::InitSparseValidArray(std::vector<int64_t> &s
                 std::min(s2BlkNum - validS2Size,
                          CeilDivision((i + 1) * s1BasicBlock + s2SparseValidSize, s2BasicBlock) - validS2Size);
             int64_t validBlockNum = validS2Size - reduceBlk + addBlk;
-            sparseValidArray[i] = validBlockNum > 0 ? validBlockNum : invalid_row_sparse_ratio;
+            sparseValidArray[i] = validBlockNum > 0 ? validBlockNum : invalidRowSparseRatio;
             maxValidS2Len = std::max(sparseValidArray[i] * s1BasicBlock, maxValidS2Len);
         }
     }
@@ -2298,8 +2297,7 @@ protected:
         return s1Ratio;
     }
 
-    bool CalcUBSize(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
-                    int64_t tmpDBasicBlock, int64_t batch) override
+    bool CalcUBSize(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock, int64_t batch) override
     {
         apiMaxUBSize = tmpS1BasicBlock * tmpS2BasicBlock * sizeof(float) + softmaxExtraSize;
         return true;
@@ -2431,7 +2429,7 @@ protected:
         workspaces[0] = static_cast<size_t>((bmm1AlignBytes + stage1AlignBytes + bmm2AlignBytes) *
                                             tilingData.multiCoreParams.get_coreNum()) +
                         WORK_SPACE_RESERVE_SIZE;
-	    if (pseType == PSE_INNER_MUL_ADD_TYPE || pseType == PSE_INNER_MUL_ADD_SQRT_TYPE) {
+        if (pseType == PSE_INNER_MUL_ADD_TYPE || pseType == PSE_INNER_MUL_ADD_SQRT_TYPE) {
             pseAlibiBaseS2 = alignedS2;
             pseAlibiBaseS1 = std::min(static_cast<int64_t>(coreParams.get_s1BaseSize()),
                                       UB_BASIC_LIMIT_SIZE / pseAlibiBaseS2);
@@ -2651,8 +2649,7 @@ protected:
         return true;
     }
 
-    bool CalcUBSize(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
-                    int64_t tmpDBasicBlock, int64_t batch) override
+    bool CalcUBSize(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock, int64_t batch) override
     {
         apiMaxUBSize = HIGH_PERF_API_BUFFER_MULTIPLE * tmpS1BasicBlock * tmpS2BasicBlock * sizeof(float);
         return true;
@@ -2866,8 +2863,7 @@ protected:
         return true;
     }
 
-    bool CalcUBSize(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
-                    int64_t tmpDBasicBlock, int64_t batch) override
+    bool CalcUBSize(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock, int64_t batch) override
     {
         apiMaxUBSize = HIGH_PERF_API_BUFFER_MULTIPLE * tmpS1BasicBlock * tmpS2BasicBlock * sizeof(float);
         return true;
@@ -2896,44 +2892,38 @@ protected:
         int64_t bmm1Bytes = coreParams.get_nRatio() * tensorSizeParams.get_bmm1ResUbSize() * calcTypeSize;
 
         // dSize小于64的场景，无需切D， workspace占用较小
-        if (dSize <= 64) {
+        if (dSize <= D_SPECIFIC_SIZE) {
             // stage1占用2倍的空间，stage2占用2倍空间
             workspaces[0] = static_cast<size_t>((bmm1Bytes * SPACE_NUM_2 +
-                                                 SPACE_NUM_2 * coreParams.get_s1BaseSize() * dSize * calcTypeSize) *
-                                                aivNum) +
+                            SPACE_NUM_2 * coreParams.get_s1BaseSize() * alignedD * calcTypeSize) * aivNum) +
                             WORK_SPACE_RESERVE_SIZE;
             // NZND场景，stage1占用3倍的空间，stage2占用2倍空间
             if (s2Size % S2_NZTOND_SIZE_64 != 0) {
                 workspaces[0] = static_cast<size_t>((bmm1Bytes * SPACE_NUM_3 +
-                                                     SPACE_NUM_2 * coreParams.get_s1BaseSize() * dSize * calcTypeSize) *
-                                                    aivNum) +
+                                SPACE_NUM_2 * coreParams.get_s1BaseSize() * alignedD * calcTypeSize) * aivNum) +
                                 WORK_SPACE_RESERVE_SIZE;
             }
             // FP32场景，stage1占用4倍的空间，stage2占用2倍空间
             if (inputDtypeBytes == DATA_TYPE_FP32) {
                 workspaces[0] = static_cast<size_t>((bmm1Bytes * SPACE_NUM_4 +
-                                                     SPACE_NUM_2 * coreParams.get_s1BaseSize() * dSize * calcTypeSize) *
-                                                    aivNum) +
+                                SPACE_NUM_2 * coreParams.get_s1BaseSize() * alignedD * calcTypeSize) * aivNum) +
                                 WORK_SPACE_RESERVE_SIZE;
             }
         } else {
             // 切D场景，stage1占用2倍的空间，stage2占用4倍空间
             workspaces[0] = static_cast<size_t>((bmm1Bytes * SPACE_NUM_2 +
-                                                 SPACE_NUM_4 * coreParams.get_s1BaseSize() * dSize * calcTypeSize) *
-                                                aivNum) +
+                            SPACE_NUM_4 * coreParams.get_s1BaseSize() * alignedD * calcTypeSize) * aivNum) +
                             WORK_SPACE_RESERVE_SIZE;
             // NZND场景，stage1占用3倍的空间，stage2占用4倍空间
             if (s2Size % S2_NZTOND_SIZE_64 != 0) {
                 workspaces[0] = static_cast<size_t>((bmm1Bytes * SPACE_NUM_3 +
-                                                     SPACE_NUM_4 * coreParams.get_s1BaseSize() * dSize * calcTypeSize) *
-                                                    aivNum) +
+                                SPACE_NUM_4 * coreParams.get_s1BaseSize() * alignedD * calcTypeSize) * aivNum) +
                                 WORK_SPACE_RESERVE_SIZE;
             }
             // FP32场景，stage1占用4倍的空间，stage2占用4倍空间
             if (inputDtypeBytes == DATA_TYPE_FP32) {
                 workspaces[0] = static_cast<size_t>((bmm1Bytes * SPACE_NUM_4 +
-                                                     SPACE_NUM_4 * coreParams.get_s1BaseSize() * dSize * calcTypeSize) *
-                                                    aivNum) +
+                                SPACE_NUM_4 * coreParams.get_s1BaseSize() * alignedD * calcTypeSize) * aivNum) +
                                 WORK_SPACE_RESERVE_SIZE;
             }
         }
@@ -3073,13 +3063,31 @@ protected:
 
     bool SetPseAlibiParams() override
     {
-        OPS_LOG_D(context_, "Set PseAlibiParams.");
+        OPS_LOG_D(context_, "Set pseAlibiParams begin.");
         auto pseShape = context_->GetOptionalInputShape(PSE_INPUT_INDEX);
         if (pseShape == nullptr) {
             OPS_LOG_D(context_, "SetPseAlibiParams pseShape == nullptr.");
             return true;
         }
         if (pseType == PSE_INNER_MUL_ADD_TYPE || pseType == PSE_INNER_MUL_ADD_SQRT_TYPE) {
+            OPS_ERR_IF(tilingData.inputParams.get_sparseType() == static_cast<uint8_t>(SparseEnum::RIGHT_DOWN_CAUSAL_BAND),
+                       OPS_REPORT_VECTOR_INNER_ERR(opName, "INNER Pse alibi only support BAND_LEFT_UP_CAUSAL sparse type."), return false);
+            if (tilingData.inputParams.get_sparseType() == static_cast<uint8_t>(SparseEnum::BAND_LEFT_UP_CAUSAL)) {
+                for (int64_t i = 0L; i < bSize; ++i) {
+                    if (i == 0) {
+                        if (actualSeqLenData[i] - actualSeqLenKvData[i] + qStartIdx - kvStartIdx == 0) {
+                            continue;
+                        } else {
+                            OPS_LOG_E(context_, "INNER Pse alibi only support when actualSeqQLen and actualSeqKvLen are equal.");
+                            return false;
+                        }
+                    }
+                    if (actualSeqLenData[i] != actualSeqLenKvData[i]) {
+                        OPS_LOG_E(context_, "INNER Pse alibi only support when actualSeqQLen and actualSeqKvLen are equal.");
+                        return false;
+                    }
+                }
+            }
             return true;
         }
         // 2: pre last axiss
@@ -3137,8 +3145,7 @@ protected:
         return true;
     }
 
-    bool CalcUBSize(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
-                    int64_t tmpDBasicBlock, int64_t batch) override
+    bool CalcUBSize(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock, int64_t batch) override
     {
         apiMaxUBSize = HIGH_PERF_API_BUFFER_MULTIPLE * tmpS1BasicBlock * tmpS2BasicBlock * sizeof(float);
         return true;
@@ -3158,17 +3165,17 @@ protected:
         }
 
         // dSize小于64的场景，无需切D， workspace占用较小
-        if (dSize <= 64) {
+        if (dSize <= D_SPECIFIC_SIZE) {
             // 默认使能NZND, stage1占用3倍的空间，stage2占用2倍空间
             workspaces[0] = static_cast<size_t>(
                                 (bmm1Byetes * SPACE_NUM_3 + stage1Bytes * SPACE_NUM_2 +
-                                 SPACE_NUM_2 * coreParams.get_s1BaseSize() * dSize * calcTypeSize) * aivNum) +
+                                 SPACE_NUM_2 * coreParams.get_s1BaseSize() * alignedD * calcTypeSize) * aivNum) +
                                  WORK_SPACE_RESERVE_SIZE;
         } else {
             // 切D场景，默认使能NZND，stage1占用3倍的空间，stage2占用4倍空间
             workspaces[0] = static_cast<size_t>(
                                 (bmm1Byetes * SPACE_NUM_3 + stage1Bytes * SPACE_NUM_2 +
-                                 SPACE_NUM_4 * coreParams.get_s1BaseSize() * dSize * calcTypeSize) * aivNum) +
+                                 SPACE_NUM_4 * coreParams.get_s1BaseSize() * alignedD * calcTypeSize) * aivNum) +
                                  WORK_SPACE_RESERVE_SIZE;
         }
         if (pseType == PSE_INNER_MUL_ADD_TYPE || pseType == PSE_INNER_MUL_ADD_SQRT_TYPE) {
@@ -3457,8 +3464,8 @@ protected:
             int64_t n2G = coreParams.get_n2OuterSize() * coreParams.get_gOuterSize();
             int64_t s1BlockNum = CeilDivision(actualSeqLenData[i], s1BasicBlock);
             // 每个s1方向上切分块的计算量
-            for (int64_t k = 0; k < n2G; k++) {
-                for (int64_t j = 0; j < s1BlockNum; j++) {
+            for (int64_t k = 0; k < n2G; ++k) {
+                for (int64_t j = 0; j < s1BlockNum; ++j) {
                     // 此处暂时设置为1, 由于实测尾块1和128性能差距不大，理论上应该如下所示
                     // 理论值: s1RealSize为std::min(s1BasicBlock, (actualSeqLenData[i] - s1BasicBlock * j))
                     int64_t s1RealSize = 1;
@@ -3466,7 +3473,7 @@ protected:
                     // 新增一个系数, 解决理论和实际的差异
                     int64_t s2RemainSize = s2RealSize % s2sizeLimitMax;
                     s2RealSize = (s2RealSize / s2sizeLimitMax) * s2sizeLimitMax;
-                    s2RealSize += ((s2RemainSize > 0) ? cof[CeilDivision(s2RemainSize, 128L) - 1] : 0);
+                    s2RealSize += ((s2RemainSize > 0) ? COF[CeilDivision(s2RemainSize, 128L) - 1] : 0);
                     sparseValidArray.emplace_back(s1RealSize * s2RealSize);
                 }
             }
@@ -3671,8 +3678,7 @@ protected:
         return ge::GRAPH_PARAM_INVALID;
     }
 
-    bool CalcUBSize(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock,
-                    int64_t tmpDBasicBlock, int64_t batch) override
+    bool CalcUBSize(int64_t tmpS1BasicBlock, int64_t tmpS2BasicBlock, int64_t batch) override
     {
         return true;
     }

@@ -535,6 +535,55 @@ REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000011110002134, FlashAt
 REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000011111002134, FlashAttentionScoreGradTilingDataS1s2Bn2)
 // End BSND
 
+// mm345 NZ出
+// mmOutFormat(ND: 0, NZ: 1), mm_config(NULL: 0, NORMAL: 1, MDL: 2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000100000002134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000100001002134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000100010002134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000100011002134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+
+// mmOutFormat(ND: 0, NZ: 1), mm_config(NULL: 0, NORMAL: 1, MDL: 2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000100100002134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000100101002134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000100110002134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000100111002134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+
+// mmOutFormat(ND: 0, NZ: 1), mm_config(NULL: 0, NORMAL: 1, MDL: 2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000101000002134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000101001002134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000101010002134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000101011002134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+
+// mmOutFormat(ND: 0, NZ: 1), mm_config(NULL: 0, NORMAL: 1, MDL: 2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000101100002134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000101101002134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000101110002134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000101111002134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+
+// mmOutFormat(ND: 0, NZ: 1), mm_config(NULL: 0, NORMAL: 1, MDL: 2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000110000002134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000110001002134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000110010002134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000110011002134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+
+// mmOutFormat(ND: 0, NZ: 1), mm_config(NULL: 0, NORMAL: 1, MDL: 2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000110100002134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000110101002134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000110110002134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000110111002134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+
+// mmOutFormat(ND: 0, NZ: 1), mm_config(NULL: 0, NORMAL: 1, MDL: 2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000111000002134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000111001002134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000111010002134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000111011002134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+
+// mmOutFormat(ND: 0, NZ: 1), mm_config(NULL: 0, NORMAL: 1, MDL: 2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000111100002134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000111101002134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000111110002134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000111111002134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+// End BSND
 
 // SBND
 // drop_out_cfg(0, 1), atten_mask_cfg(0, 1), pse_cfg(0, 1)
@@ -588,6 +637,55 @@ REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000011110012134, FlashAt
 REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000011111012134, FlashAttentionScoreGradTilingDataS1s2Bn2)
 // End SBND
 
+// mm345 NZ out
+// mmOutFormat(ND: 0, NZ: 1), mm_config(NULL: 0, NORMAL: 1, MDL: 2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000100000012134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000100001012134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000100010012134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000100011012134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+
+// mmOutFormat(ND: 0, NZ: 1), mm_config(NULL: 0, NORMAL: 1, MDL: 2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000100100012134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000100101012134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000100110012134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000100111012134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+
+// mmOutFormat(ND: 0, NZ: 1), mm_config(NULL: 0, NORMAL: 1, MDL: 2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000101000012134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000101001012134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000101010012134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000101011012134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+
+// mmOutFormat(ND: 0, NZ: 1), mm_config(NULL: 0, NORMAL: 1, MDL: 2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000101100012134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000101101012134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000101110012134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000101111012134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+
+// mmOutFormat(ND: 0, NZ: 1), mm_config(NULL: 0, NORMAL: 1, MDL: 2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000110000012134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000110001012134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000110010012134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000110011012134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+
+// mmOutFormat(ND: 0, NZ: 1), mm_config(NULL: 0, NORMAL: 1, MDL: 2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000110100012134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000110101012134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000110110012134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000110111012134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+
+// mmOutFormat(ND: 0, NZ: 1), mm_config(NULL: 0, NORMAL: 1, MDL: 2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000111000012134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000111001012134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000111010012134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000111011012134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+
+// mmOutFormat(ND: 0, NZ: 1), mm_config(NULL: 0, NORMAL: 1, MDL: 2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000111100012134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000111101012134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000111110012134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000111111012134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+// End SBND
 
 // BNSD
 // drop_out_cfg(0, 1), atten_mask_cfg(0, 1), pse_cfg(0, 1)
@@ -640,6 +738,57 @@ REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000011101022134, FlashAt
 REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000011110022134, FlashAttentionScoreGradTilingDataS1s2Bn2)
 REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000011111022134, FlashAttentionScoreGradTilingDataS1s2Bn2)
 // End BNSD
+
+// mm345 NZ out
+// mmOutFormat(ND: 0, NZ: 1), mm_config(NULL: 0, NORMAL: 1, MDL: 2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000100000022134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000100001022134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000100010022134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000100011022134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+
+// mmOutFormat(ND: 0, NZ: 1), mm_config(NULL: 0, NORMAL: 1, MDL: 2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000100100022134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000100101022134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000100110022134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000100111022134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+
+// mmOutFormat(ND: 0, NZ: 1), mm_config(NULL: 0, NORMAL: 1, MDL: 2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000101000022134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000101001022134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000101010022134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000101011022134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+
+// mmOutFormat(ND: 0, NZ: 1), mm_config(NULL: 0, NORMAL: 1, MDL: 2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000101100022134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000101101022134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000101110022134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000101111022134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+
+// mmOutFormat(ND: 0, NZ: 1), mm_config(NULL: 0, NORMAL: 1, MDL: 2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000110000022134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000110001022134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000110010022134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000110011022134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+
+// mmOutFormat(ND: 0, NZ: 1), mm_config(NULL: 0, NORMAL: 1, MDL: 2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000110100022134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000110101022134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000110110022134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000110111022134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+
+// mmOutFormat(ND: 0, NZ: 1), mm_config(NULL: 0, NORMAL: 1, MDL: 2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000111000022134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000111001022134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000111010022134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000111011022134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+
+// mmOutFormat(ND: 0, NZ: 1), mm_config(NULL: 0, NORMAL: 1, MDL: 2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000111100022134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000111101022134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000111110022134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+REGISTER_TILING_DATA_CLASS(FlashAttentionScoreGrad_10000000111111022134, FlashAttentionScoreGradTilingDataS1s2Bn2)
+// End BNSD
+
 // TND
 // drop_out_cfg(0, 1), atten_mask_cfg(0, 1), pse_cfg(0, 1)
 

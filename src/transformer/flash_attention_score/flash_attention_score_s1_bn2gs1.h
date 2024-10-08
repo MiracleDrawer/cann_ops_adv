@@ -18,6 +18,7 @@
 
 #include "util.h"
 #include "dropmask.h"
+#include "flash_attention_score_common.h"
 #include "kernel_operator.h"
 #include "kernel_tiling/kernel_tiling.h"
 #include "lib/matmul_intf.h"
@@ -56,14 +57,6 @@ struct SplitS1dExtraInfo {
     int64_t softmaxCopyOutLimit;
     int64_t softmaxCopyOutS1Size;
     bool lastNotPair;
-};
-
-struct Nz2NdInfo {
-    int64_t ndFirstAxisRealSize;
-    int64_t ndFirstAxisBaseSize;
-    int64_t ndFirstAxisLoopSize;
-    int64_t ndLastAxis;
-    int64_t loopIdx;
 };
 
 // INPUT_T - means data type for input
@@ -143,8 +136,6 @@ protected:
     __aicore__ inline void CopyInAttenMask(SplitS1dExtraInfo &extraInfo, int64_t loopIdx, int64_t maskOffset);
     __aicore__ inline int64_t ComputeAttenMaskOffset(SplitS1dExtraInfo &extraInfo, int64_t loopIdx);
     __aicore__ inline int64_t ComputeOffsetForNoCompress(SplitS1dExtraInfo &extraInfo, int64_t loopIdx);
-    __aicore__ inline void NzToNd(Nz2NdInfo &nz2NdInfo, const GlobalTensor<T> &bmmResGm,
-                                  LocalTensor<T> &tempUb, LocalTensor<T> &bmmResUb);
     __aicore__ inline void NdToNz(SplitS1dExtraInfo &extraInfo, LocalTensor<INPUT_T> &nzResUb,
                                   LocalTensor<INPUT_T> &vec1ResUb, int64_t loopIdx);
     __aicore__ inline void GetBmm1Result(SplitS1dExtraInfo &extraInfo, LocalTensor<T> &bmm1ResUb, int64_t loopIdx);
@@ -763,6 +754,11 @@ __aicore__ inline void FlashAttentionScoreS1Bn2gs1<
     DataCopyParams dataCopyParams;
     dataCopyParams.blockLen = dSize * sizeof(INPUT_T);
     dataCopyParams.srcStride = 0;
+    if constexpr (IsSameType<INPUT_T, float>::value) {
+        if (this->dSizeAlign16 - this->dSize >= this->blockSize) {
+            dataCopyParams.srcStride = 1;
+        }
+    }
     int64_t dstStride = 0;
     int64_t attenOutOffset = dSize;
     if constexpr (layOutType == LayOutTypeEnum::LAYOUT_BSH) {
@@ -1521,76 +1517,6 @@ FlashAttentionScoreS1Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INP
         }
         return bOffset + n2Offset + gOffset + s1Offset + s2Offset;
     }
-}
-
-template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,
-          typename T, bool isBasicBlock, CubeFormat bmm1Format, TPosition bmm2Source, CubeFormat bmm2SourceFormat,
-          bool enableL1Reuse>
-__aicore__ inline void
-FlashAttentionScoreS1Bn2gs1<implMode, layOutType, hasPse, hasAtten, hasDrop, INPUT_T, T, isBasicBlock, bmm1Format,
-                            bmm2Source, bmm2SourceFormat, enableL1Reuse>::NzToNd(Nz2NdInfo &nz2NdInfo,
-                                                                                 const GlobalTensor<T> &bmmResGm,
-                                                                                 LocalTensor<T> &tempUb,
-                                                                                 LocalTensor<T> &bmmResUb)
-{
-    // 1.将bmm1结果由GM搬至UB，每块数据在UB上间隔1个block，防止BANK冲突
-    DataCopyParams dataCopyParams;
-    int64_t nzFirstAxis = CeilDiv(nz2NdInfo.ndLastAxis, 16L);
-    dataCopyParams.blockCount = nzFirstAxis;
-    dataCopyParams.blockLen = nz2NdInfo.ndFirstAxisLoopSize * 2;
-    dataCopyParams.srcStride = (nz2NdInfo.ndFirstAxisRealSize - nz2NdInfo.ndFirstAxisLoopSize) * 2;
-    dataCopyParams.dstStride = 1;
-    int64_t bmmResOffset = nz2NdInfo.loopIdx * nz2NdInfo.ndFirstAxisBaseSize * 16;
-    int64_t innerLoop = nzFirstAxis / 8L;
-    int64_t innerRemain = nzFirstAxis % 8L;
-
-    CopyRepeatParams repeatParams;
-    repeatParams.srcStride = nz2NdInfo.ndFirstAxisLoopSize * 2 + 1;
-    repeatParams.dstStride = 2;
-    repeatParams.srcRepeatSize = 2;
-    repeatParams.dstRepeatSize = nz2NdInfo.ndLastAxis / 8;
-    int32_t outerLoop = nz2NdInfo.ndFirstAxisLoopSize / this->repeatMaxTimes;
-    int32_t outerRemain = nz2NdInfo.ndFirstAxisLoopSize % this->repeatMaxTimes;
-    int32_t outerBmmOffset = this->repeatMaxTimes * nz2NdInfo.ndLastAxis;
-    int32_t outerTempOffset = this->repeatMaxTimes * 16;
-    int64_t offsetJ = 128 * nz2NdInfo.ndFirstAxisLoopSize + 64;
-    DataCopy(tempUb, bmmResGm[bmmResOffset], dataCopyParams);
-
-    // 2.使用vcopy进行transpose，[S2/16, vec1S1Base * 16 + 8] -> [vec1S1Base, S2/16 , 16]
-    event_t eventIdMte2ToV = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::MTE2_V));
-    SetFlag<HardEvent::MTE2_V>(eventIdMte2ToV);
-    WaitFlag<HardEvent::MTE2_V>(eventIdMte2ToV);
-    for (int64_t outerIndex = 0; outerIndex < outerLoop; ++outerIndex) {
-        for (int64_t i = 0; i < 2; ++i) {
-            for (int64_t j = 0; j < innerLoop; ++j) {
-                Copy(bmmResUb[outerIndex * outerBmmOffset + j * 128 + i * 8],
-                     tempUb[outerIndex * outerTempOffset + j * offsetJ + i * 8], this->repeatMaxSize,
-                     this->repeatMaxTimes, repeatParams);
-            }
-            if (likely(innerRemain)) {
-                Copy(bmmResUb[outerIndex * outerBmmOffset + innerLoop * 128 + i * 8],
-                     tempUb[outerIndex * outerTempOffset + innerLoop * offsetJ + i * 8], innerRemain * 8,
-                     this->repeatMaxTimes, repeatParams);
-            }
-        }
-    }
-    if (likely(outerRemain)) {
-        for (int64_t i = 0; i < 2; ++i) {
-            for (int64_t j = 0; j < innerLoop; ++j) {
-                Copy(bmmResUb[outerLoop * outerBmmOffset + j * 128 + i * 8],
-                     tempUb[outerLoop * outerTempOffset + j * offsetJ + i * 8], this->repeatMaxSize, outerRemain,
-                     repeatParams);
-            }
-            if (likely(innerRemain)) {
-                Copy(bmmResUb[outerLoop * outerBmmOffset + innerLoop * 128 + i * 8],
-                     tempUb[outerLoop * outerTempOffset + innerLoop * offsetJ + i * 8], innerRemain * 8,
-                     outerRemain, repeatParams);
-            }
-        }
-    }
-    uint32_t bmm1ResUbShape[] = {static_cast<uint32_t>(nz2NdInfo.ndFirstAxisLoopSize),
-                                 static_cast<uint32_t>(nz2NdInfo.ndLastAxis)};
-    bmmResUb.SetShapeInfo(ShapeInfo(2, bmm1ResUbShape, DataFormat::ND));
 }
 
 template <ImplModeEnum implMode, LayOutTypeEnum layOutType, bool hasPse, bool hasAtten, bool hasDrop, typename INPUT_T,

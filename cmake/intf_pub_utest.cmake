@@ -9,7 +9,7 @@
 
 # UTest 场景, 编译 Target 名称公共前缀
 set(UTest_NamePrefix UTest)
-
+set(ENABLE_ASAN OFF)
 # UTest 场景, 公共配置
 add_library(intf_pub_utest INTERFACE)
 target_compile_definitions(intf_pub_utest

@@ -124,7 +124,8 @@ Atlas A2 训练系列产品
 - 部分场景下，如果计算量过大可能会导致算子执行超时(aicore error类型报错，errorStr为：timeout or trap error)，此时建议做轴切分处理，注：这里的计算量会受B、S、N、D等参数的影响，值越大计算量越大。
 - band场景，preTokensOptional和nextTokensOptional之间必须要有交集。
 - prefixOptional稀疏计算场景即sparseModeOptional=6，当Sq > Skv时，prefix的N值取值范围\[0, Skv\]，当Sq <= Skv时，prefix的N值取值范围\[Skv-Sq, Skv\]。
-- sparse_mode=7或者8时，不支持可选输入realShiftOptional。
+- sparse_mode=7时，不支持可选输入realShiftOptional。
+- sparse_mode=8时，当每个sequence的q、kv等长时支持可选输入realShiftOptional，针对全局做pse生成。支持q方向进行外切，需要外切前每个sequence的q、kv等长，外切后传入的actualSeqQLenOptional[0] - actualSeqKvLenOptional[0] + qStartIdxOptional - kvStartIdxOptional == 0（本功能属实验性功能）。
 - actualSeqQLenOptional输入支持某个Batch上的S长度为0，此时不支持可选输入realShiftOptional。
 - attenMaskOptional输入不支持补pad，即attenMaskOptional中不能存在某一行全1的场景。
 - 支持actualSeqQLenOptional中某个Batch上的S长度为0；如果存在S为0的情况，不支持pse输入，
