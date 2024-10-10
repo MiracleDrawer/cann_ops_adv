@@ -635,6 +635,7 @@ void FFNTiling::SetTilingBaseParams(gert::TilingContext *context, const FFNCompi
                                     const uint32_t aicNum)
 {
     context->SetBlockDim(compileInfoPtr->blockDim);
+    context->SetScheduleMode(1);  // 1: batchmode
     tilingData.ffnBaseParams.set_totalTokens(bs);
     tilingData.ffnBaseParams.set_k1(k1);
     tilingData.ffnBaseParams.set_n1(n1);
@@ -1985,7 +1986,7 @@ ge::graphStatus FFNTiling::FFNSetTilingData(gert::TilingContext *context)
 
 ASCENDC_EXTERN_C ge::graphStatus TilingFFN(gert::TilingContext *context)
 {
-    static thread_local FFNTiling FFN_tiling;
+    FFNTiling FFN_tiling;
     auto ret = FFN_tiling.RunFusionKernelTiling(context);
     return ret;
 }

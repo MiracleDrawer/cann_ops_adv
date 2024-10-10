@@ -197,7 +197,7 @@ const auto Tc_FFN_Kernel_Case = ::testing::Values(
                GenTensor("weight2", {4, 0, 512}, ge::DataType::DT_BF16),
                GenTensor("expertTokens", {4}, ge::DataType::DT_INT64),
                GenTensor("y", {256, 512}, ge::DataType::DT_BF16)},
-              {64, 64, 64, 64}, "fastgelu", 1, -1),
+              {64, 64, 64, 64}, "fastgelu", 0, -1),
         0),
     FFNCase(
         "FFN_Moe_Case12", true, "", /* CaseName, Enable, DebugInfo */
@@ -209,7 +209,7 @@ const auto Tc_FFN_Kernel_Case = ::testing::Values(
                GenTensor("weight2", {4, 0, 512}, ge::DataType::DT_BF16),
                GenTensor("expertTokens", {4}, ge::DataType::DT_INT64),
                GenTensor("bias2", {4, 512}, ge::DataType::DT_FLOAT), GenTensor("y", {256, 512}, ge::DataType::DT_BF16)},
-              {64, 64, 64, 64}, "fastgelu", 1, -1),
+              {64, 64, 64, 64}, "fastgelu", 0, -1),
         0),
     FFNCase(
         "FFN_Moe_Case14", true, "", /* CaseName, Enable, DebugInfo */
