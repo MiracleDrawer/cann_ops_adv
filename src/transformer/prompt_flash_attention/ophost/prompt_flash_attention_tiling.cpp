@@ -14,6 +14,7 @@
  */
 #include <queue>
 #include <vector>
+#include <unordered_map>
 #include "register/op_def_registry.h"
 #include "tiling/tiling_api.h"
 #include "tiling/data_copy_transpose_tiling.h"
@@ -115,21 +116,61 @@ constexpr uint32_t SLIMIT = 20971520;  // s、kvs <= 20M
 constexpr uint32_t DLIMIT = 512; // D <= 512
 
 constexpr uint32_t MSD_UB_BASE_WIDTH = 16;
-constexpr uint32_t MSD_UB_HEGHT = 128;
+constexpr uint32_t MSD_UB_HEGHT = 256;
 constexpr uint32_t MSD_UB_INQUEUE = 8;
-constexpr uint32_t MSD_UB_TMP_NM = 32;
+constexpr uint32_t MSD_UB_TMP_NM = 16;
 constexpr uint32_t NO_MSD_UB_BMM2 = 64;
 constexpr uint32_t NO_MSD_HIGH_PERFORMANCE = 2;
 constexpr uint32_t NO_MSD_HIGH_PRECISION = 3;
 constexpr uint32_t ONE_BLK_SIZE_PFA = 32;
 constexpr uint32_t MAX_SOFTMAX_COMPUTE_LINES = 4;
+constexpr uint32_t COMPUTELINE_FOR_BIG_D = 1;
+constexpr uint32_t MAX_COMPUTELINES = 16;
+constexpr uint32_t UB_SIZE_FOR_1_K = 1024;
+constexpr uint32_t MSD_BIG_D = 256;
 
-static uint32_t promptGcd(uint32_t a, uint32_t b)
+static const std::unordered_map<ge::DataType, string> g_strDataTypePfa = {
+    {ge::DT_FLOAT, "DT_FLOAT"},
+    {ge::DT_FLOAT16, "DT_FLOAT16"},
+    {ge::DT_INT8, "DT_INT8"},
+    {ge::DT_INT16, "DT_INT16"},
+    {ge::DT_UINT16, "DT_UINT16"},
+    {ge::DT_UINT8, "DT_UINT8"},
+    {ge::DT_INT32, "DT_INT32"},
+    {ge::DT_INT64, "DT_INT64"},
+    {ge::DT_UINT32, "DT_UINT32"},
+    {ge::DT_UINT64, "DT_UINT64"},
+    {ge::DT_BOOL, "DT_BOOL"},
+    {ge::DT_DOUBLE, "DT_DOUBLE"},
+    {ge::DT_STRING, "DT_STRING"},
+    {ge::DT_DUAL_SUB_INT8, "DT_DUAL_SUB_INT8"},
+    {ge::DT_DUAL_SUB_UINT8, "DT_DUAL_SUB_UINT8V"},
+    {ge::DT_COMPLEX64, "DT_COMPLEX64"},
+    {ge::DT_COMPLEX128, "DT_COMPLEX128"},
+    {ge::DT_QINT8, "DT_QINT8"},
+    {ge::DT_QINT16, "DT_QINT16"},
+    {ge::DT_QINT32, "DT_QINT32"},
+    {ge::DT_QUINT8, "DT_QUINT8"},
+    {ge::DT_QUINT16, "DT_QUINT16"},
+    {ge::DT_RESOURCE, "DT_RESOURCE"},
+    {ge::DT_STRING_REF, "DT_STRING_REF"},
+    {ge::DT_DUAL, "DT_DUAL"},
+    {ge::DT_VARIANT, "DT_VARIANT"},
+    {ge::DT_BF16, "DT_BF16"},
+    {ge::DT_UNDEFINED, "DT_UNDEFINED"},
+};
+
+static uint32_t PromptGcd(uint32_t a, uint32_t b)
 {
     if (a % b == 0) {
         return b;
 	}
-    return promptGcd(b, a % b);
+    return PromptGcd(b, a % b);
+}
+
+static ge::DataType ValidPfaDataType(ge::DataType type)
+{
+    return (g_strDataTypePfa.find(type) == g_strDataTypePfa.end()) ? ge::DT_UNDEFINED : type;
 }
 
 static ge::graphStatus ConvertContextToPFAParams(gert::TilingContext* context, ContextParamsForPFATiling& contextKeyParams)
@@ -304,8 +345,8 @@ ge::graphStatus PromptFlashAttentionTiling::TilingGetTilingKeyAttentionAscendC(u
     tilingKey += (tilingMod == TilingMod::CVDIFF) || (isSOuterNoTail && isSInnerNoTail && isDNoTail) ? 0U : 1U;
     tilingKey += inputDataType == ge::DT_BF16 ? 100U : 0U;     // When the input qkv is BF16, add 100.
     tilingKey += inputDataType == ge::DT_INT8 ? 200U : 0U;     // When the input qkv is INT8, add 200.
-    tilingKey += tilingMod == TilingMod::CVDIFF ? 1002U : 0U;  // 1002: Add 1000 when using CV diff; Without distinguishing between tail and no tail, add 2 uniformly
-    tilingKey += outputDataType == ge::DT_INT8 ? 20000U : 0U;  // When output is INT8, add 20000
+    tilingKey += tilingMod == TilingMod::CVDIFF ? 1002U : 0U;   // 1002: Add 1000 when using CV diff; Without distinguishing between tail and no tail, add 2 uniformly.
+    tilingKey += outputDataType == ge::DT_INT8 ? 20000U : 0U;   // When output is INT8, add 20000.
 
     if (!useNewTiling) {
         return ge::GRAPH_SUCCESS; // The old template does not consider NSD differences, only 0, 1, 100, 101
@@ -316,14 +357,14 @@ ge::graphStatus PromptFlashAttentionTiling::TilingGetTilingKeyAttentionAscendC(u
 
     // The KV cache inverse quantization for CV diff currently only handles the case where Q in the CV diff template is FP16.
     if ((inputDataType == ge::DT_FLOAT16 || inputDataType == ge::DT_BF16) && (tilingMod == TilingMod::CVDIFF)) {
-        tilingKey = 1012;   // 1012：CV diff, +1000; new_tiling, +10; not distinguishing between tail and total, +2
-        tilingKey += ((inputDataType == ge::DT_FLOAT16) && (innerPrecise == HIGH_PRECISION)) ? 600 : 0; // fp16 high precision mode, regarded as a type 600
+        tilingKey = 1012;    // 1012：CV diff, +1000; new_tiling, +10; not distinguishing between tail and total, +2.
+        tilingKey += ((inputDataType == ge::DT_FLOAT16) && (innerPrecise == HIGH_PRECISION)) ? 600 : 0;  // fp16 high precision mode, regarded as a type 600.
         tilingKey += (inputDataType == ge::DT_BF16) ? 100 : 0;    // 100: bf16
         tilingKey += (outputDataType == ge::DT_BF16) ? 10000 : 0; // When the output dtype is bf16, tilingKey should increase by 10000.
         tilingKey += (outputDataType == ge::DT_INT8) ? 20000 : 0; // 20000: The situation of outputDataType == ge::DT_INT8
-        tilingKey += ((inputLayout == InputLayout::BSH) || (inputLayout == InputLayout::SH) || (inputLayout == InputLayout::BSND)) ? 100000 : 0;  // When the inputLayout is BSH, SH or BSND, plus 100000
+        tilingKey += ((inputLayout == InputLayout::BSH) || (inputLayout == InputLayout::SH) || (inputLayout == InputLayout::BSND)) ? 100000 : 0;   // When the inputLayout is BSH, SH or BSND, plus 100000.
         tilingKey += (!enableSplitSeqOneN && enableMatmulNorm ? 1000000 : 0);  // Only enable matmul tiling optimization, do not enable l1reuse, add 1000000, mutually exclusive with the following situation of 2000000.
-        tilingKey += (enableSplitSeqOneN ? 2000000 : 0);          // l1reuse defaults to enabling matmul tiling optimization, with an additional 2000000, which is mutually exclusive from the 1000000 situation mentioned above
+        tilingKey += (enableSplitSeqOneN ? 2000000 : 0);   // l1reuse defaults to enabling matmul tiling optimization, with an additional 2000000, which is mutually exclusive from the 1000000 situation mentioned above.
         UpdateTilingKeyFlag(contextKeyParams, tilingKey);         // Determine whether to perform inverse quantization and generate a binary number by combining it with the remaining reserved bits, and take its decimal representation.
     }
 
@@ -354,7 +395,7 @@ ge::graphStatus PromptFlashAttentionTiling::PromptFlashAttentionSplitNS(ContextP
 
     uint32_t arrayLen = baseParams->get_dimNumOfseq();
 
-    std::vector<uint32_t> CoreHeadNumTail(arrayLen, 0U);
+    std::vector<uint32_t> coreHeadNumTail(arrayLen, 0U);
     std::vector<uint32_t> actualS1(arrayLen, 0U);
     std::vector<uint32_t> singleCoreHeadNumSize(arrayLen, 0U);
     std::vector<uint32_t> actualCoreNums(arrayLen, 0U);
@@ -382,31 +423,31 @@ ge::graphStatus PromptFlashAttentionTiling::PromptFlashAttentionSplitNS(ContextP
 
         // Two strategies 1. gcd average core 2. Abandoning some core components
         uint32_t headNumSize = baseParams->get_headNumSize();
-        uint32_t n1 = promptGcd(curCoreNum, headNumSize);
+        uint32_t n1 = PromptGcd(curCoreNum, headNumSize);
         if (headNumSize / n1 > sOuterBlockNums[i]) {
             // Abandoning some cores or N-dimensional partitioning
             if (headNumSize > curCoreNum) {
                 singleCoreHeadNumSize[i] = headNumSize / curCoreNum;
-                CoreHeadNumTail[i] = headNumSize % curCoreNum;
+                coreHeadNumTail[i] = headNumSize % curCoreNum;
                 actualS1[i] = 1;
                 actualCoreNums[i] = curCoreNum;
             } else {
                 singleCoreHeadNumSize[i] = 1;
-                CoreHeadNumTail[i] = 0;
+                coreHeadNumTail[i] = 0;
                 actualS1[i] = curCoreNum / headNumSize;
                 actualCoreNums[i] = actualS1[i] * headNumSize;
             }
         } else { // gcd average core
             uint32_t s1 = (curCoreNum / n1);
             singleCoreHeadNumSize[i] = (headNumSize / n1);
-            CoreHeadNumTail[i] = 0;
+            coreHeadNumTail[i] = 0;
             actualS1[i] = s1;
             actualCoreNums[i] = (n1 * actualS1[i]);
         }
     }
     seqParams->set_singleCoreHeadNumSize(singleCoreHeadNumSize.data());
     seqParams->set_actualS1(actualS1.data());
-    seqParams->set_CoreHeadNumTail(CoreHeadNumTail.data());
+    seqParams->set_CoreHeadNumTail(coreHeadNumTail.data());
     seqParams->set_actualCoreNums(actualCoreNums.data());
 
     singleCoreParams->set_multiSmaxsInnerLoopTimes(multiSmaxsInnerLoopTimes);
@@ -630,8 +671,8 @@ void PromptFlashAttentionTiling::PromptFlashAttentionSplitSeqOneN(PromptFlashAtt
 
     uint32_t sOuterSize = singleCoreParams->get_singleProcessSOuterSize();
     if (!isVectorCore) {   // When viewed from the perspective of a cube, sOuter * 2 is used for kernel partitioning, and within each cube kernel, 2 vector kernels still receive sOuter.
-        sOuterSize = sOuterSize * 2;  // 2 : sOuter * 2 is used for kernel partitioning
-        curCoreNum = curCoreNum / 2;  // 2 : within each cube kernel, 2 vector kernels still receive sOuter
+        sOuterSize = sOuterSize * 2; // 2 : sOuter * 2 is used for kernel partitioning.
+        curCoreNum = curCoreNum / 2; // 2 : within each cube kernel, 2 vector kernels still receive sOuter.
     }
 
     int64_t outerBlockNums = (actualSeqLength + sOuterSize - 1) / sOuterSize;
@@ -875,9 +916,9 @@ bool PromptFlashAttentionTiling::PromptFlashAttentionCheckBmm1(PromptFlashAttent
         EnableBmmDoubleBuffer(bmm1TilingData); // Open the double buffer for BMM1 calculation, and BMM1's MTE2 can be bound.
     }
 
-    bool res = EnableMTE2BmmPipe(tilingData, bmm1, bmm1TilingData, sOuterFactor, sInnerFactor); // Open MTE2 Matmul pipeline
+    bool res = EnableMTE2BmmPipe(tilingData, bmm1, bmm1TilingData, sOuterFactor, sInnerFactor);  // Open MTE2 Matmul pipeline.
 
-    OPS_ERR_IF(res == false,      // EnableMTE2BmmPipe fail
+    OPS_ERR_IF(res == false,     // EnableMTE2BmmPipe fail.
                     OPS_REPORT_VECTOR_INNER_ERR(contextKeyParamsPtr->opName, "EnableMTE2BmmPipe failed!"),
                     return false);
 
@@ -1025,8 +1066,12 @@ ge::graphStatus PromptFlashAttentionTiling::PromptFlashAttentionSetTensorSize(
         tensorSize.set_pseShiftUbSize(sOuterFactor * sInnerFactor);
     }
 
-    if(enableMsd){
-        tensorSize.set_mmResUbSize(CVDIFF_SMALL_QS_THRESHOLDS * CVDIFF_MSD_BUFFER_SIZE_1024B / sizeof(int32_t)); // for msd touji
+    if (enableMsd){
+        if (tilingData.promptAttentionBaseParams.get_headSize() > MSD_BIG_D) {
+            tensorSize.set_mmResUbSize(COMPUTELINE_FOR_BIG_D * sInnerFactor * 2); // 2:double buffer
+        } else {
+            tensorSize.set_mmResUbSize(CVDIFF_SMALL_QS_THRESHOLDS * CVDIFF_MSD_BUFFER_SIZE_1024B / sizeof(int32_t));
+        }
     } else {
         tensorSize.set_mmResUbSize(sOuterFactor * sInnerFactor);
     }
@@ -1041,7 +1086,11 @@ ge::graphStatus PromptFlashAttentionTiling::PromptFlashAttentionSetTensorSize(
     }
     tensorSize.set_softmaxValueSize(sOuterFactor * sInnerFactor);
     if (enableMsd) {
-         tensorSize.set_bmm2ResUbSize(MSD_UB_BASE_WIDTH * MSD_UB_HEGHT);
+        if (tilingData.promptAttentionBaseParams.get_headSize() > MSD_BIG_D) {
+            tensorSize.set_bmm2ResUbSize(MAX_COMPUTELINES * tilingData.promptAttentionBaseParams.get_alignedHeadSize());
+        } else {
+             tensorSize.set_bmm2ResUbSize(MSD_UB_BASE_WIDTH * MSD_UB_HEGHT);
+        }
      } else {
         tensorSize.set_bmm2ResUbSize(sOuterFactor * tilingData.promptAttentionBaseParams.get_alignedHeadSize());
     }
@@ -1072,26 +1121,46 @@ ge::graphStatus PromptFlashAttentionTiling::PromptFlashAttentionSetTensorSize(
     return ge::GRAPH_SUCCESS;
 }
 
-int64_t PromptFlashAttentionTiling::PromptFlashAttentionSetMsdUbSize(PromptFlashAttentionTilingData& tilingData, PromptAttentionSingleCoreTensorSize& tensorSize)
+int64_t PromptFlashAttentionTiling::PromptFlashAttentionSetMsdUbSize(PromptFlashAttentionTilingData& tilingData, PromptAttentionSingleCoreTensorSize& tensorSize, int32_t sInnerFactorTmp) const
 {
     int64_t msdUbSize =  0;
     if (enableMsd) {
-        tensorSize.set_msdInQueueSize(CVDIFF_SINNER_FACTOR_DEFAULT * MSD_UB_INQUEUE);
-        tensorSize.set_msdQRowSumBuffSize(CVDIFF_MSD_BUFFER_SIZE_512B);
-        tensorSize.set_msdAMaxTmpBuffSize(CVDIFF_MSD_BUFFER_SIZE_512B);
-        tensorSize.set_msdAMaxResBuffSize(CVDIFF_MSD_BUFFER_SIZE_512B);
-        tensorSize.set_msdSoftmaxResAmaxBuffSize(CVDIFF_MSD_BUFFER_SIZE_512B);
-        tensorSize.set_msdSoftmaxRowSumScaleBuffSize(CVDIFF_MSD_BUFFER_SIZE_512B);
-        tensorSize.set_msdScaleBuffSize(CVDIFF_SINNER_FACTOR_DEFAULT);
-        tensorSize.set_msdOffsetBuffSize(CVDIFF_SINNER_FACTOR_DEFAULT);
-        tensorSize.set_msdTmpMm1BuffSize(CVDIFF_SINNER_FACTOR_DEFAULT * MSD_UB_TMP_NM);
-        tensorSize.set_msdTmpMm2BuffSize(CVDIFF_SINNER_FACTOR_DEFAULT * MSD_UB_TMP_NM);
-        tensorSize.set_msdOutQueueSize(MSD_UB_BASE_WIDTH * tilingData.promptAttentionBaseParams.get_headSize() * sizeof(half));
+        if (tilingData.promptAttentionBaseParams.get_headSize() > MSD_BIG_D) {
+            int64_t msdTmpMmBufferSize = std::max(COMPUTELINE_FOR_BIG_D * sInnerFactorTmp * sizeof(float),
+                                                  MAX_COMPUTELINES * tilingData.promptAttentionBaseParams.get_headSize() * sizeof(float)); // 2:double buffer
+            tensorSize.set_msdInQueueSize(MAX_COMPUTELINES * tilingData.promptAttentionBaseParams.get_headSize() * FLOAT16SIZE);
+            tensorSize.set_msdQRowSumBuffSize(MAX_COMPUTELINES * 8 * sizeof(float)); // 8:param of ub
+            tensorSize.set_msdAMaxTmpBuffSize(MAX_COMPUTELINES * 8 * sizeof(float)); // 8:param of ub
+            tensorSize.set_msdAMaxResBuffSize(MAX_COMPUTELINES * 8 * sizeof(float)); // 8:param of ub
+            tensorSize.set_msdSoftmaxResAmaxBuffSize(MAX_COMPUTELINES * 8 * sizeof(float)); // 8:param of ub
+            tensorSize.set_msdSoftmaxRowSumScaleBuffSize(MAX_COMPUTELINES * 8 * sizeof(float)); // 8:param of ub
+            tensorSize.set_msdScaleBuffSize(tilingData.promptAttentionBaseParams.get_headSize() * sizeof(float));
+            tensorSize.set_msdOffsetBuffSize(tilingData.promptAttentionBaseParams.get_headSize() * sizeof(float));
+            tensorSize.set_msdTmpMm1BuffSize(msdTmpMmBufferSize);
+            tensorSize.set_msdTmpMm2BuffSize(msdTmpMmBufferSize);
+            tensorSize.set_msdOutQueueSize(msdTmpMmBufferSize / 2); // 2:half of msdOutQueueSize
+
+            int64_t computeLines = COMPUTELINE_FOR_BIG_D;
+            tilingData.promptAttentionTensorSizeRect.set_msdComputeLines(computeLines);
+        } else {
+            tensorSize.set_msdInQueueSize(CVDIFF_SINNER_FACTOR_DEFAULT * MSD_UB_INQUEUE);
+            tensorSize.set_msdQRowSumBuffSize(CVDIFF_MSD_BUFFER_SIZE_512B);
+            tensorSize.set_msdAMaxTmpBuffSize(CVDIFF_MSD_BUFFER_SIZE_512B);
+            tensorSize.set_msdAMaxResBuffSize(CVDIFF_MSD_BUFFER_SIZE_512B);
+            tensorSize.set_msdSoftmaxResAmaxBuffSize(CVDIFF_MSD_BUFFER_SIZE_512B);
+            tensorSize.set_msdSoftmaxRowSumScaleBuffSize(CVDIFF_MSD_BUFFER_SIZE_512B);
+            tensorSize.set_msdScaleBuffSize(CVDIFF_SINNER_FACTOR_DEFAULT);
+            tensorSize.set_msdOffsetBuffSize(CVDIFF_SINNER_FACTOR_DEFAULT);
+            tensorSize.set_msdTmpMm1BuffSize(CVDIFF_SINNER_FACTOR_DEFAULT * MSD_UB_TMP_NM);
+            tensorSize.set_msdTmpMm2BuffSize(CVDIFF_SINNER_FACTOR_DEFAULT * MSD_UB_TMP_NM);
+            tensorSize.set_msdOutQueueSize((CVDIFF_SINNER_FACTOR_DEFAULT * MSD_UB_TMP_NM) / 2); // 2:half of msdTmpMm1BuffSize
+        }
 
         // msd UB size
-        msdUbSize = (int64_t)tensorSize.get_msdInQueueSize() + (int64_t)tensorSize.get_msdQRowSumBuffSize() * NUM_2 + (int64_t)tensorSize.get_msdAMaxResBuffSize() * NUM_2 + (int64_t)tensorSize.get_msdAMaxTmpBuffSize() + (int64_t)tensorSize.get_msdSoftmaxResAmaxBuffSize() + 
-                    (int64_t)tensorSize.get_msdSoftmaxRowSumScaleBuffSize() + (int64_t)tensorSize.get_msdScaleBuffSize() + (int64_t)tensorSize.get_msdOffsetBuffSize() + 
-                    (int64_t)tensorSize.get_msdTmpMm1BuffSize() + (int64_t)tensorSize.get_msdTmpMm2BuffSize() + (int64_t)tensorSize.get_msdOutQueueSize();
+        msdUbSize = static_cast<int64_t>(tensorSize.get_msdInQueueSize()) + static_cast<int64_t>(tensorSize.get_msdQRowSumBuffSize()) * NUM_2 + static_cast<int64_t>(tensorSize.get_msdAMaxResBuffSize()) * NUM_2 + 
+                    static_cast<int64_t>(tensorSize.get_msdAMaxTmpBuffSize()) + static_cast<int64_t>(tensorSize.get_msdSoftmaxResAmaxBuffSize()) + 
+                    static_cast<int64_t>(tensorSize.get_msdSoftmaxRowSumScaleBuffSize()) + static_cast<int64_t>(tensorSize.get_msdScaleBuffSize()) + static_cast<int64_t>(tensorSize.get_msdOffsetBuffSize()) + 
+                    static_cast<int64_t>(tensorSize.get_msdTmpMm1BuffSize()) + static_cast<int64_t>(tensorSize.get_msdTmpMm2BuffSize()) + static_cast<int64_t>(tensorSize.get_msdOutQueueSize());
      }
  
     return msdUbSize;
@@ -1130,7 +1199,7 @@ bool PromptFlashAttentionTiling::PromptFlashAttentionCheckArgsLegal(PromptFlashA
 
     PromptFlashAttentionSetTensorSize(tilingData, tilingData.promptAttentionTensorSizeRect,
                                         sOuterFactor, sInnerFactor);
-    msdUbSize = PromptFlashAttentionSetMsdUbSize(tilingData, tilingData.promptAttentionTensorSizeRect);
+    msdUbSize = PromptFlashAttentionSetMsdUbSize(tilingData, tilingData.promptAttentionTensorSizeRect, static_cast<int32_t>(sInnerFactor));
     int32_t l1SizeRemain = l1Size - CalculateL1SizeUsed(tilingData, typeByteSize);
     if (l1SizeRemain < 0) {
         updateDiv = true;
@@ -1318,7 +1387,7 @@ bool PromptFlashAttentionTiling::CheckInputDimAndHeadNum(ContextParamsForPFATili
         }
     }
 
-    OPS_ERR_IF(nQ > 256U,  // The maximum limit for head is 256
+    OPS_ERR_IF(nQ > 256U,   // The maximum limit for head is 256.
                     OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "numHeads(%u) should not be more than 256!", nQ),
                     return false);
 
@@ -1358,7 +1427,7 @@ bool PromptFlashAttentionTiling::SetTilingHeadNumRatio(ContextParamsForPFATiling
         OPS_LOG_E(contextKeyParams.opName, "numHeads(%d) must be divisible by numKeyValueHeads(%d)!", nQ, nKV);
         return false;
     } else {
-        if (nQ / nKV > 64) { // G cannot be greater than 64
+        if (nQ / nKV > 64) {   // G cannot be greater than 64.
             OPS_LOG_E(contextKeyParams.opName, "numHeads / numKeyValueHeads = %d, cannot be larger than 64", nQ / nKV);
             return false;
         }
@@ -1415,7 +1484,7 @@ bool PromptFlashAttentionTiling::CheckActualSeqLength(ContextParamsForPFATiling&
         OPS_ERR_IF(actualLenDimsQ < b && actualLenDimsQ > actualLenDimsQMin,
                         OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "Dim(%lu) of actual_seq_lengths must equal to 1 or greater than or equal to batch size(%u)!", actualLenDimsQ, b),
                         return false);
-        uint32_t actualSeqQLength = std::min((uint32_t)actualLenDimsQ, b); // actual_seq_lengths is 1 or batch size
+        uint32_t actualSeqQLength = std::min(static_cast<uint32_t>(actualLenDimsQ), b); // actual_seq_lengths is 1 or batch size
         for (uint32_t i = LOOP_BEGIN_NUM; i < actualSeqQLength; ++i) {
             actualSeqTmp = static_cast<int64_t>(actualSeqLenQ->GetData<int64_t>()[i]);
             OPS_ERR_IF(actualSeqTmp < 0 || actualSeqTmp > sQ,
@@ -1428,7 +1497,7 @@ bool PromptFlashAttentionTiling::CheckActualSeqLength(ContextParamsForPFATiling&
         OPS_ERR_IF(actualLenDimsKV < b && actualLenDimsKV > actualLenDimsKVMin,
                         OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "Dim(%lu) of actual_seq_lengths_kv must equal to 1 or greater than or equal to batch size(%u)!", actualLenDimsKV, b),
                         return false);
-        uint32_t actualSeqKVLength = std::min((uint32_t)actualLenDimsKV, b); // actual_seq_lengths_KV is 1 or batch size
+        uint32_t actualSeqKVLength = std::min(static_cast<uint32_t>(actualLenDimsKV), b); // actual_seq_lengths_KV is 1 or batch size
         for (uint32_t i = LOOP_BEGIN_NUM; i < actualSeqKVLength; ++i) {
             actualSeqTmp = static_cast<int64_t>(actualSeqLenKV->GetData<int64_t>()[i]);
             if (contextKeyParams.isKvContinuous == 1) {
@@ -1474,17 +1543,20 @@ bool PromptFlashAttentionTiling::CheckPseShiftTypeAndShape(ContextParamsForPFATi
 
     OPS_ERR_IF((inputType == ge::DT_FLOAT16 && pseShiftElemType != ge::DT_FLOAT16),
                     OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                    "q type is fp16, but pse shift type is not fp16, pse shift type = %ld", (int64_t)pseShiftElemType),
+                    "q type is fp16, but pse shift type is not fp16, pse shift type = %s",
+                    g_strDataTypePfa.at(ValidPfaDataType(pseShiftElemType)).c_str()),
                     return false);
 
     OPS_ERR_IF((inputType == ge::DT_BF16 && pseShiftElemType != ge::DT_BF16),
                     OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                    "q type is bf16, but pse shift type is not bf16, pse shift type = %ld", (int64_t)pseShiftElemType),
+                    "q type is bf16, but pse shift type is not bf16, pse shift type = %s",
+                    g_strDataTypePfa.at(ValidPfaDataType(pseShiftElemType)).c_str()),
                     return false);
 
     OPS_ERR_IF((inputType == ge::DT_INT8 && pseShiftElemType != ge::DT_FLOAT16),
                     OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                    "q type is int8, but pse shift type is not fp16, pse shift type = %ld", (int64_t)pseShiftElemType),
+                    "q type is int8, but pse shift type is not fp16, pse shift type = %s",
+                    g_strDataTypePfa.at(ValidPfaDataType(pseShiftElemType)).c_str()),
                     return false);
 
     // Currently does not support D has super large size.
@@ -1543,7 +1615,7 @@ bool PromptFlashAttentionTiling::CheckPATypeAndShape(ContextParamsForPFATiling& 
                     "blockTable can't be empty when PA enable"),
                     return false);
     int32_t blockTableDim1 = static_cast<int32_t>(blockTableShape->GetStorageShape().GetDim(0));
-    blockTableDim2 = (int32_t)(blockTableShape->GetStorageShape().GetDim(1));
+    blockTableDim2 = static_cast<int32_t>(blockTableShape->GetStorageShape().GetDim(1));
     // When blockTableDim2>maxBlockNumPerBatch, the kernel should use blockTableDim2 as the second dimension when indexing block id in blockTable.
     // But for the verification of mask S2 axis, maxBlockNumPerBatch * tempBlockSize should still be used as the verification benchmark.
 
@@ -1611,7 +1683,7 @@ bool PromptFlashAttentionTiling::CheckPATypeAndShape(ContextParamsForPFATiling& 
                     "the dim of key [%d, %d, %d] is wrong, which should be [>=%ld, %d, %d] when PA enable", keyDim1,
                     keyDim2, keyDim3, blockNumValid, *blockSize, h / headNumRatio),  // When assigning headNumRatio, it is guaranteed that it will not be 0
                     return false);
-        // In the BSH input of the PA scenario, it is required that the h of the KV matrix does not exceed 65535. The dim and dim3 of the K/V have already been verified to be equal, so only the K matrix is verified here
+        // In the BSH input of the PA scenario, it is required that the h of the KV matrix does not exceed 65535.  The dim and dim3 of the K/V have already been verified to be equal, so only the K matrix is verified here.
         OPS_ERR_IF(keyDim3 > 65535,
                     OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
                     "layout of key/value is BSH, the h of key/value %d should not > 65535 when PA enable",
@@ -1856,13 +1928,16 @@ ge::graphStatus PromptFlashAttentionTiling::CheckPostQuantParams(const ContextPa
 
         // dtype verification
         OPS_ERR_IF((quantScale2Type != ge::DT_BF16) && (quantScale2Type != ge::DT_FLOAT),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "post quant scale dtype(%d) only support bf16 and fp32.", quantScale2Type),
+                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "post quant scale dtype(%s) only support bf16 and fp32.",
+                g_strDataTypePfa.at(ValidPfaDataType(quantScale2Type)).c_str()),
                 return ge::GRAPH_FAILED);
         OPS_ERR_IF((quantOffset2Shape != nullptr) && (quantScale2Type != quantOffset2Type),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "post quant scale dtype(%d) and offset dtype(%d) must be consistent.", quantScale2Type, quantOffset2Type),
+                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "post quant scale dtype(%s) and offset dtype(%s) must be consistent.",
+                g_strDataTypePfa.at(ValidPfaDataType(quantScale2Type)).c_str(), g_strDataTypePfa.at(ValidPfaDataType(quantOffset2Type)).c_str()),
                 return ge::GRAPH_FAILED);
         OPS_ERR_IF((inputType != ge::DT_BF16) && (quantScale2Type == ge::DT_BF16),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "post quant scale and offset support bf16 only if input dtype(%d) is bf16.", inputType),
+                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "post quant scale and offset support bf16 only if input dtype(%s) is bf16.",
+                g_strDataTypePfa.at(ValidPfaDataType(inputType)).c_str()),
                 return ge::GRAPH_FAILED);
 
         // shape verification
@@ -1890,7 +1965,7 @@ ge::graphStatus PromptFlashAttentionTiling::AdjustBasicBlock(PromptFlashAttentio
     if ((coreNum % headNumSize == 0) && (sCoreNum > 1) && (sOuterBlockNum % sCoreNum == 0) &&
         sOuterBlockNum / sCoreNum == 1) {
       // Open all core in the n direction; Multiple cores are opened in the s direction and each core only processes one Souter. At this point, the Souter is divided into two blocks for load balancing optimization.
-      // To ensure that the basic block is an integer multiple of typeByteNum
+      // To ensure that the basic block is an integer multiple of typeByteNum.
       sOuterFactor = (sOuterFactor / 2 + typeByteNum - 1) / typeByteNum * typeByteNum;  // split outer: 2
     }
     return ge::GRAPH_SUCCESS;
@@ -2088,30 +2163,10 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
     OPS_LOG_I(contextKeyParams.opName,
             "ascendPlatformInfo:aivNum = %d, aicNum = %d, l1Size = %lu, l0CSize = %lu, l0ASize = %lu, l0BSize = %lu, ubSize = %lu!",
             aivNum, aicNum, ascendPlatformInfo.l1Size, ascendPlatformInfo.l0CSize, ascendPlatformInfo.l0ASize, ascendPlatformInfo.l0BSize, ascendPlatformInfo.ubSize);
+    
     int32_t outputDataTypeSize = FLOAT32SIZE;
-    outputType = contextKeyParams.outputDataType;
-    inputType = contextKeyParams.inputDataType;
-    if (inputType == ge::DT_FLOAT16 && contextKeyParams.kDataType == ge::DT_INT8) {
-        enableKvAntiquant = true;
-
-        if (contextKeyParams.hasKeyAntiquantScale || contextKeyParams.hasValueAntiquantScale) {        
-            enableKvAntiquant = false;
-        }
-    }
-
-    if (inputType == ge::DT_FLOAT16) {
-        dataTypeSize = FLOAT16SIZE;
-    } else if (inputType == ge::DT_BF16) {
-        dataTypeSize = BFLOAT16SIZE;
-    } else if (inputType == ge::DT_INT8) {
-        dataTypeSize = INT8SIZE;
-    }
-    if (outputType == ge::DT_FLOAT16) {
-        outputDataTypeSize = FLOAT16SIZE;
-    } else if (outputType == ge::DT_BF16) {
-        outputDataTypeSize = BFLOAT16SIZE;
-    } else if (outputType == ge::DT_INT8) {
-        outputDataTypeSize = INT8SIZE;
+    if(CheckIOType(contextKeyParams, tilingData, outputDataTypeSize) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
     }
 
     OPS_ERR_IF(((inputType == ge::DT_FLOAT) || (outputType == ge::DT_FLOAT)),
@@ -2169,7 +2224,7 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
                     "not support 310P when blockTable is not null"),
                     return ge::GRAPH_FAILED);
 
-        OPS_ERR_IF(contextKeyParams.isKvContinuous == 0,  // The interception that is mutually exclusive with the left padding has been implemented in FIA
+        OPS_ERR_IF(contextKeyParams.isKvContinuous == 0,   // The interception that is mutually exclusive with the left padding has been implemented in FIA.
                     OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
                     "not support tensorlist when blockTable is not null"),
                     return ge::GRAPH_FAILED);
@@ -2189,50 +2244,10 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
     }
 
     uint32_t maskElemSize = dataTypeSize;
-    if (contextKeyParams.attentionMask != nullptr) {
-        auto maskDataType = contextKeyParams.maskDataType;
-        if (maskDataType == ge::DT_FLOAT16) {
-            maskElemSize = FLOAT16SIZE;
-        }
-        else if (maskDataType == ge::DT_FLOAT) {
-            maskElemSize = FLOAT32SIZE;
-        }
-        else if (maskDataType == ge::DT_BOOL) {
-            maskElemSize = BOOLSIZE;
-        }
-        else if (maskDataType == ge::DT_INT8) { // Adapt to static graph mode, bool type attentionmask is converted to int8.
-            maskElemSize = INT8SIZE;
-        }
-        else if (maskDataType == ge::DT_UINT8) {
-            maskElemSize = UINT8SIZE;
-        }
-        // FP32 mask type does not support.
-        OPS_ERR_IF(maskDataType == ge::DT_FLOAT,
-                        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                        "maskType[%d] should not be float[%d]", maskDataType, ge::DT_FLOAT),
-                        return ge::GRAPH_FAILED);
-        // When in fp16 high-precision mode, the mask type only supports bool or int8.
-        OPS_ERR_IF(((inputType == ge::DT_FLOAT16) && (innerPrecise == HIGH_PRECISION)) &&
-                        (maskDataType != ge::DT_BOOL) && (maskDataType != ge::DT_INT8) && (maskDataType != ge::DT_UINT8),
-                        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                        "maskType[%d] should be bool, int8 or uint8 when precision mode", maskDataType),
-                        return ge::GRAPH_FAILED);
-        // When bf16, the mask type only supports bool or int8.
-        OPS_ERR_IF((inputType == ge::DT_BF16) &&
-                        (maskDataType != ge::DT_BOOL) && (maskDataType != ge::DT_INT8) && (maskDataType != ge::DT_UINT8),
-                        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                        "maskType[%d] should be bool, int8 or uint8 when input type is bfloat16", maskDataType),
-                        return ge::GRAPH_FAILED);
-        // FP16 mask type does not support invalid line correction.
-        OPS_ERR_IF((maskDataType == ge::DT_FLOAT16 && tilingData.promptAttentionBaseParams.get_isRowInvalid()),
-                        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                        "maskType[%d] should not be float16[%d] when innerPrecise = 2 or 3", maskDataType, ge::DT_FLOAT16),
-                        return ge::GRAPH_FAILED);
-        if (curShortSocName == platform_ascendc::SocVersion::ASCEND310P) {
-            OPS_ERR_IF(maskDataType != ge::DT_BOOL, OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                        "maskType[%d] should be bool when socVersion is 310p", maskDataType), return ge::GRAPH_FAILED);
-        }
+    if(CheckMaskType(contextKeyParams, tilingData, maskElemSize) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
     }
+
     typeByteNum = BYTE_BLOCK / dataTypeSize;
     outputTypeByteNum = BYTE_BLOCK / outputDataTypeSize;
     softmaxTypeByteNum = BYTE_BLOCK / softmaxDataTypeSize;
@@ -2311,51 +2326,12 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
     }
 
     // Set the last dim size of mask.
-    auto maskKVsSize = 2048; // 2048 : default the last frist dim.
-    auto maskQsSize = 2048; // 2048 : default the last second dim.
-    if (attenMaskShape != nullptr) {
-        maskKVsSize = attenMaskShape->GetStorageShape().GetDim(attenMaskShape->GetStorageShape().GetDimNum() - 1); // 1: last frist dim
-        maskQsSize = attenMaskShape->GetStorageShape().GetDim(attenMaskShape->GetStorageShape().GetDimNum() - 2); // 2: last second dim
-    }
-
-    tilingData.promptAttentionBaseParams.set_maskKVsSize(maskKVsSize);
-    tilingData.promptAttentionBaseParams.set_maskQsSize(maskQsSize);
+    SetMaskSize(attenMaskShape, tilingData);
 
     // Internal log printing, no need to print here, same below.
-    if (CheckNonEmptyShapeExceptions(contextKeyParams, queryShape, "query")) {
+    if(CheckShape(contextKeyParams, queryShape, keyShape, valueShape, outShape, pseShiftShape, attenMaskShape) != ge::GRAPH_SUCCESS) {
         return ge::GRAPH_FAILED;
     }
-    if (CheckNonEmptyShapeExceptions(contextKeyParams, keyShape, "key")) {
-        return ge::GRAPH_FAILED;
-    }
-    if (CheckNonEmptyShapeExceptions(contextKeyParams, valueShape, "value")) {
-        return ge::GRAPH_FAILED;
-    }
-    if (CheckNonEmptyShapeExceptions(contextKeyParams, outShape, "out")) {
-        return ge::GRAPH_FAILED;
-    }
-    // Optional input can be empty.
-    OPS_ERR_IF((pseShiftShape != nullptr) &&
-                    (pseShiftShape->GetStorageShape().GetShapeSize() == gert::Shape::kInvalidDimValue),
-                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                    "Shape size of pseShift is overflow."),
-                    return ge::GRAPH_FAILED);
-    OPS_ERR_IF((attenMaskShape != nullptr) &&
-                    (attenMaskShape->GetStorageShape().GetShapeSize() == gert::Shape::kInvalidDimValue),
-                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                    "Shape size of attenMask is overflow."),
-                    return ge::GRAPH_FAILED);
-    OPS_ERR_IF((outShape->GetStorageShape().GetShapeSize() != 0) &&
-                    (queryShape->GetStorageShape().GetShapeSize() == 0),
-                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "query is empty tensor."),
-                    return ge::GRAPH_FAILED);
-    OPS_ERR_IF((queryShape->GetStorageShape().GetDimNum() < NUM_2) || (queryShape->GetStorageShape().GetDimNum() > 4), 
-                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "queryShape dim num is error, queryShape dim num = %lu", queryShape->GetStorageShape().GetDimNum()),
-                    return ge::GRAPH_FAILED);
-
-    OPS_ERR_IF(SetInputLayout(contextKeyParams.layout) == GRAPH_FAILED,
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "invalid input layout:%s.", contextKeyParams.layout),
-                return ge::GRAPH_FAILED);
 
     // In the scene of entering the image, there may be a situation where out is an empty tensor. Here, out is empty and size 0 is processed, which is equivalent to doing nothing and returning directly.
     if ((keyShape->GetStorageShape().GetShapeSize() == 0) || (valueShape->GetStorageShape().GetShapeSize() == 0) ||
@@ -2956,18 +2932,13 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
     InferTilingMod(contextKeyParams, actualSeqLengths, actualSeqLengthsKV, lenDims, hDivN, tmpS2, sparseModeVal);
     EnableSplitSeqOneN(tilingData, contextKeyParams, hDivN);
 
-    if (contextKeyParams.hasKeyAntiquantScale || contextKeyParams.hasValueAntiquantScale) {        
-        enableMsd = true;
-        tilingData.promptAttentionBaseParams.set_isMsd(1);
+    if (enableMsd) {
         if (s > CVDIFF_SMALL_QS_THRESHOLDS) {
-            OPS_LOG_E("PromptFlashAttention", "S of query(%u) is larger than 16, when keyAntiquantScale or valueAntiquantScale is enabled.", s);
+            OPS_LOG_E("PromptFlashAttention", "S of query(%u) is larger than 16, when keyAntiquantScale or valueAntiquantScale is enabled", s);
             return ge::GRAPH_FAILED;
         }
-    } else{
-        enableMsd = false;
-        tilingData.promptAttentionBaseParams.set_isMsd(0);
     }
-
+    
     uint32_t sOuterFactor;
     uint32_t sInnerFactor;
     uint32_t softmaxSInnerFactor;
@@ -3048,6 +3019,10 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
                          OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "keyAntiquantMode(%ld) or valueAntiquantMode(%ld) is not correct, keyAntiquantMode and valueAntiquantMode only support per-token when keyAntiquantScale or valueAntiquantScale is enabled", 
                         keyAntiquantModeMsd, valueAntiquantModeMsd),
                         return ge::GRAPH_FAILED);
+        OPS_ERR_IF((keyAntiquantModeMsd == 0 || valueAntiquantModeMsd == 0),
+                        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "keyAntiquantMode(%ld) or valueAntiquantMode(%ld) is not correct, per-tensor and per-channel is not supported when keyAntiquantScale or valueAntiquantScale is enabled", 
+                        keyAntiquantModeMsd, valueAntiquantModeMsd),
+                        return ge::GRAPH_FAILED);
         OPS_ERR_IF((contextKeyParams.kDataType == ge::DT_INT4 || contextKeyParams.vDataType == ge::DT_INT4),
                          OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "int4 is not supported when keyAntiquantScale or valueAntiquantScale is enabled, date type of key = %d,  date type of value = %d", contextKeyParams.kDataType, contextKeyParams.vDataType),
                          return ge::GRAPH_FAILED);
@@ -3056,9 +3031,6 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
                          return ge::GRAPH_FAILED);
         OPS_ERR_IF((isLeftPadding == true),
                          OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "LeftPadding is not supported when keyAntiquantScale or valueAntiquantScale is enabled"),
-                         return ge::GRAPH_FAILED);
-        OPS_ERR_IF((isKVHasPrefix == true),
-                         OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "Prefix is not supported when keyAntiquantScale or valueAntiquantScale is enabled"),
                          return ge::GRAPH_FAILED);
 
         OPS_ERR_IF(contextKeyParams.inputDataType != ge::DT_BF16,
@@ -3090,7 +3062,8 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
                       || ((contextKeyParams.valueAntiquantOffsetShape != nullptr) && contextKeyParams.valueAntiquantOffsetShape->GetStorageShape().GetDimNum() != NUM_2),
                         OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "Dimension number of KeyAntiquantScaleShape(%zu) or valueAntiquantScaleShape(%zu) or KeyAntiquantOffsetShape(%zu) or valueAntiquantOffsetShape(%zu) is not 2 in perToken mode", 
                                                 contextKeyParams.KeyAntiquantScaleShape->GetStorageShape().GetDimNum(), contextKeyParams.valueAntiquantScaleShape->GetStorageShape().GetDimNum(), 
-                                                contextKeyParams.KeyAntiquantOffsetShape->GetStorageShape().GetDimNum(), contextKeyParams.valueAntiquantOffsetShape->GetStorageShape().GetDimNum()),
+                                                (contextKeyParams.KeyAntiquantOffsetShape != nullptr) ? contextKeyParams.KeyAntiquantOffsetShape->GetStorageShape().GetDimNum() : 0, 
+                                                (contextKeyParams.valueAntiquantOffsetShape != nullptr) ? contextKeyParams.valueAntiquantOffsetShape->GetStorageShape().GetDimNum() : 0),
                         return ge::GRAPH_FAILED);
  
             OPS_ERR_IF(((contextKeyParams.KeyAntiquantScaleShape->GetStorageShape().GetDim(0) != bKV) 
@@ -3120,7 +3093,8 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
                             || ((contextKeyParams.valueAntiquantOffsetShape != nullptr) && contextKeyParams.valueAntiquantOffsetShape->GetStorageShape().GetDimNum() != NUM_2), 
                            OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "Dimension number of KeyAntiquantScaleShape(%zu) or valueAntiquantScaleShape(%zu) or KeyAntiquantOffsetShape(%zu) or valueAntiquantOffsetShape(%zu) is not same in perChannel mode", 
                                                       contextKeyParams.KeyAntiquantScaleShape->GetStorageShape().GetDimNum(), contextKeyParams.valueAntiquantScaleShape->GetStorageShape().GetDimNum(), 
-                                                      contextKeyParams.KeyAntiquantOffsetShape->GetStorageShape().GetDimNum(), contextKeyParams.valueAntiquantOffsetShape->GetStorageShape().GetDimNum()),
+                                                      (contextKeyParams.KeyAntiquantOffsetShape != nullptr) ? contextKeyParams.KeyAntiquantOffsetShape->GetStorageShape().GetDimNum() : 0, 
+                                                      (contextKeyParams.valueAntiquantOffsetShape != nullptr) ? contextKeyParams.valueAntiquantOffsetShape->GetStorageShape().GetDimNum() : 0),
                            return ge::GRAPH_FAILED);
  
                 OPS_ERR_IF(((contextKeyParams.KeyAntiquantScaleShape->GetStorageShape().GetDim(0) != nKV) || (contextKeyParams.KeyAntiquantScaleShape->GetStorageShape().GetDim(1) != hKV / nKV)), 
@@ -3147,7 +3121,8 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
                           || ((contextKeyParams.valueAntiquantOffsetShape != nullptr) && contextKeyParams.valueAntiquantOffsetShape->GetStorageShape().GetDimNum() != INDEX_3), 
                            OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "Dimension number of KeyAntiquantScaleShape(%zu) or valueAntiquantScaleShape(%zu) or KeyAntiquantOffsetShape(%zu) or valueAntiquantOffsetShape(%zu) is not same in perChannel mode", 
                                                        contextKeyParams.KeyAntiquantScaleShape->GetStorageShape().GetDimNum(), contextKeyParams.valueAntiquantScaleShape->GetStorageShape().GetDimNum(), 
-                                                       contextKeyParams.KeyAntiquantOffsetShape->GetStorageShape().GetDimNum(), contextKeyParams.valueAntiquantOffsetShape->GetStorageShape().GetDimNum()),
+                                                       (contextKeyParams.KeyAntiquantOffsetShape != nullptr) ? contextKeyParams.KeyAntiquantOffsetShape->GetStorageShape().GetDimNum() : 0, 
+                                                       (contextKeyParams.valueAntiquantOffsetShape != nullptr) ? contextKeyParams.valueAntiquantOffsetShape->GetStorageShape().GetDimNum() : 0),
                            return ge::GRAPH_FAILED);
  
                 OPS_ERR_IF(((contextKeyParams.KeyAntiquantScaleShape->GetStorageShape().GetDim(0) != nKV) || (contextKeyParams.KeyAntiquantScaleShape->GetStorageShape().GetDim(1) != 1) 
@@ -3180,7 +3155,8 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
                            || ((contextKeyParams.valueAntiquantOffsetShape != nullptr) && contextKeyParams.valueAntiquantOffsetShape->GetStorageShape().GetDimNum() != 1), 
                            OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "Dimension number of KeyAntiquantScaleShape(%zu) or valueAntiquantScaleShape(%zu) or KeyAntiquantOffsetShape(%zu) or valueAntiquantOffsetShape(%zu) is not same in perChannel mode", 
                                                        contextKeyParams.KeyAntiquantScaleShape->GetStorageShape().GetDimNum(), contextKeyParams.valueAntiquantScaleShape->GetStorageShape().GetDimNum(), 
-                                                       contextKeyParams.KeyAntiquantOffsetShape->GetStorageShape().GetDimNum(), contextKeyParams.valueAntiquantOffsetShape->GetStorageShape().GetDimNum()),
+                                                       (contextKeyParams.KeyAntiquantOffsetShape != nullptr) ? contextKeyParams.KeyAntiquantOffsetShape->GetStorageShape().GetDimNum() : 0, 
+                                                       (contextKeyParams.valueAntiquantOffsetShape != nullptr) ? contextKeyParams.valueAntiquantOffsetShape->GetStorageShape().GetDimNum() : 0),
                            return ge::GRAPH_FAILED);
                 
                 OPS_ERR_IF((contextKeyParams.KeyAntiquantScaleShape->GetStorageShape().GetDim(0) != hKV) , 
@@ -3206,25 +3182,26 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
                           contextKeyParams.KeyAntiquantOffsetShape->GetStorageShape().GetDimNum(), contextKeyParams.valueAntiquantOffsetShape->GetStorageShape().GetDimNum());
                 return ge::GRAPH_FAILED;
             }
-
-            OPS_ERR_IF((keyAntiquantModeMsd == 0),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "keyAntiquantMode(%ld) is not correct, per-tensor and per-channel is not supported when keyAntiquantScale or valueAntiquantScale is enabled", 
-                keyAntiquantModeMsd),
-            return ge::GRAPH_FAILED);
         }
  
         OPS_ERR_IF(((keyAntiquantModeMsd == 0 && (contextKeyParams.KeyAntiquantScaleType != ge::DT_BF16 || contextKeyParams.valueAntiquantScaleType != ge::DT_BF16 
                     || (contextKeyParams.KeyAntiquantOffsetShape != nullptr && contextKeyParams.KeyAntiquantOffsetType != ge::DT_BF16) 
                     || (contextKeyParams.valueAntiquantOffsetShape != nullptr && contextKeyParams.valueAntiquantOffsetType != ge::DT_BF16)))),
-                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "KeyAntiquantScaleType(%d) or valueAntiquantScaleType(%d) or KeyAntiquantOffsetType(%d) or valueAntiquantOffsetType(%d) is not bf16 in per-channel mode", 
-                                                contextKeyParams.KeyAntiquantScaleType, contextKeyParams.valueAntiquantScaleType, contextKeyParams.KeyAntiquantOffsetType, contextKeyParams.valueAntiquantOffsetType),
+                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "KeyAntiquantScaleType(%s) or valueAntiquantScaleType(%s) or KeyAntiquantOffsetType(%s) or valueAntiquantOffsetType(%s) is not bf16 in per-channel mode",
+                                                g_strDataTypePfa.at(ValidPfaDataType(contextKeyParams.KeyAntiquantScaleType)).c_str(),
+                                                g_strDataTypePfa.at(ValidPfaDataType(contextKeyParams.valueAntiquantScaleType)).c_str(),
+                                                g_strDataTypePfa.at(ValidPfaDataType(contextKeyParams.KeyAntiquantOffsetType)).c_str(),
+                                                g_strDataTypePfa.at(ValidPfaDataType(contextKeyParams.valueAntiquantOffsetType)).c_str()),
                     return ge::GRAPH_FAILED);
  
         OPS_ERR_IF(((keyAntiquantModeMsd == 1 && (contextKeyParams.KeyAntiquantScaleType != ge::DT_FLOAT || contextKeyParams.valueAntiquantScaleType != ge::DT_FLOAT 
                     || (contextKeyParams.KeyAntiquantOffsetShape != nullptr && contextKeyParams.KeyAntiquantOffsetType != ge::DT_FLOAT) 
                     || (contextKeyParams.valueAntiquantOffsetShape != nullptr && contextKeyParams.valueAntiquantOffsetType != ge::DT_FLOAT)))),
-                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "KeyAntiquantScaleType(%d) or valueAntiquantScaleType(%d) or KeyAntiquantOffsetType(%d) or valueAntiquantOffsetType(%d) is not float32 in pertoken mode", 
-                                                contextKeyParams.KeyAntiquantScaleType, contextKeyParams.valueAntiquantScaleType, contextKeyParams.KeyAntiquantOffsetType, contextKeyParams.valueAntiquantOffsetType),
+                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "KeyAntiquantScaleType(%s) or valueAntiquantScaleType(%s) or KeyAntiquantOffsetType(%s) or valueAntiquantOffsetType(%s) is not float32 in pertoken mode",
+                                                g_strDataTypePfa.at(ValidPfaDataType(contextKeyParams.KeyAntiquantScaleType)).c_str(),
+                                                g_strDataTypePfa.at(ValidPfaDataType(contextKeyParams.valueAntiquantScaleType)).c_str(),
+                                                g_strDataTypePfa.at(ValidPfaDataType(contextKeyParams.KeyAntiquantOffsetType)).c_str(),
+                                                g_strDataTypePfa.at(ValidPfaDataType(contextKeyParams.valueAntiquantOffsetType)).c_str()),
                     return ge::GRAPH_FAILED);
  
         if((contextKeyParams.KeyAntiquantOffsetShape != nullptr) && (contextKeyParams.valueAntiquantOffsetShape != nullptr)) {
@@ -3274,6 +3251,144 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
     workspaces[0] = GetPFAWorkSpaceSize(tilingData);
     OPS_LOG_I(contextKeyParams.opName, "The Tiling key is %lu", tilingKey);
 
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus PromptFlashAttentionTiling::CheckIOType(ContextParamsForPFATiling& contextKeyParams, PromptFlashAttentionTilingData& tilingData, int32_t& outputDataTypeSize) {
+    outputType = contextKeyParams.outputDataType;
+    inputType = contextKeyParams.inputDataType;
+    if (inputType == ge::DT_FLOAT16 && contextKeyParams.kDataType == ge::DT_INT8) {
+        enableKvAntiquant = true;
+
+        if (contextKeyParams.hasKeyAntiquantScale || contextKeyParams.hasValueAntiquantScale) {        
+            enableKvAntiquant = false;
+        }
+    }
+
+    if (contextKeyParams.hasKeyAntiquantScale || contextKeyParams.hasValueAntiquantScale) {        
+        enableMsd = true;
+        tilingData.promptAttentionBaseParams.set_isMsd(1);
+    } else{
+        enableMsd = false;
+        tilingData.promptAttentionBaseParams.set_isMsd(0);
+        OPS_ERR_IF(inputType == ge::DT_BF16 && contextKeyParams.kDataType == ge::DT_INT8,
+                   OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "keyAntiquantScale and valueAntiquantScale should not be null, when data type of query is bf16 and data type of key/value is int8"),
+                   return ge::GRAPH_FAILED);
+    }
+
+    if (inputType == ge::DT_FLOAT16) {
+        dataTypeSize = FLOAT16SIZE;
+    } else if (inputType == ge::DT_BF16) {
+        dataTypeSize = BFLOAT16SIZE;
+    } else if (inputType == ge::DT_INT8) {
+        dataTypeSize = INT8SIZE;
+    }
+    if (outputType == ge::DT_FLOAT16) {
+        outputDataTypeSize = FLOAT16SIZE;
+    } else if (outputType == ge::DT_BF16) {
+        outputDataTypeSize = BFLOAT16SIZE;
+    } else if (outputType == ge::DT_INT8) {
+        outputDataTypeSize = INT8SIZE;
+    }
+    return ge::GRAPH_SUCCESS; 
+}
+
+ge::graphStatus PromptFlashAttentionTiling::CheckMaskType(ContextParamsForPFATiling& contextKeyParams, 
+                                                          PromptFlashAttentionTilingData& tilingData, 
+                                                          uint32_t& maskElemSize) {
+    if (contextKeyParams.attentionMask != nullptr) {
+        auto maskDataType = contextKeyParams.maskDataType;
+        if (maskDataType == ge::DT_FLOAT16) {
+            maskElemSize = FLOAT16SIZE;
+        }
+        else if (maskDataType == ge::DT_BOOL) {
+            maskElemSize = BOOLSIZE;
+        }
+        else if (maskDataType == ge::DT_INT8) { // Adapt to static graph mode, bool type attentionmask is converted to int8.
+            maskElemSize = INT8SIZE;
+        }
+        else if (maskDataType == ge::DT_UINT8) {
+            maskElemSize = UINT8SIZE;
+        }
+        // FP32 mask type does not support.
+        OPS_ERR_IF(maskDataType == ge::DT_FLOAT,
+                        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
+                        "maskType[%d] should not be float[%d]", maskDataType, ge::DT_FLOAT),
+                        return ge::GRAPH_FAILED);
+        // When in fp16 high-precision mode, the mask type only supports bool or int8.
+        OPS_ERR_IF(((inputType == ge::DT_FLOAT16) && (innerPrecise == HIGH_PRECISION)) &&
+                        (maskDataType != ge::DT_BOOL) && (maskDataType != ge::DT_INT8) && (maskDataType != ge::DT_UINT8),
+                        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
+                        "maskType[%d] should be bool, int8 or uint8 when precision mode", maskDataType),
+                        return ge::GRAPH_FAILED);
+        // When bf16, the mask type only supports bool or int8.
+        OPS_ERR_IF((inputType == ge::DT_BF16) &&
+                        (maskDataType != ge::DT_BOOL) && (maskDataType != ge::DT_INT8) && (maskDataType != ge::DT_UINT8),
+                        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
+                        "maskType[%d] should be bool, int8 or uint8 when input type is bfloat16", maskDataType),
+                        return ge::GRAPH_FAILED);
+        // FP16 mask type does not support invalid line correction.
+        OPS_ERR_IF((maskDataType == ge::DT_FLOAT16 && tilingData.promptAttentionBaseParams.get_isRowInvalid()),
+                        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
+                        "maskType[%d] should not be float16[%d] when innerPrecise = 2 or 3", maskDataType, ge::DT_FLOAT16),
+                        return ge::GRAPH_FAILED);
+        if (curShortSocName == platform_ascendc::SocVersion::ASCEND310P) {
+            OPS_ERR_IF(maskDataType != ge::DT_BOOL, OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
+                        "maskType[%d] should be bool when socVersion is 310p", maskDataType), return ge::GRAPH_FAILED);
+        }
+    }
+    return ge::GRAPH_SUCCESS;
+}
+
+void PromptFlashAttentionTiling::SetMaskSize(const gert::StorageShape* attenMaskShape, PromptFlashAttentionTilingData& tilingData) {
+    auto maskKVsSize = 2048; // 2048 : default the last frist dim.
+    auto maskQsSize = 2048; // 2048 : default the last second dim.
+    if (attenMaskShape != nullptr) {
+        maskKVsSize = attenMaskShape->GetStorageShape().GetDim(attenMaskShape->GetStorageShape().GetDimNum() - 1); // 1: last frist dim
+        maskQsSize = attenMaskShape->GetStorageShape().GetDim(attenMaskShape->GetStorageShape().GetDimNum() - 2); // 2: last second dim
+    }
+
+    tilingData.promptAttentionBaseParams.set_maskKVsSize(maskKVsSize);
+    tilingData.promptAttentionBaseParams.set_maskQsSize(maskQsSize);
+}
+
+ge::graphStatus PromptFlashAttentionTiling::CheckShape(ContextParamsForPFATiling& contextKeyParams, const gert::StorageShape* queryShape, 
+                                                       const gert::StorageShape* keyShape, const gert::StorageShape* valueShape, const gert::StorageShape* outShape, 
+                                                       const gert::StorageShape* pseShiftShape, const gert::StorageShape* attenMaskShape) {
+    if (CheckNonEmptyShapeExceptions(contextKeyParams, queryShape, "query")) {
+        return ge::GRAPH_FAILED;
+    }
+    if (CheckNonEmptyShapeExceptions(contextKeyParams, keyShape, "key")) {
+        return ge::GRAPH_FAILED;
+    }
+    if (CheckNonEmptyShapeExceptions(contextKeyParams, valueShape, "value")) {
+        return ge::GRAPH_FAILED;
+    }
+    if (CheckNonEmptyShapeExceptions(contextKeyParams, outShape, "out")) {
+        return ge::GRAPH_FAILED;
+    }
+    // Optional input can be empty.
+    OPS_ERR_IF((pseShiftShape != nullptr) &&
+                    (pseShiftShape->GetStorageShape().GetShapeSize() == gert::Shape::kInvalidDimValue),
+                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
+                    "Shape size of pseShift is overflow."),
+                    return ge::GRAPH_FAILED);
+    OPS_ERR_IF((attenMaskShape != nullptr) &&
+                    (attenMaskShape->GetStorageShape().GetShapeSize() == gert::Shape::kInvalidDimValue),
+                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
+                    "Shape size of attenMask is overflow."),
+                    return ge::GRAPH_FAILED);
+    OPS_ERR_IF((outShape->GetStorageShape().GetShapeSize() != 0) &&
+                    (queryShape->GetStorageShape().GetShapeSize() == 0),
+                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "query is empty tensor."),
+                    return ge::GRAPH_FAILED);
+    OPS_ERR_IF((queryShape->GetStorageShape().GetDimNum() < NUM_2) || (queryShape->GetStorageShape().GetDimNum() > 4), 
+                    OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "queryShape dim num is error, queryShape dim num = %lu", queryShape->GetStorageShape().GetDimNum()),
+                    return ge::GRAPH_FAILED);
+
+    OPS_ERR_IF(SetInputLayout(contextKeyParams.layout) == GRAPH_FAILED,
+                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "invalid input layout:%s.", contextKeyParams.layout),
+                return ge::GRAPH_FAILED);
     return ge::GRAPH_SUCCESS;
 }
 
@@ -3379,7 +3494,11 @@ ge::graphStatus PromptFlashAttentionTiling::PromptFlashAttentionCVDiffSetTensorS
 
     tensorSize.set_attenMaskUbSize(softmaxSOuterFactor * sInnerFactor);
     if(enableMsd){
-        tensorSize.set_mmResUbSize(CVDIFF_SMALL_QS_THRESHOLDS * CVDIFF_MSD_BUFFER_SIZE_1024B / sizeof(int32_t)); // for msd
+        if (tilingData.promptAttentionBaseParams.get_headSize() > MSD_BIG_D) {
+            tensorSize.set_mmResUbSize(COMPUTELINE_FOR_BIG_D * sInnerFactor * 2); // 2:double buffer
+        } else {
+            tensorSize.set_mmResUbSize(CVDIFF_SMALL_QS_THRESHOLDS * CVDIFF_MSD_BUFFER_SIZE_1024B / sizeof(int32_t)); // for msd
+        }
     } else {
         tensorSize.set_mmResUbSize(tensorSize.get_attenMaskUbSize());
     }
@@ -3397,7 +3516,11 @@ ge::graphStatus PromptFlashAttentionTiling::PromptFlashAttentionCVDiffSetTensorS
     tensorSize.set_softmaxSumSize(tensorSize.get_softmaxMaxSize());
     tensorSize.set_softmaxValueSize(sOuterFactor * sInnerFactor);
     if (enableMsd) {
-        tensorSize.set_bmm2ResUbSize(MSD_UB_BASE_WIDTH * MSD_UB_HEGHT);
+        if (tilingData.promptAttentionBaseParams.get_headSize() > MSD_BIG_D) {
+            tensorSize.set_bmm2ResUbSize(MAX_COMPUTELINES * tilingData.promptAttentionBaseParams.get_alignedHeadSize()); // for big d of msd
+        } else {
+            tensorSize.set_bmm2ResUbSize(MSD_UB_BASE_WIDTH * MSD_UB_HEGHT);
+        }
     } else {
         tensorSize.set_bmm2ResUbSize(sOuterFactor * tilingData.promptAttentionBaseParams.get_alignedHeadSize());
     }
@@ -3477,13 +3600,15 @@ bool PromptFlashAttentionTiling::FindOptimalTilingSouter(PromptFlashAttentionTil
     uint32_t& sOuterFactor, uint32_t &sInnerFactor, uint32_t &softmaxSOuterFactor,
     int64_t ubSize, uint32_t typeByteSize, uint32_t maskTypeSize)
 {
-    // This function has a fixed Sinner of 1024 or kvs, reducing Souter to make ub sufficient. Currently, only Int8 is using it
+    // This function has a fixed Sinner of 1024 or kvs, reducing Souter to make ub sufficient.
+    // Currently, only Int8 is using it
     auto tmpShape = Shape({softmaxSOuterFactor, sInnerFactor});
     int64_t softmaxTmpSize = 0;
     int64_t softmaxFlashTmpSize = 0;
     int64_t queueBufferSize = 0;
 
-    // Temporary solution, first calculate using the Tmp variable of type int32_t, and then optimize by changing the input parameter to type int32_t
+    // Temporary solution, first calculate using the Tmp variable of type int32_t,
+    // and then optimize by changing the input parameter to type int32_t
     int32_t sOuterFactorTmp = (int32_t)sOuterFactor;
     int32_t sInnerFactorTmp = (int32_t)sInnerFactor;
     int32_t softmaxSOuterFactorTmp = (int32_t)softmaxSOuterFactor;
@@ -3533,7 +3658,7 @@ bool PromptFlashAttentionTiling::FindOptimalTilingSouter(PromptFlashAttentionTil
             return false;
         }
 
-        int64_t msdUbSize = PromptFlashAttentionSetMsdUbSize(tilingData, tilingData.promptAttentionTensorSizeRect);
+        int64_t msdUbSize = PromptFlashAttentionSetMsdUbSize(tilingData, tilingData.promptAttentionTensorSizeRect, sInnerFactorTmp);
         queueBufferSize = tilingData.promptAttentionTensorSizeRect.get_attenMaskUbSize();
         pseShiftBufferSize = tilingData.promptAttentionTensorSizeRect.get_pseShiftUbSize();
         apiTmpSize = std::max(softmaxTmpSize, softmaxFlashTmpSize);
@@ -3643,7 +3768,7 @@ bool PromptFlashAttentionTiling::FindOptimalTilingBasicBLock(PromptFlashAttentio
                 return false;
             }
 
-            msdUbSize = PromptFlashAttentionSetMsdUbSize(tilingData, tilingData.promptAttentionTensorSizeRect);
+            msdUbSize = PromptFlashAttentionSetMsdUbSize(tilingData, tilingData.promptAttentionTensorSizeRect, sInnerFactorTmp);
 
             queueBufferSize = tilingData.promptAttentionTensorSizeRect.get_attenMaskUbSize();
             pseShiftBufferSize = tilingData.promptAttentionTensorSizeRect.get_pseShiftUbSize();
@@ -3709,9 +3834,9 @@ ge::graphStatus PromptFlashAttentionTiling::AdjustCVTilingCVDiff(int64_t ubSize,
             rectangleFactor = 512;     // 512: Adjust the size of the basic block Sinner to 512.
             softmaxSOuterFactor = 8;   // 8:   Adjust softmaxSOuter to 8
         } else if (tilingData.promptAttentionBaseParams.get_alignedHeadSize() >= 32) {     // D: [32, 128)
-            minFactor = 128;           // 128: Adjust the size of the basic block Souter to 128.
-            rectangleFactor = 512;     // 512: Adjust the size of the basic block Sinner to 512.
-            softmaxSOuterFactor = 16;  // 16:  Adjust softmaxSOuter to 16.
+            minFactor = 128;           // 128: Adjust the size of the basic block Souter to 128
+            rectangleFactor = 512;     // 512: Adjust the size of the basic block Sinner to 512
+            softmaxSOuterFactor = 16;  // 16:  Adjust softmaxSOuter to 16
         } else {                                                                           // D: (0, 32)
             minFactor = 128;           // 128: Adjust the size of the basic block Souter to 128.
             rectangleFactor = 512;     // 512: Adjust the size of the basic block Sinner to 512.
@@ -3721,14 +3846,14 @@ ge::graphStatus PromptFlashAttentionTiling::AdjustCVTilingCVDiff(int64_t ubSize,
     if (enablePA) {
         minFactor = 64;  // In the PA scenario, Souter starts cutting from 64 and tries to ensure that Sinner does not cut, so that Single is a multiple of blockSize
     }
-    if (tilingData.promptAttentionBaseParams.get_seqSize() <= CVDIFF_SMALL_QS_THRESHOLDS) {  // Minimum basic block size
+    if (tilingData.promptAttentionBaseParams.get_seqSize() <= CVDIFF_SMALL_QS_THRESHOLDS) {   // Minimum basic block size.
         minFactor = CVDIFF_SMALL_QS_THRESHOLDS;  // Reduce S1 to avoid unnecessary calculation of mm1
         if ((tilingData.promptAttentionBaseParams.get_seqInnerSize() > CVDIFF_SINNER_FACTOR_SMALL_QS)
-            && (tilingData.promptAttentionBaseParams.get_useMask() == 0)) {  // Only in scenes without masks can it be set to 2048
+            && (tilingData.promptAttentionBaseParams.get_useMask() == 0)) {   // Only in scenes without masks can it be set to 2048.
             if (enableMsd) {
                 rectangleFactor = CVDIFF_SINNER_FACTOR_DEFAULT; 
             } else {
-                rectangleFactor = CVDIFF_SINNER_FACTOR_SMALL_QS;  // Increase S2 to improve softmax throughput
+                rectangleFactor = CVDIFF_SINNER_FACTOR_SMALL_QS;   // Increase S2 to improve softmax throughput.
             }
         }
         softmaxSOuterFactor = softmaxUbSize / rectangleFactor;

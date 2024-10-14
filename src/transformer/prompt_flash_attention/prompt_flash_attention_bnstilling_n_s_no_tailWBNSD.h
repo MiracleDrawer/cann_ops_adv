@@ -72,9 +72,10 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDNoTail<T, U, FORM
     if (!(this->usePseShift)) {
         return;
     }
+    // Allocate local tensor for PSE shift data
     LocalTensor<pseShiftType> pseShiftUb = this->attenMaskQueue.template AllocTensor<pseShiftType>();
     pseShiftUb.SetSize(this->singleProcessSOuterSize * sinnerSize);
-
+    // Initialize data copy parameters
     DataCopyParams intriParams;
     intriParams.blockCount = this->singleProcessSOuterSize;
     intriParams.blockLen = sinnerSize / this->pseShiftTypeByteNum;
@@ -366,12 +367,15 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSWithBNSDNoTail<T, U, FORM
             this->GetSingleCoreParam(sIdx);
             this->GetSparseParam(&preTokens, &nextTokens);
             actualSeqLengthsIdx = this->isActualLenDimsNull ? this->tilingData->promptAttentionBaseParams.seqSize : this->actualSeqLengthsGm.GetValue(sIdx);
-            actualSeqLengthsIdx = (this->attentionMaskType == 0 && (int64_t)actualSeqLengthsIdx >
+            actualSeqLengthsIdx = (this->attentionMaskType == 0 &&
+                               (int64_t)actualSeqLengthsIdx >
                                (int64_t)this->tilingData->promptAttentionBaseParams.seqInnerSize +
                                (int64_t)this->tilingData->promptAttentionBaseParams.preTokens) ?
-                            this->tilingData->promptAttentionBaseParams.seqInnerSize + this->tilingData->promptAttentionBaseParams.preTokens :
+                            this->tilingData->promptAttentionBaseParams.seqInnerSize +
+                            this->tilingData->promptAttentionBaseParams.preTokens :
                             actualSeqLengthsIdx;
-            int sOuterBlockNum = (actualSeqLengthsIdx + this->tilingData->promptAttentionSingleCoreParams.singleProcessSOuterSize - 1) /
+            int sOuterBlockNum = (actualSeqLengthsIdx + 
+                                  this->tilingData->promptAttentionSingleCoreParams.singleProcessSOuterSize - 1) /
                                   this->tilingData->promptAttentionSingleCoreParams.singleProcessSOuterSize;
             this->multiSeqOffset = this->actualSeqOffsets[sIdx];
             if (isLast && sIdx == tmpSLoopEnd - 1) {

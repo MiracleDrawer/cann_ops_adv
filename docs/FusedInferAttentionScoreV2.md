@@ -48,9 +48,9 @@
     
         其中Q_S为query的shape中的S，KV_S为key和value的shape中的S，但如果Q_S、KV_S非16或32对齐，可以向上取到对齐的S。综合约束请见[约束与限制](#1)。
         
-    - actualSeqLengthsOptional（aclIntArray\*，计算输入）：Host侧的aclIntArray，代表不同Batch中query的有效Sequence Length，数据类型支持INT64。如果不指定seqlen可以传入nullptr，表示和query的shape的s长度相同。限制：该入参中每个batch的有效Sequence Length应该不大于query中对应batch的Sequence Length，Q_S为1时该参数无效。
+    - actualSeqLengthsOptional（aclIntArray\*，计算输入）：Host侧的aclIntArray，代表不同Batch中query的有效Sequence Length，数据类型支持INT64。如果不指定seqlen可以传入nullptr，表示和query的shape的s长度相同。限制：该入参中每个batch的有效Sequence Length应该不大于query中对应batch的Sequence Length，Q_S为1时该参数无效。seqlen的传入长度为1时，每个Batch使用相同seqlen；传入长度大于等于Batch时取seqlen的前Batch个数。其他长度不支持。
     
-    - actualSeqLengthsKvOptional（aclIntArray\*，计算输入）：Host侧的aclIntArray，可传入nullptr，代表不同Batch中key/value的有效Sequence Length。数据类型支持：INT64。如果不指定seqlen可以传入nullptr，表示和key/value的shape的s长度相同。限制：该入参中每个batch的有效Sequence Length应该不大于key/value中对应batch的Sequence Length。
+    - actualSeqLengthsKvOptional（aclIntArray\*，计算输入）：Host侧的aclIntArray，可传入nullptr，代表不同Batch中key/value的有效Sequence Length。数据类型支持：INT64。如果不指定seqlen可以传入nullptr，表示和key/value的shape的s长度相同。限制：该入参中每个batch的有效Sequence Length应该不大于key/value中对应batch的Sequence Length。seqlenKv的传入长度为1时，每个Batch使用相同seqlenKv；传入长度大于等于Batch时取seqlenKv的前Batch个数。其他长度不支持。
     
     - deqScale1Optional（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：UINT64。[数据格式](common/数据格式.md)支持ND（参考），表示BMM1后面的反量化因子，支持per-tensor。 如不使用该功能时可传入nullptr，综合约束请见[约束与限制](#1)。
     
@@ -150,10 +150,10 @@
 
     返回aclnnStatus状态码，具体参见[aclnn返回码](common/aclnn返回码.md)。
 
-    ```
+    说明：
     第一段接口完成入参校验，若出现以下错误码，则对应原因为：
-    -  返回161001（ACLNN_ERR_PARAM_NULLPTR）：传入的query、key、value、attentionOut是空指针。
-    ```
+    
+    -  返回161001（ACLNN\_ERR\_PARAM\_NULLPTR）：传入的query、key、value、attentionOut是空指针。
 
 ## aclnnFusedInferAttentionScoreV2
 
@@ -200,7 +200,7 @@
         -   sparseMode = 0时，attenMask如果为空指针,或者在左padding场景传入attenMask，则忽略入参preTokens、nextTokens。
         -   sparseMode = 2、3、4时，attenMask的shape需要为S,S或1,S,S或1,1,S,S,其中S的值需要固定为2048，且需要用户保证传入的attenMask为下三角，不传入attenMask或者传入的shape不正确报错。
         -   sparseMode = 1、2、3的场景忽略入参preTokens、nextTokens并按照相关规则赋值。
-   -   kvCache反量化仅支持query为FLOAT16时，将INT8类型的key和value反量化到FLOAT16。入参key/value的datarange与入参antiquantScale的datarange乘积范围在（-1，1）范围内，高性能模式可以保证精度，否则需要开启高精度模式来保证精度。
+   -   kvCache反量化的合成参数场景仅支持query为FLOAT16时，将INT8类型的key和value反量化到FLOAT16。入参key/value的datarange与入参antiquantScale的datarange乘积范围在（-1，1）范围内，高性能模式可以保证精度，否则需要开启高精度模式来保证精度。
    -   page attention场景:
         -   page attention的使能必要条件是blockTable存在且有效，同时key、value是按照blockTable中的索引在一片连续内存中排布，支持key、value dtype为FLOAT16/BFLOAT16/INT8，在该场景下key、value的inputLayout参数无效。blockTable中填充的是blockid，当前不会对blockid的合法性进行校验，需用户自行保证。
         -   blockSize是用户自定义的参数，该参数的取值会影响page attention的性能，在使能page attention场景下，blockSize最小为128, 最大为512，且要求是128的倍数。通常情况下，page attention可以提高吞吐量，但会带来性能上的下降。
@@ -332,7 +332,7 @@ REG_OP(FusedInferAttentionScore)
     .REQUIRED_ATTR(num_heads, Int)
     .ATTR(scale, Float, 1.0)
     .ATTR(pre_tokens, Int, 2147483647)
-    .ATTR(next_tokens, Int, 2147483647)
+    .ATTR(next_tokens, Int, 0)
     .ATTR(input_layout, String, "BSH")
     .ATTR(num_key_value_heads, Int, 0)
     .ATTR(sparse_mode, Int, 0)

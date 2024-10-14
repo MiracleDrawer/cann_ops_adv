@@ -60,9 +60,9 @@
 
   - attenMask（aclTensor\*，计算输入）：Device侧的aclTensor，代表下三角全为0上三角全为负无穷的倒三角mask矩阵，不支持[[非连续的Tensor](common/非连续的Tensor.md)](common/[非连续的Tensor](common/非连续的Tensor.md).md)，数据类型支持BOOL、INT8和UINT8。[数据格式](common/数据格式.md)支持ND。如果不使用该功能可传入nullptr。通常建议shape输入Q_S,KV_S;B,Q_S,KV_S;1,Q_S,KV_S;B,1,Q_S,KV_S;1,1,Q_S,KV_S，其中Q_S为query的shape中的S，KV_S为key和value的shape中的S，对于attenMask的KV_S为非32对齐的场景，建议padding到32对齐来提高性能，多余部分填充成1。综合约束请见[约束与限制](#1)，**Atlas推理系列产品（Ascend310P处理器）中的加速卡数据类型仅支持BOOL**。
 
-  - actualSeqLengths（aclIntArray\*，计算输入）：Host侧的aclIntArray，代表不同Batch中query的有效Sequence Length，数据类型支持INT64。如果不指定seqlen可以传入nullptr，表示和query的shape的s长度相同。限制：该入参中每个batch的有效Sequence Length应该不大于query中对应batch的Sequence Length，**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持nullptr**。
+  - actualSeqLengths（aclIntArray\*，计算输入）：Host侧的aclIntArray，代表不同Batch中query的有效Sequence Length，数据类型支持INT64。如果不指定seqlen可以传入nullptr，表示和query的shape的s长度相同。限制：该入参中每个batch的有效Sequence Length应该不大于query中对应batch的Sequence Length。seqlen的传入长度为1时，每个Batch使用相同seqlen；传入长度大于等于Batch时取seqlen的前Batch个数。其他长度不支持。**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持nullptr**。
 
-  - actualSeqLengthsKv（aclIntArray\*，计算输入）：Host侧的aclIntArray，可传入nullptr，代表不同batch中key/value的有效Sequence Length。数据类型支持INT64。限制：该入参中每个batch的有效Sequence Length应该不大于key/value中对应batch的Sequence Length，**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持nullptr**。
+  - actualSeqLengthsKv（aclIntArray\*，计算输入）：Host侧的aclIntArray，可传入nullptr，代表不同batch中key/value的有效Sequence Length。数据类型支持INT64。限制：该入参中每个batch的有效Sequence Length应该不大于key/value中对应batch的Sequence Length。seqlenKv的传入长度为1时，每个Batch使用相同seqlenKv；传入长度大于等于Batch时取seqlenKv的前Batch个数。其他长度不支持。**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持nullptr**。
 
   - deqScale1（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持UINT64、FLOAT32。[数据格式](common/数据格式.md)支持ND（参考），表示BMM1后面的反量化因子，支持per-tensor。 如不使用该功能时可传入nullptr，**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持nullptr**。
 
@@ -121,11 +121,10 @@
 
   返回aclnnStatus状态码，具体参见[aclnn返回码](common/aclnn返回码.md)。
 
-  ```
+  说明：
   第一段接口完成入参校验，若出现以下错误码，则对应原因为：
   -  返回161001（ACLNN_ERR_PARAM_NULLPTR）：如果传入参数是必选输入，输出或者必选属性，且是空指针，则返回161001。
   -  返回161002（ACLNN_ERR_PARAM_INVALID）：query、key、value、pseShift、attenMask、attentionOut的数据类型和数据格式不在支持的范围内。
-  ```
 
 ## aclnnPromptFlashAttentionV3
 
@@ -199,7 +198,7 @@ REG_OP(PromptFlashAttention)
     .OUTPUT(attention_out, TensorType({DT_FLOAT16, DT_BF16, DT_INT8}))
     .REQUIRED_ATTR(num_heads, Int)
     .ATTR(scale_value, Float, 1.0)
-    .ATTR(pre_tokens, Int, 2147483647)
+    .ATTR(pre_tokens, Int, 214748647)
     .ATTR(next_tokens, Int, 0)
     .ATTR(input_layout, String, "BSH")
     .ATTR(num_key_value_heads, Int, 0)

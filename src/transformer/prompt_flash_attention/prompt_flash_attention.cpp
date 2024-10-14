@@ -196,18 +196,12 @@ extern "C" __global__ __aicore__ void prompt_flash_attention_FIAS(__gm__ uint8_t
             } else if (TILING_KEY_IS(1000000800000101612)) {
                 // BSH layout HighPrecision
                 INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, half, int8_t, Mode::HighPrecision>);
-            } else if (TILING_KEY_IS(1000000800010101612)) {
-                // BSH layout HighPrecision, enable PA
-                INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, half, int8_t, Mode::HighPrecision, MatMulType::MM_PA>);
             } else if (TILING_KEY_IS(1000000800100101612)) {
                 // Prefix BSH layout HighPrecision
                 INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, half, int8_t, Mode::HighPrecision, MatMulType::MM_MDL, true>);
             } else if (TILING_KEY_IS(1000000800000001612)) {
                 // BNSD layout HighPrecision
                 INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, half, int8_t, Mode::HighPrecision>);
-            } else if (TILING_KEY_IS(1000000800010001612)) {
-                // BNSD layout HighPrecision, enable PA
-                INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, half, int8_t, Mode::HighPrecision, MatMulType::MM_PA>);
             } else if (TILING_KEY_IS(1000000800100001612)) {
                 // Prefix BNSD layout HighPrecision
                 INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, half, int8_t, Mode::HighPrecision, MatMulType::MM_MDL, true>);
@@ -233,9 +227,6 @@ extern "C" __global__ __aicore__ void prompt_flash_attention_FIAS(__gm__ uint8_t
             } else if (TILING_KEY_IS(1000000800000101012)) {
                 // anti-quant path for CVDIFF-BSH, half in half out
                 INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, half, int8_t>);
-            } else if (TILING_KEY_IS(1000000800010101012)) {
-                // anti-quant path for CVDIFF-BSH, half in half out, enable PA
-                INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, half, int8_t, Mode::HighPerformance, MatMulType::MM_PA>);
             } else if (TILING_KEY_IS(1000000800100101012)) {
                 // Prefix anti-quant path for CVDIFF-BSH, half in half out
                 INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, half, int8_t, Mode::HighPerformance, MatMulType::MM_MDL, true>);
@@ -258,9 +249,6 @@ extern "C" __global__ __aicore__ void prompt_flash_attention_FIAS(__gm__ uint8_t
             } else if (TILING_KEY_IS(1000000800000001012)) {
                 // anti-quant path for CVDIFF-BNSD, half in half out
                 INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, half, int8_t>);
-            } else if (TILING_KEY_IS(1000000800010001012)) {
-                // anti-quant path for CVDIFF-BNSD, half in half out, enable PA
-                INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, half, int8_t, Mode::HighPerformance, MatMulType::MM_PA>);
             } else if (TILING_KEY_IS(1000000800100001012)) {
                 // Prefix anti-quant path for CVDIFF-BNSD, half in half out
                 INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, half, int8_t, Mode::HighPerformance, MatMulType::MM_MDL, true>);
@@ -280,9 +268,6 @@ extern "C" __global__ __aicore__ void prompt_flash_attention_FIAS(__gm__ uint8_t
             } else if (TILING_KEY_IS(1000000800000121012)) {
                 // anti-quant path for CVDIFF-BSH, half in int8 out
                 INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, int8_t, int8_t>);
-            } else if (TILING_KEY_IS(1000000800010121012)) {
-                // anti-quant path for CVDIFF-BSH, half in int8 out, enable PA
-                INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, int8_t, int8_t, Mode::HighPerformance, MatMulType::MM_PA>);
             } else if (TILING_KEY_IS(1000000800100121012)) {
                 // Prefix anti-quant path for CVDIFF-BSH, half in int8 out
                 INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, int8_t, int8_t, Mode::HighPerformance, MatMulType::MM_MDL, true>);
@@ -298,9 +283,6 @@ extern "C" __global__ __aicore__ void prompt_flash_attention_FIAS(__gm__ uint8_t
             } else if (TILING_KEY_IS(1000000800000021012)) {
                 // anti-quant path for CVDIFF-BNSD, half in int8 out
                 INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, int8_t, int8_t>);
-            } else if (TILING_KEY_IS(1000000800010021012)) {
-                // anti-quant path for CVDIFF-BNSD, half in int8 out, enable PA
-                INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, int8_t, int8_t, Mode::HighPerformance, MatMulType::MM_PA>);
             } else if (TILING_KEY_IS(1000000800100021012)) {
                 // Prefix anti-quant path for CVDIFF-BNSD, half in int8 out
                 INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, int8_t, int8_t, Mode::HighPerformance, MatMulType::MM_MDL, true>);
@@ -316,9 +298,6 @@ extern "C" __global__ __aicore__ void prompt_flash_attention_FIAS(__gm__ uint8_t
             } else if (TILING_KEY_IS(1000000800000121612)) {
                 // anti-quant path for CVDIFF-BSH, half in int8 out
                 INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, int8_t, int8_t, Mode::HighPrecision>);
-            } else if (TILING_KEY_IS(1000000800010121612)) {
-                // anti-quant path for CVDIFF-BSH, half in int8 out, enable PA
-                INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, int8_t, int8_t, Mode::HighPrecision, MatMulType::MM_PA>);
             } else if (TILING_KEY_IS(1000000800100121612)) {
                 // Prefix anti-quant path for CVDIFF-BSH, half in int8 out
                 INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, int8_t, int8_t, Mode::HighPrecision, MatMulType::MM_MDL, true>);
@@ -334,9 +313,6 @@ extern "C" __global__ __aicore__ void prompt_flash_attention_FIAS(__gm__ uint8_t
             } else if (TILING_KEY_IS(1000000800000021612)) {
                 // anti-quant path for CVDIFF-BNSD, half in int8 out
                 INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, int8_t, int8_t, Mode::HighPrecision>);
-            } else if (TILING_KEY_IS(1000000800010021612)) {
-                // anti-quant path for CVDIFF-BNSD, half in int8 out, enable PA
-                INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, int8_t, int8_t, Mode::HighPrecision, MatMulType::MM_PA>);
             } else if (TILING_KEY_IS(1000000800100021612)) {
                 // Prefix anti-quant path for CVDIFF-BNSD, half in int8 out
                 INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, int8_t, int8_t, Mode::HighPrecision, MatMulType::MM_MDL, true>);

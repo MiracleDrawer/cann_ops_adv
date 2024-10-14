@@ -1272,7 +1272,7 @@ public:
         this->Attr("num_heads").AttrType(REQUIRED).Int(1);
         this->Attr("scale").AttrType(OPTIONAL).Float(1.0);
         this->Attr("pre_tokens").AttrType(OPTIONAL).Int(2147483647); // 2147483647: Maximum value of int32_t.
-        this->Attr("next_tokens").AttrType(OPTIONAL).Int(0);
+        this->Attr("next_tokens").AttrType(OPTIONAL).Int(2147483647); // 2147483647: Maximum value of int32_t.
         this->Attr("input_layout").AttrType(OPTIONAL).String("BSH");
         this->Attr("num_key_value_heads").AttrType(OPTIONAL).Int(0);
         this->Attr("sparse_mode").AttrType(OPTIONAL).Int(0);

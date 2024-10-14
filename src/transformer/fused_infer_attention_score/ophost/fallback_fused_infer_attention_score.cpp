@@ -9,9 +9,9 @@
  */
 
 #include <vector>
+#include "error/ops_error.h"
 #include "fallback_comm.h"
 #include "fallback.h"
-#include "error/ops_error.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -137,42 +137,42 @@ static graphStatus FusedInferHostExecuteFunc(OpExecuteContext *host_api_ctx)
     }
 
     auto attrs = host_api_ctx->GetAttrs();
-    const uint32_t *get_num_heads = attrs->GetAttrPointer<uint32_t>(ATTR_N_INDEX);
+    const uint32_t *getNumHeads = attrs->GetAttrPointer<uint32_t>(ATTR_N_INDEX);
     const float *scaleValue = attrs->GetAttrPointer<float>(ATTR_SCALE_INDEX);
-    const int64_t *get_pre_tokens = attrs->GetAttrPointer<int64_t>(ATTR_PRE_TOKEN_INDEX);
-    const int64_t *get_next_tokens = attrs->GetAttrPointer<int64_t>(ATTR_NEXT_TOKEN_INDEX);
+    const int64_t *getPreTokens = attrs->GetAttrPointer<int64_t>(ATTR_PRE_TOKEN_INDEX);
+    const int64_t *getNextTokens = attrs->GetAttrPointer<int64_t>(ATTR_NEXT_TOKEN_INDEX);
     const char *layout = attrs->GetAttrPointer<char>(ATTR_INPUT_LAYOUT_INDEX);
-    const uint32_t *get_kvHeadNum = attrs->GetAttrPointer<uint32_t>(ATTR_NUM_KV_HEADS_INDEX);
-    const uint32_t *get_sparseMode = attrs->GetAttrPointer<uint32_t>(ATTR_SPARSE_MODE_INDEX);
-    const uint32_t *get_innerPrecise = attrs->GetAttrPointer<uint32_t>(ATTR_INNER_PRECISE_INDEX);
-    const uint32_t *get_blockSize = attrs->GetAttrPointer<uint32_t>(ATTR_BLOCK_SIZE_INDEX);
-    const uint32_t *get_antiquantMode = attrs->GetAttrPointer<uint32_t>(ATTR_ANTIQUANT_MODE_INDEX);
-    const bool *get_softmaxLseFlag = attrs->GetAttrPointer<bool>(ATTR_SOFTMAX_LSE_FLAG_INDEX);
-    const uint32_t *get_keyAntiquantMode = attrs->GetAttrPointer<uint32_t>(ATTR_KEY_ANTIQUANT_MODE_INDEX);
-    const uint32_t *get_valueAntiquantMode = attrs->GetAttrPointer<uint32_t>(ATTR_VALUE_ANTIQUANT_MODE_INDEX);
+    const uint32_t *getKVHeadNum = attrs->GetAttrPointer<uint32_t>(ATTR_NUM_KV_HEADS_INDEX);
+    const uint32_t *getSparseMode = attrs->GetAttrPointer<uint32_t>(ATTR_SPARSE_MODE_INDEX);
+    const uint32_t *getInnerPrecise = attrs->GetAttrPointer<uint32_t>(ATTR_INNER_PRECISE_INDEX);
+    const uint32_t *getBlockSize = attrs->GetAttrPointer<uint32_t>(ATTR_BLOCK_SIZE_INDEX);
+    const uint32_t *getAntiquantMode = attrs->GetAttrPointer<uint32_t>(ATTR_ANTIQUANT_MODE_INDEX);
+    const bool *getSoftmaxLseFlag = attrs->GetAttrPointer<bool>(ATTR_SOFTMAX_LSE_FLAG_INDEX);
+    const uint32_t *getKeyAntiquantMode = attrs->GetAttrPointer<uint32_t>(ATTR_KEY_ANTIQUANT_MODE_INDEX);
+    const uint32_t *getValueAntiquantMode = attrs->GetAttrPointer<uint32_t>(ATTR_VALUE_ANTIQUANT_MODE_INDEX);
 
-    int64_t num_heads = *get_num_heads;
+    int64_t numHeads = *getNumHeads;
     double dScaleValue = *scaleValue;
-    int64_t pre_tokens = *get_pre_tokens;
-    int64_t next_tokens = *get_next_tokens;
-    int64_t kvHeadNum = *get_kvHeadNum;
-    int64_t sparseMode = *get_sparseMode;
-    int64_t innerPrecise = *get_innerPrecise;
-    int64_t blockSize = *get_blockSize;
-    int64_t antiquantMode = *get_antiquantMode;
-    bool softmaxLseFlag = *get_softmaxLseFlag;
-    int64_t keyAntiquantMode = *get_keyAntiquantMode;
-    int64_t valueAntiquantMode = *get_valueAntiquantMode;
+    int64_t preTokens = *getPreTokens;
+    int64_t nextTokens = *getNextTokens;
+    int64_t kvHeadNum = *getKVHeadNum;
+    int64_t sparseMode = *getSparseMode;
+    int64_t innerPrecise = *getInnerPrecise;
+    int64_t blockSize = *getBlockSize;
+    int64_t antiquantMode = *getAntiquantMode;
+    bool softmaxLseFlag = *getSoftmaxLseFlag;
+    int64_t keyAntiquantMode = *getKeyAntiquantMode;
+    int64_t valueAntiquantMode = *getValueAntiquantMode;
 
     if (innerPrecise < 0 || innerPrecise > 3) { // innerPrecise=2,3 corresponds to rows with invalid high precision and high performance
         OPS_LOG_E("aclnnfallback", "invalid innerPrecise(%ld). Only support 0~3 now.", innerPrecise);
         return GRAPH_FAILED;
     }
-    OPS_LOG_D("aclnnFallback", "FusedInferAttentionScore fallback begin, num_heads = %ld, dScaleValue = %lf", num_heads,
+    OPS_LOG_D("aclnnFallback", "FusedInferAttentionScore fallback begin, numHeads = %ld, dScaleValue = %lf", numHeads,
               dScaleValue);
     OPS_LOG_D("aclnnFallback",
-              "pre_tokens = %ld, next_tokens = %ld, kvHeadNum = %ld, sparseMode = %ld, innerPrecise = %ld", pre_tokens,
-              next_tokens, kvHeadNum, sparseMode, innerPrecise);
+              "preTokens = %ld, nextTokens = %ld, kvHeadNum = %ld, sparseMode = %ld, innerPrecise = %ld", preTokens,
+              nextTokens, kvHeadNum, sparseMode, innerPrecise);
 
     if (sparseMode >= 10 && sparseMode <= 14) { // 10: min  14: max
         innerPrecise = 0;
@@ -182,15 +182,15 @@ static graphStatus FusedInferHostExecuteFunc(OpExecuteContext *host_api_ctx)
                   sparseMode, innerPrecise);
     }
 
-    auto api_ret = EXEC_OPAPI_CMD(
+    auto apiRet = EXEC_OPAPI_CMD(
         aclnnFusedInferAttentionScoreV2, query, ge_tenserListKey, ge_tenserListValue, pseShiftGe, attenMaskGe,
         actSeqArray, actSeqArrayKv, deqScale1, quantScale1, deqScale2, quantScale2, quantOffset2, antiquantScaleGe,
         antiquantOffsetGe, blocktableGe, queryPaddingGe, kvPaddingGe, keyAntiquantScaleGe, keyAntiquantOffsetGe,
         valueAntiquantScaleGe, valueAntiquantOffsetGe, keySharedPrefixGe, valueSharedPrefixGe, actSeqSharedPrefix,
-        num_heads, dScaleValue, pre_tokens, next_tokens, layout, kvHeadNum, sparseMode, innerPrecise, blockSize,
+        numHeads, dScaleValue, preTokens, nextTokens, layout, kvHeadNum, sparseMode, innerPrecise, blockSize,
         antiquantMode, softmaxLseFlag, keyAntiquantMode, valueAntiquantMode, output, softmaxLse);
 
-    OPS_ERR_IF(api_ret != GRAPH_SUCCESS, OPS_LOG_E("aclnnfallback", "api_ret faild:%u", api_ret), return GRAPH_FAILED);
+    OPS_ERR_IF(apiRet != GRAPH_SUCCESS, OPS_LOG_E("aclnnfallback", "apiRet faild:%u", apiRet), return GRAPH_FAILED);
 
     return GRAPH_SUCCESS;
 }

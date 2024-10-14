@@ -250,7 +250,7 @@ public:
             .Float(1.0);
         this->Attr("pre_tokens")
             .AttrType(OPTIONAL)
-            .Int(2147483647);  // 2147483647: Maximum value of int32_t.
+            .Int(214748647);  // 214748647: default value of pre_tokens.
         this->Attr("next_tokens")
             .AttrType(OPTIONAL)
             .Int(0);
@@ -273,8 +273,8 @@ public:
             .DynamicShapeSupportFlag(true)
             .NeedCheckSupportFlag(false)
             .PrecisionReduceFlag(true)
-            .ExtendCfgInfo("aclnnSupport.value", "support_aclnn")
-            .ExtendCfgInfo("jitCompile.flag", "static_false,dynamic_false");
+            .ExtendCfgInfo("aclnnSupport.value", "support_aclnn")   // set value of aclnn support
+            .ExtendCfgInfo("jitCompile.flag", "static_false,dynamic_false"); //set jit compile flag
         this->AICore().AddConfig("ascend910b", aicore_config);
     
         OpAICoreConfig config_310p;

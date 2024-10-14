@@ -25,125 +25,12 @@
 #include "error/ops_error.h"
 #include "register/op_def_registry.h"
 
+#include "prompt_flash_attention_tiling_compile_info.h"
+#include "prompt_flash_attention_tiling_const.h"
+#include "prompt_flash_attention_tiling_context.h"
+#include "prompt_flash_attention_tiling_struct.h"
+
 namespace optiling { 
-
-constexpr uint32_t INT8SIZE = 1;
-constexpr uint32_t UINT8SIZE = 1;
-constexpr uint32_t FLOAT16SIZE = 2;
-constexpr uint32_t BFLOAT16SIZE = 2;
-constexpr uint32_t FLOAT32SIZE = 4;
-constexpr uint32_t BOOLSIZE = 1;
-
-constexpr int HIGH_PRECISION = 0;
-constexpr int HIGH_PERFORMANCE = 1;
-constexpr uint32_t MSD_HIGH_PERFORMANCE_EXPEND_NUM = 2;
-constexpr uint32_t MSD_HIGH_PRECISION_EXPEND_NUM = 3;
-
-const uint32_t MAX_BATCH = 256U;
-struct PromptFlashAttentionCompileInfo {
-    uint32_t aivNum;
-    uint32_t aicNum;
-    uint64_t ubSize;
-    uint64_t l1Size;
-    uint64_t l0CSize;
-    uint64_t l0ASize;
-    uint64_t l0BSize;
-    size_t defaultSysWorkspaceSize;
-    platform_ascendc::SocVersion socShortName;
-};
-
-/*
-contextParams is a new structured defined for the use of FusedInferAttentionScore op.
-It is meant to catch and organize all the necessary variables passed by FIAS tilling function.
-It will be used as the input to the new 'runBigKernelWithParams' function in PFA tilling.
-The old PFA tillingContext will also be transformed to this structure in the future.
-*/
-struct ContextParamsForPFATiling
-{
-    const gert::Tensor* pseShift;
-    const gert::Tensor* attentionMask;
-    const gert::Tensor* actualSeqenceLengthQ;
-    const gert::Tensor* actualSeqenceLengthKV;
-    const gert::Tensor* antiquantScale;
-    const gert::Tensor* antiquantOffset;
-    const gert::Tensor* queryPaddingSize;
-    const gert::Tensor* kvPaddingSize;
-    const gert::Tensor* blockTable;
-    const gert::Tensor* keySharedPrefix;
-    const gert::Tensor* valueSharedPrefix;
-    const gert::Tensor* actualSharedPrefixLen;
-
-    const gert::Tensor* KeyAntiquantScale;
-    const gert::Tensor* valueAntiquantScale;
-    const gert::Tensor* KeyAntiquantOffset;
-    const gert::Tensor* valueAntiquantOffset;
-
-    ge::DataType inputDataType;
-    ge::DataType kDataType;
-    ge::DataType vDataType;
-    ge::DataType pseShiftDataType;
-    ge::DataType maskDataType;
-    ge::DataType blockTableType;
-    ge::DataType outputDataType;
-    const char* opName;
-    const gert::StorageShape* queryInputShape;
-    const gert::StorageShape* keyInputShape;
-    const gert::StorageShape* valueInputShape;
-    const gert::StorageShape* pseShiftShape;
-    const gert::StorageShape* attentionMaskShape;
-    const gert::StorageShape* deqScale1Shape;
-    const gert::StorageShape* scale1Shape;
-    const gert::StorageShape* deqScale2Shape;
-    const gert::StorageShape* scale2Shape;
-    const gert::StorageShape* offset2Shape;
-    const gert::StorageShape* antiquantScaleShape;
-    const gert::StorageShape* antiquantOffsetShape;
-    const gert::StorageShape* blockTableShape;
-    const gert::StorageShape* outputShape;
-    const gert::StorageShape* lseoutputShape;
-
-    const gert::StorageShape* KeyAntiquantScaleShape;
-    const gert::StorageShape* valueAntiquantScaleShape;
-    const gert::StorageShape* KeyAntiquantOffsetShape;
-    const gert::StorageShape* valueAntiquantOffsetShape;
-    ge::DataType KeyAntiquantScaleType;
-    ge::DataType valueAntiquantScaleType;
-    ge::DataType KeyAntiquantOffsetType;
-    ge::DataType valueAntiquantOffsetType;
-
-    const int64_t* innerPrecisePtr;
-    const int32_t* headsNumber;
-    const int32_t* sparseMode;
-    const int64_t* preToken;
-    const int64_t* nextToken;
-    const float* scaleValue;
-    const int32_t* blockSize;
-    const char* layout;
-    const int32_t* numKeyValueHeads;
-    size_t* workspaceSize;
-    const PromptFlashAttentionCompileInfo* compileInfoPtr;
-    ge::DataType deqScaleType;
-    ge::DataType deqScale2Type;
-    ge::DataType quantScale2Type;
-    ge::DataType quantOffset2Type;
-    uint32_t isKvContinuous;
-    std::vector<const gert::StorageShape*> kTensorList;
-    std::vector <const gert::StorageShape*> vTensorList;
-    uint32_t maxKVs;
-    uint32_t fromFused;
-    uint32_t emptyTensor;
-    uint32_t isBSNDOut;
-    const bool *softmaxLseFlag;
-    bool isSoftMaxLseEnable;
-    uint32_t fromTilingSink;    // Flag indicating whether it is the step to enter the workspace calculation from tiling sinking
-
-    bool hasKeyAntiquantScale;
-    bool hasValueAntiquantScale;
-    uint32_t isMsd;
-    const int64_t* keyAntiquantMode;
-    const int64_t* valueAntiquantMode;
-    bool hasKeyAntiquantOffset;
-};
 
 BEGIN_TILING_DATA_DEF(PromptAttentionBaseParams)
   TILING_DATA_FIELD_DEF(uint32_t, batchSize);
@@ -262,6 +149,7 @@ BEGIN_TILING_DATA_DEF(PromptAttentionSingleCoreTensorSize)
   TILING_DATA_FIELD_DEF(uint32_t, msdTmpMm1BuffSize);
   TILING_DATA_FIELD_DEF(uint32_t, msdTmpMm2BuffSize);
   TILING_DATA_FIELD_DEF(uint32_t, msdOutQueueSize);
+  TILING_DATA_FIELD_DEF(uint32_t, msdComputeLines);
 END_TILING_DATA_DEF;
 REGISTER_TILING_DATA_CLASS(PromptAttentionSingleCoreTensorSizeOp, PromptAttentionSingleCoreTensorSize)
 
@@ -289,13 +177,6 @@ BEGIN_TILING_DATA_DEF(PromptFlashAttentionTilingData)
 END_TILING_DATA_DEF;
 
 REGISTER_TILING_DATA_CLASS(PromptFlashAttention, PromptFlashAttentionTilingData)
-
-enum class InputLayout{ SH, BSH, BNSD, NSD, BSND, BNSD_BSND, NONE, };
-
-enum class TilingMod {
-    CVSAME = 0,
-    CVDIFF,
-};
 
 class PromptFlashAttentionTiling {
 public:
@@ -397,8 +278,15 @@ protected:
                                   const std::vector<int64_t>& actualSeqLengthsKV, size_t lenDims);
     ge::graphStatus GetAndCheckEmptyQueryShape(ContextParamsForPFATiling& contextKeyParams, const gert::StorageShape *queryShape) const;
     void UpdateTilingKeyFlag(ContextParamsForPFATiling& contextKeyParams, uint64_t& tilingKey);
-    int64_t PromptFlashAttentionSetMsdUbSize(PromptFlashAttentionTilingData& tilingData, PromptAttentionSingleCoreTensorSize& tensorSize);
+    int64_t PromptFlashAttentionSetMsdUbSize(PromptFlashAttentionTilingData& tilingData, PromptAttentionSingleCoreTensorSize& tensorSize, int32_t sInnerFactorTmp) const;
   
+    ge::graphStatus CheckIOType(ContextParamsForPFATiling& contextKeyParams, PromptFlashAttentionTilingData& tilingData, int32_t& outputDataTypeSize);
+    ge::graphStatus CheckMaskType(ContextParamsForPFATiling& contextKeyParams, PromptFlashAttentionTilingData& tilingData, uint32_t& maskElemSize);
+    void SetMaskSize(const gert::StorageShape* attenMaskShape, PromptFlashAttentionTilingData& tilingData);
+    ge::graphStatus CheckShape(ContextParamsForPFATiling& contextKeyParams, const gert::StorageShape* queryShape, const gert::StorageShape* keyShape, 
+                               const gert::StorageShape* valueShape, const gert::StorageShape* outShape, const gert::StorageShape* pseShiftShape,
+                               const gert::StorageShape* attenMaskShape);
+                               
     protected:
         ContextParamsForPFATiling* contextKeyParamsPtr = nullptr;
         int64_t ubSizeRemain = 1;

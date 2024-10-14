@@ -19,69 +19,14 @@
 #include "incre_flash_attention_tiling.h"
 #include "register/tilingdata_base.h"
 
+#include "fused_infer_attention_score_tiling_attr_index.h"
+#include "fused_infer_attention_score_tiling_compile_info.h"
+#include "fused_infer_attention_score_tiling_const.h"
+#include "fused_infer_attention_score_tiling_input_index.h"
+#include "fused_infer_attention_score_tiling_output_index.h"
+
 namespace optiling {
-// Inputs Index
-constexpr uint32_t QUERY_INDEX = 0;
-constexpr uint32_t KEY_INDEX = 1;
-constexpr uint32_t VALUE_INDEX = 2;
-constexpr uint32_t PSE_SHIFT_INDEX = 3;
-constexpr uint32_t ATTEN_MASK_INDEX = 4;
-constexpr uint32_t ACTUAL_SEQ_Q_INDEX = 5;
-constexpr uint32_t ACTUAL_SEQ_KV_INDEX = 6;
-constexpr uint32_t DEQUANT_SCALE1_INDEX = 7;
-constexpr uint32_t QUANT_SCALE1_INDEX = 8;
-constexpr uint32_t DEQUANT_SCALE2_INDEX = 9;
-constexpr uint32_t QUANT_SCALE2_INDEX = 10;
-constexpr uint32_t QUANT_OFFSET2_INDEX = 11;
-constexpr uint32_t ANTIQUANT_SCALE_INDEX = 12;
-constexpr uint32_t ANTIQUANT_OFFSET_INDEX = 13;
-constexpr uint32_t BLOCK_TABLE_INDEX = 14;
-constexpr uint32_t QUERY_PADDING_SIZE_INDEX = 15;
-constexpr uint32_t KV_PADDING_SIZE_INDEX = 16;
-constexpr uint32_t KEY_ANTIQUANT_SCALE_INDEX = 17;
-constexpr uint32_t KEY_ANTIQUANT_OFFSET_INDEX = 18;
-constexpr uint32_t VALUE_ANTIQUANT_SCALE_INDEX = 19;
-constexpr uint32_t VALUE_ANTIQUANT_OFFSET_INDEX = 20;
-constexpr uint32_t KEY_SHARED_PREFIX_INDEX = 21;
-constexpr uint32_t VALUE_SHARED_PREFIX_INDEX = 22;
-constexpr uint32_t ACTUAL_SHARED_PREFIX_LEN_INDEX = 23;
-// Attributes Index
-constexpr uint32_t ATTR_N_INDEX = 0;
-constexpr uint32_t ATTR_SCALE_INDEX = 1;
-constexpr uint32_t ATTR_PRE_TOKEN_INDEX = 2;
-constexpr uint32_t ATTR_NEXT_TOKEN_INDEX = 3;
-constexpr uint32_t ATTR_INPUT_LAYOUT_INDEX = 4;
-constexpr uint32_t ATTR_NUM_KV_HEADS_INDEX = 5;
-constexpr uint32_t ATTR_SPARSE_MODE_INDEX = 6;
-constexpr uint32_t ATTR_INNER_PRECISE_INDEX = 7;
-constexpr uint32_t ATTR_BLOCK_SIZE_INDEX = 8;
-constexpr uint32_t ANTIQUANT_MODE_INDEX = 9;
-constexpr uint32_t SOFTMAX_LSE_FLAG_INDEX = 10;
-constexpr uint32_t KEY_ANTIQUANT_MODE_INDEX = 11;
-constexpr uint32_t VALUE_ANTIQUANT_MODE_INDEX = 12;
-// Output Index
-constexpr uint32_t ATTENTION_OUT_INDEX = 0;
-constexpr uint32_t SOFTMAX_LSE_INDEX = 1;
 
-constexpr uint32_t FROM_FUSED_FLAG = 71;
-constexpr uint32_t FROM_TILING_SINK = 27;
-
-constexpr int64_t D_ALIGN_16 = 16;
-constexpr int64_t D_ALIGN_32 = 32;
-
-constexpr uint64_t BENCHMARK_TILING_KEY = 1000000000000000000;
-
-struct FusedInferAttentionScoreCompileInfo {
-    uint32_t aivNum;
-    uint32_t aicNum;
-    uint64_t ubSize;
-    uint64_t l1Size;
-    uint64_t l0CSize;
-    uint64_t l0ASize;
-    uint64_t l0BSize;
-    size_t defaultSysWorkspaceSize;
-    platform_ascendc::SocVersion socShortName;
-};
 BEGIN_TILING_DATA_DEF(FusedInferAttentionScoreTilingData)
 TILING_DATA_FIELD_DEF(uint32_t, placeHolder);
 END_TILING_DATA_DEF;
@@ -149,20 +94,12 @@ REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000000000021112, PromptF
 // PA tilingkey
 REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000000010101612, PromptFlashAttentionTilingData)
 REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000000010001612, PromptFlashAttentionTilingData)
-REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000800010101612, PromptFlashAttentionTilingData)
-REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000800010001612, PromptFlashAttentionTilingData)
 REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000000010101012, PromptFlashAttentionTilingData)
-REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000800010101012, PromptFlashAttentionTilingData)
 REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000000010001012, PromptFlashAttentionTilingData)
-REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000800010001012, PromptFlashAttentionTilingData)
 REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000000010121012, PromptFlashAttentionTilingData)
-REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000800010121012, PromptFlashAttentionTilingData)
 REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000000010021012, PromptFlashAttentionTilingData)
-REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000800010021012, PromptFlashAttentionTilingData)
 REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000000010121612, PromptFlashAttentionTilingData)
-REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000800010121612, PromptFlashAttentionTilingData)
 REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000000010021612, PromptFlashAttentionTilingData)
-REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000800010021612, PromptFlashAttentionTilingData)
 REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000000010111112, PromptFlashAttentionTilingData)
 REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000000010011112, PromptFlashAttentionTilingData)
 REGISTER_TILING_DATA_CLASS(FusedInferAttentionScore_1000000000010121112, PromptFlashAttentionTilingData)

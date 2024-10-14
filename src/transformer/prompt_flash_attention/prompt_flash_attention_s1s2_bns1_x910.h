@@ -43,7 +43,7 @@ protected:
     __aicore__ inline void FreeGlobalResources();
 
     __aicore__ inline void PseOrMaskCopyIn(int64_t offset, uint32_t souterSize,
-        bool isInnerTail, uint32_t alignSInner, uint32_t unalignSInner, uint32_t padSize, bool isMask);
+        bool isInnerTail, uint32_t alignSInner, uint32_t unalignSInner, uint32_t padSize, bool isMask, uint32_t souterTailMaskCopyInSize);
 
     __aicore__ inline void SparseBandElewiseCompute(int32_t ubPingpong, uint32_t souterSize, int64_t attenMaskOffsetPre);
 
@@ -99,7 +99,7 @@ protected:
     __aicore__ inline void MsdAIterExpand(GlobalTensor<int8_t> dstGm, LocalTensor<FT>& tmpA1, LocalTensor<FT>& tmpA2, 
                                           uint32_t calcSize, bool isFirst, int64_t outOffset, int gmPingpong);
 
-    __aicore__ inline void MsdMatmulPreProcess(GlobalTensor<KV_T> dstGm, LocalTensor<FT>& msdMaxResUb, LocalTensor<FT>& srcUb, LocalTensor<FT>& tmpAFloorUb,
+    __aicore__ inline void MsdMatmulPreProcess(PFAComputeParam *params, GlobalTensor<KV_T> dstGm, LocalTensor<FT>& msdMaxResUb, LocalTensor<FT>& srcUb, LocalTensor<FT>& tmpAFloorUb,
                                                uint32_t startRow, uint32_t dealRowCount, uint32_t columnCount, uint32_t actualColumnCount, int gmPingpong);
 
     __aicore__ inline void Bmm1MsdCalcQueryRowSum(LocalTensor<FT> &queryUb, 
@@ -127,7 +127,7 @@ protected:
     __aicore__ inline void Bmm2MsdExpandMm1ResMulScaleVPerToken(PFAComputeParam *params, LocalTensor<FT> &mmResUb, 
                                                                 uint32_t dealRowCount, uint32_t columnCount, uint32_t actualColumnCount, int gmPingpong);
 
-    __aicore__ inline void Bmm2MsdExpandResPerToken(LocalTensor<FT> &mmResUb, GlobalTensor<KV_T> bmm1ExpandGm,
+    __aicore__ inline void Bmm2MsdExpandResPerToken(PFAComputeParam *params, LocalTensor<FT> &mmResUb, GlobalTensor<KV_T> bmm1ExpandGm,
                                                     uint32_t startRow, uint32_t dealRowCount, uint32_t columnCount, uint32_t actualColumnCount, int gmPingpong);
 
     __aicore__ inline void Bmm2MsdExpandResMulOffsetVPerToken(PFAComputeParam *params, LocalTensor<FT> &mmResUb,
@@ -170,12 +170,12 @@ protected:
 
         DataCopyParams kvCopyParam;
         kvCopyParam.blockLen = headSize / 32;   // KV int8 dtype  32 : 32B alignment
+        kvCopyParam.dstStride = 0;
         if constexpr (PFAT::layout == PFALayout::BNSD) {
             kvCopyParam.srcStride = 0;  // BNSD
         } else {
             kvCopyParam.srcStride = (this->MultiHeadKV - headSize) / 32;    // BSH  32 : 32B alignment
         }
-        kvCopyParam.dstStride = 0;
 
         for (int loopIdx = 0; loopIdx < kvAntiquantLoopTimes; loopIdx++) {
             int64_t kvComputeSInnerSize = (loopIdx == kvAntiquantLoopTimes - 1) ? (params->singleProcessSInnerBmmTail - loopIdx * step) : step;
@@ -488,7 +488,7 @@ protected:
                         padSize = params->padSize;
                     }
                     this->PseOrMaskCopyIn(attenMaskOffset, souterSize, params->isInnerTail,
-                        params->maskCopyInCol, params->singleProcessSInnerBmmTail, padSize, true);
+                        params->maskCopyInCol, params->singleProcessSInnerBmmTail, padSize, true, souterSize);
                 }
             }
 
@@ -552,7 +552,7 @@ protected:
                     }
                     pseShiftOffset += souterSize * this->pseShiftStride;
                     this->PseOrMaskCopyIn(pseShiftOffset, nextSouterSize, params->isInnerTail,
-                        params->pseShiftCopyInCol, params->singleProcessSInnerBmmTail, padSize, false);
+                        params->pseShiftCopyInCol, params->singleProcessSInnerBmmTail, padSize, false, nextSouterSize);
                 } else if (params->useMask && params->sparseBandSelect0) {  // mask pre fetch. In non band mode, the sparseBandSelect0 is true. Just focus on the previous useMask.
                     if constexpr (PFAT::enablePrefix) {
                         padSize = params->isPrefixInnerIter ? params->padPrefixSize : params->padSize;
@@ -560,7 +560,7 @@ protected:
                         padSize = params->padSize;
                     }
                     this->PseOrMaskCopyIn(attenMaskOffset, nextSouterSize, params->isInnerTail, params->maskCopyInCol,
-                        params->singleProcessSInnerBmmTail, padSize, true);
+                        params->singleProcessSInnerBmmTail, padSize, true, nextSouterSize);
                 }
 
                 // mm1 result copyIn pre fetch
@@ -813,9 +813,9 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Process() {
 
 template<typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::PseOrMaskCopyIn(int64_t offset, uint32_t souterSize,
-    bool isInnerTail, uint32_t alignSInner, uint32_t unalignSInner, uint32_t padSize, bool isMask) {
+    bool isInnerTail, uint32_t alignSInner, uint32_t unalignSInner, uint32_t padSize, bool isMask, uint32_t souterTailMaskCopyInSize) {
     // Optimize for small Q_S using the actual required Q_S.
-    uint32_t neededSouterSize = souterSize;
+    uint32_t neededSouterSize = souterTailMaskCopyInSize;
     if (this->tilingData->promptAttentionBaseParams.seqSize < neededSouterSize) {
         neededSouterSize = this->tilingData->promptAttentionBaseParams.seqSize;
     }
@@ -884,7 +884,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1VecInputCopyI
     if (params->fakeMsg) {
         return;
     }
-    this->softmaxSouterStepLen = this->softmaxFlashTilingData.srcM;
+    this->softmaxSouterStepLen = this->tilingData->promptAttentionBaseParams.softmaxOuterSize;
 
     // Optimize the tail block. Number of softmax cycles
     if (this->softmaxFlashTilingData.srcK != params->singleProcessSInnerSizeNow) {
@@ -900,11 +900,17 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1VecInputCopyI
     }
 
     if constexpr (PFAT::msdMode == MsdMode::MSD_ON) {
-        uint32_t maxSouterSizeTmp = this->tilingData->promptAttentionTensorSizeRect.mmResUbSize / params->singleProcessSInnerSizeNow;
-        this->softmaxSouterStepLen = this->softmaxSouterStepLen > maxSouterSizeTmp ? maxSouterSizeTmp : this->softmaxSouterStepLen;
+        if (this->tilingData->promptAttentionBaseParams.headSize > 256) { // 256:big d for msd mode
+            uint32_t msdComputeLinesTiling = this->tilingData->promptAttentionTensorSizeRect.msdComputeLines;
+            this->softmaxSouterStepLen = this->softmaxSouterStepLen > msdComputeLinesTiling ? msdComputeLinesTiling : this->softmaxSouterStepLen;
+        } else {
+            uint32_t maxSouterSizeTmp = this->tilingData->promptAttentionTensorSizeRect.mmResUbSize / params->singleProcessSInnerSizeNow;
+            this->softmaxSouterStepLen = this->softmaxSouterStepLen > maxSouterSizeTmp ? maxSouterSizeTmp : this->softmaxSouterStepLen;
+        }
+        this->softmaxSouterStepLen = (this->softmaxSouterStepLen > params->singleProcessSOuterSize)? params->singleProcessSOuterSize : this->softmaxSouterStepLen;
     }
     uint32_t souterSize = this->softmaxSouterStepLen;
-
+    uint32_t souterTailMaskCopyInSize = ClipSInnerToken(souterSize, 0, params->singleProcessSOuterSize);
     uint32_t padSize = 0;
     if (params->usePseShift) {
         if constexpr (PFAT::enablePrefix) {
@@ -913,7 +919,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1VecInputCopyI
             padSize = params->pseShiftPadSize;
         }
         this->PseOrMaskCopyIn(params->pseShiftOffset, souterSize, params->isInnerTail, params->pseShiftCopyInCol,
-            params->singleProcessSInnerBmmTail, padSize, false);
+            params->singleProcessSInnerBmmTail, padSize, false, souterTailMaskCopyInSize);
     } else if (params->useMask && params->sparseBandSelect0) {  // In non band mode, sparseBandSelect0 is true. Just focus on what's ahead useMask.
         if constexpr (PFAT::enablePrefix) {
             padSize = params->isPrefixInnerIter ? params->padPrefixSize : params->padSize;
@@ -921,7 +927,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1VecInputCopyI
             padSize = params->padSize;
         }
         this->PseOrMaskCopyIn(params->attenMaskOffset, souterSize, params->isInnerTail, params->maskCopyInCol,
-            params->singleProcessSInnerBmmTail, padSize, true);
+            params->singleProcessSInnerBmmTail, padSize, true, souterTailMaskCopyInSize);
     }
 
     if constexpr (PFAT::msdMode == MsdMode::MSD_ON) {
@@ -948,7 +954,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::SparseBandElewise
             padSize = params->isPrefixInnerIter ? params->padPrefixSize : params->padSize;
         }
         this->PseOrMaskCopyIn(attenMaskOffsetPre, souterSize, params->isInnerTail, params->maskCopyInCol,
-            params->singleProcessSInnerBmmTail, padSize, true);
+            params->singleProcessSInnerBmmTail, padSize, true, souterSize);
 
         pipe_barrier(PIPE_V);
         this->template ElewiseCompute<U>(this->mmResUb[ubPingpong], souterSize, params->singleProcessSInnerSizeNow,
@@ -1325,17 +1331,17 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::MsdAIterExpand(Gl
     // copyOut Ak
     this->msdOutQueue.template EnQue(aResOutUbI8);
     this->msdOutQueue.template DeQue<KV_T>();
-    DataCopy(dstGm[outOffset], aResOutUbI8, calcSize);
+    DataCopyExtParams copyParams{1, calcSize, 0, 0, 0};
+    DataCopyPad(dstGm[outOffset], aResOutUbI8, copyParams);
     this->msdOutQueue.FreeTensor(aResOutUbI8);
 }
 
 // 𝑄2=𝑟𝑜𝑢𝑛𝑑((127/𝑄𝑚𝑎𝑥×𝑄 −𝑄1)×254)
 template<typename PFAT>
-__aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::MsdMatmulPreProcess(GlobalTensor<KV_T> dstGm, LocalTensor<FT>& msdMaxResUb, LocalTensor<FT>& srcUb, LocalTensor<FT>& tmpAFloorUb,
+__aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::MsdMatmulPreProcess(PFAComputeParam *params, GlobalTensor<KV_T> dstGm, LocalTensor<FT>& msdMaxResUb, LocalTensor<FT>& srcUb, LocalTensor<FT>& tmpAFloorUb,
                                                                                    uint32_t startRow, uint32_t dealRowCount, uint32_t columnCount, uint32_t actualColumnCount, int gmPingpong) {
-    int64_t actualSeqLength = this->isActualLenDimsNull ? this->tilingData->promptAttentionBaseParams.seqSize : this->actualSeqLengthsGm.GetValue(0);
-    uint32_t gSize = actualSeqLength;
-    uint32_t step = gSize * columnCount;
+    int64_t actualSeqLength = params->actualSeqLengthPerBatch;
+    int64_t step = actualSeqLength * columnCount;
     int64_t baseOffset = startRow * columnCount;
     uint32_t calcSize = dealRowCount * columnCount;
 
@@ -1374,7 +1380,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1MsdCalcQueryR
 template<typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1MsdExpandPertoken(PFAComputeParam *params) {
     uint32_t startRow = 0;
-    uint32_t dealRowCount = this->isActualLenDimsNull ? this->tilingData->promptAttentionBaseParams.seqSize : this->actualSeqLengthsGm.GetValue(0); // batch内所有seq的length相同
+    uint32_t dealRowCount = params->actualSeqLengthPerBatch;
     uint32_t columnCount = this->tilingData->promptAttentionBaseParams.alignedHeadSize;
     uint32_t actualColumnCount = columnCount;
     
@@ -1383,6 +1389,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1MsdExpandPert
     LocalTensor<FT> queryUb = this->msdTmpMm1Buff.template Get<FT>();
     LocalTensor<FT> tmpQueryUb = this->msdTmpMm2Buff.template Get<FT>(); 
     Bmm1MsdCopyQueryGm2Ub(queryUb, queryOffset, dealRowCount, columnCount, actualColumnCount);
+    pipe_barrier(PIPE_V);
 
     // 2. 𝑆𝑐𝑎𝑙𝑒𝐾×(𝑺+𝑂𝑓𝑓𝑠𝑒𝑡𝐾×∑A[j])
     if (this->msdIsKOffsetExist) {
@@ -1392,7 +1399,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1MsdExpandPert
     }
 
     // 3. expand to queryMsdExpandGm
-    MsdMatmulPreProcess(this->queryMsdExpandGm, this->msdMaxBmm1Ub[params->gmPingpong], queryUb, tmpQueryUb, 
+    MsdMatmulPreProcess(params, this->queryMsdExpandGm, this->msdMaxBmm1Ub[params->gmPingpong], queryUb, tmpQueryUb, 
                         startRow, dealRowCount, columnCount, actualColumnCount, params->gmPingpong);
 }
 
@@ -1550,13 +1557,13 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm2MsdExpandMm1R
 
 // Expend 𝐴′ to vec1ResGm
 template<typename PFAT>
-__aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm2MsdExpandResPerToken(LocalTensor<FT> &mmResUb, GlobalTensor<KV_T> bmm1ExpandGm,
+__aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm2MsdExpandResPerToken(PFAComputeParam *params, LocalTensor<FT> &mmResUb, GlobalTensor<KV_T> bmm1ExpandGm,
                                                                                         uint32_t startRow, uint32_t dealRowCount, uint32_t columnCount, uint32_t actualColumnCount, int gmPingpong) {
     LocalTensor<FT> tmpAFloorUb = this->msdTmpMm2Buff.template Get<FT>();
     Adds(tmpAFloorUb, mmResUb, (FT)0, dealRowCount * columnCount); 
     pipe_barrier(PIPE_V);
 
-    MsdMatmulPreProcess(bmm1ExpandGm, this->msdMaxBmm2Ub[gmPingpong], mmResUb, tmpAFloorUb, 
+    MsdMatmulPreProcess(params, bmm1ExpandGm, this->msdMaxBmm2Ub[gmPingpong], mmResUb, tmpAFloorUb, 
                         startRow, dealRowCount, columnCount, actualColumnCount, gmPingpong);
 }
 
@@ -1605,7 +1612,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm2MsdExpandPert
     Bmm2MsdExpandResMulOffsetVPerToken(params, mmResUb, startRow, dealRowCount, columnCount, actualColumnCount, gmPingpong);
 
     // 3. Expand 𝐴′
-    Bmm2MsdExpandResPerToken(mmResUb, bmm1ExpandGm, startRow, dealRowCount, columnCount, actualColumnCount, gmPingpong);
+    Bmm2MsdExpandResPerToken(params, mmResUb, bmm1ExpandGm, startRow, dealRowCount, columnCount, actualColumnCount, gmPingpong);
 }
 
 template<typename PFAT>
@@ -1635,7 +1642,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm2MsdSqueezeRes
 template<typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm2MsdSqueezePertoken(PFAComputeParam *params, LocalTensor<FT>& bmm2ResUb, GlobalTensor<mmOutputType> bmm2ResGmDb, int gmPingpong) {
     uint32_t startRow = 0;
-    uint32_t dealRowCount = this->isActualLenDimsNull ? this->tilingData->promptAttentionBaseParams.seqSize : this->actualSeqLengthsGm.GetValue(0);
+    uint32_t dealRowCount = params->actualSeqLengthPerBatch;
     uint32_t columnCount = this->tilingData->promptAttentionBaseParams.alignedHeadSize;
     uint32_t actualColumnCount = columnCount;
     uint32_t copySize =  dealRowCount * columnCount;

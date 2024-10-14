@@ -38,6 +38,13 @@ target_sources(optiling PRIVATE
         fallback_prompt_flash_attention.cpp
         prompt_flash_attention_tiling_register.cc
 )
+
+if (NOT BUILD_OPEN_PROJECT)
+    target_sources(opmaster_ct PRIVATE
+        prompt_flash_attention_tiling.cpp
+    )
+endif ()
+
 target_sources(opsproto PRIVATE
         prompt_flash_attention_proto.cpp
 )

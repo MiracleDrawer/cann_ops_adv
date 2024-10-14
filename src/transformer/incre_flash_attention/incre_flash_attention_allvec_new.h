@@ -1203,7 +1203,7 @@ template <typename IFAT> __aicore__ inline void IncreFlashAttentionAttenAllVecNe
                       headDim);
             inputQue2.template EnQue(accumOutLocal);
             inputQue2.DeQue<T>();
-            RowMuls(accumOutLocal, accumOutLocal, lseExpUb[i], actDealCnt, headDimAlign, headDim);
+            RowMuls(accumOutLocal, accumOutLocal, lseExpUb[i * FP32_ONE_BLOCK_SIZE], actDealCnt, headDimAlign, headDim);
             pipe_barrier(PIPE_V);
             ColumnSum(accumOutLocal, actDealCnt, headDimAlign);
             Add(bmm2ResUb, bmm2ResUb, accumOutLocal, headDim);

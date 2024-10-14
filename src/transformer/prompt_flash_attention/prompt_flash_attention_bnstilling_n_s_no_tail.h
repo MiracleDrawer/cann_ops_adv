@@ -90,11 +90,13 @@ template<typename T, typename U, CubeFormat FORMAT, typename O, Mode M>
 __aicore__ inline void PromptFlashAttentionBNSTillingNSNoTail<T, U, FORMAT, O, M>::AttenMaskCopyIn(uint64_t offset,
                                                                                      uint32_t sinnerSize,
                                                                                      uint32_t sInnerLoopIdx) {
+    // Early return if mask is not used
     if (this->useMask == false) {
         return;
     }
     LocalTensor<U> attenMaskUb = this->attenMaskQueue.template AllocTensor<U>();
     attenMaskUb.SetSize(this->singleProcessSOuterSize * sinnerSize);
+    // Set up parameters for the data copy operation.
     DataCopyParams intriParams;
     intriParams.blockCount = this->singleProcessSOuterSize;
     intriParams.blockLen = sinnerSize / this->maskTypeByteNum;
@@ -255,13 +257,14 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSNoTail<T, U, FORMAT, O, M
 template<typename T, typename U, CubeFormat FORMAT, typename O, Mode M>
 __aicore__ inline void PromptFlashAttentionBNSTillingNSNoTail<T, U, FORMAT, O, M>::SInnerLoopFunc(int32_t startIndex,
                                                                                     int32_t endIndex) {
-    if (startIndex < 0) {
-        startIndex = 0;
-    }
     if (endIndex > this->maxInnerLoopTimes) {
         endIndex = this->maxInnerLoopTimes;
     }
 
+    if (startIndex < 0) {
+        startIndex = 0;
+    }
+    
     int sInnerLoopTimes = endIndex - startIndex;
     if (sInnerLoopTimes <= 0) {
         return;
@@ -367,9 +370,11 @@ __aicore__ inline void PromptFlashAttentionBNSTillingNSNoTail<T, U, FORMAT, O, M
             actualSeqLengthsIdx = (this->attentionMaskType == 0 && (int64_t)actualSeqLengthsIdx >
                                (int64_t)this->tilingData->promptAttentionBaseParams.seqInnerSize +
                                (int64_t)this->tilingData->promptAttentionBaseParams.preTokens) ?
-                                this->tilingData->promptAttentionBaseParams.seqInnerSize + this->tilingData->promptAttentionBaseParams.preTokens :
+                                this->tilingData->promptAttentionBaseParams.seqInnerSize +
+                                this->tilingData->promptAttentionBaseParams.preTokens :
                                 actualSeqLengthsIdx;
-            int sOuterBlockNum = (actualSeqLengthsIdx + this->tilingData->promptAttentionSingleCoreParams.singleProcessSOuterSize - 1) /
+            int sOuterBlockNum = (actualSeqLengthsIdx +
+                                  this->tilingData->promptAttentionSingleCoreParams.singleProcessSOuterSize - 1) /
                                   this->tilingData->promptAttentionSingleCoreParams.singleProcessSOuterSize;
             this->multiSeqOffset = this->actualSeqOffsets[sIdx];
             if (isLast && sIdx == tmpSLoopEnd - 1) {

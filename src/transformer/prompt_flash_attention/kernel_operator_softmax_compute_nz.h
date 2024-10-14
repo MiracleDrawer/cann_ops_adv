@@ -30,8 +30,7 @@ __aicore__ inline void ReduceMaxLastNZImplPFA(const LocalTensor<half>& dst, cons
     const uint32_t splitOffset = reduceParam.dstM * SOFTMAX_SHAPE_NZ_BASIC_COUNT;
     const uint32_t splitCount = reduceParam.originalSrcM * SOFTMAX_SHAPE_NZ_BASIC_COUNT;
     const uint32_t lastBlockMaskLen = reduceParam.originalSrcK % SOFTMAX_SHAPE_NZ_BASIC_COUNT != 0 ?
-        reduceParam.originalSrcK % SOFTMAX_SHAPE_NZ_BASIC_COUNT :
-        SOFTMAX_SHAPE_NZ_BASIC_COUNT;
+        reduceParam.originalSrcK % SOFTMAX_SHAPE_NZ_BASIC_COUNT : SOFTMAX_SHAPE_NZ_BASIC_COUNT;
     SetMaskCount();
     SetVectorMask<half, MaskMode::COUNTER>(0, splitCount);
     Muls<half, false>(dst, src, 1.0, MASK_PLACEHOLDER, 1, { 1, 1, DEFAULT_REPEAT_STRIDE, DEFAULT_REPEAT_STRIDE });
@@ -181,9 +180,9 @@ __aicore__ inline void BinaryComputeWithSpecialMaskPFA(const LocalTensor<float>&
     uint32_t repeatRange = repeat / MAX_REPEAT_TIMES;
     uint32_t repeatTail = repeat % MAX_REPEAT_TIMES;
     const auto offsetCount = MAX_REPEAT_TIMES * FLOAT_REPEAT_SIZE;
-    uint32_t dstOffset = 0;
     uint32_t src0Offset = 0;
     uint32_t src1Offset = 0;
+    uint32_t dstOffset = 0;
 
     for(uint32_t i = 0; i < repeatRange; i++) {
         func(dst[i * offsetCount], src0[i * offsetCount], src1[i * offsetCount], mask, MAX_REPEAT_TIMES,
@@ -314,8 +313,7 @@ __aicore__ inline void SoftMaxGenericNZImplPFA(const LocalTensor<half>& dst, con
     const uint32_t splitNZBlockCount = tiling.srcK / SOFTMAX_SHAPE_NZ_BASIC_COUNT;
     const uint32_t lastSplitNZBlockOffset = splitOffset * (splitNZBlockCount - 1);
     const uint32_t lastBlockMaskLen = reduceParam.originalSrcK % SOFTMAX_SHAPE_NZ_BASIC_COUNT != 0 ?
-        reduceParam.originalSrcK % SOFTMAX_SHAPE_NZ_BASIC_COUNT :
-        SOFTMAX_SHAPE_NZ_BASIC_COUNT;
+        reduceParam.originalSrcK % SOFTMAX_SHAPE_NZ_BASIC_COUNT : SOFTMAX_SHAPE_NZ_BASIC_COUNT;
     
     LocalTensor<half> halfBuffer;
     halfBuffer = tmpBuffer0.template ReinterpretCast<half>();
@@ -426,12 +424,15 @@ __aicore__ inline void SoftmaxFlashV2NZNoUpdateImplPFA(const LocalTensor<T>& dst
     const uint32_t lastBlockMaskLen = originalSrcShape.k % SOFTMAX_SHAPE_NZ_BASIC_COUNT != 0 ?
         originalSrcShape.k % SOFTMAX_SHAPE_NZ_BASIC_COUNT :
         SOFTMAX_SHAPE_NZ_BASIC_COUNT;
+    // Create a mask or the special format.
     uint64_t mask[2] = { 0, 0 };
     CreateSpecialFormatMaskPFA(mask[0], lastBlockMaskLen, FLOAT_REPEAT_SIZE / SOFTMAX_SHAPE_NZ_BASIC_COUNT);
+    // Initialize offsets and split count.
     uint32_t offset1 = 0;
     uint32_t offset2 = 0;
     uint32_t splitCount = tiling.splitM * SOFTMAX_SHAPE_NZ_BASIC_COUNT;
     uint32_t paddingTailCount = (tiling.srcM - originalSrcShape.m) * SOFTMAX_SHAPE_NZ_BASIC_COUNT;
+    // Loop through the range of M to perform the softmax operation.    
     for (uint32_t i = 0; i < tiling.rangeM; i++) {
         offset1 = i * splitCount;
         offset2 = i * tiling.reduceSize;

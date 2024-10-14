@@ -126,19 +126,32 @@ void PrefixTensorPreProcess(const aclTensor *keyPrefix, const aclTensor *valuePr
 
 
 aclnnStatus aclnnFusedInferAttentionScoreV2GetWorkspaceSize(
-    const aclTensor *query, const aclTensorList *key, const aclTensorList *value, const aclTensor *pseShiftOptional,
-    const aclTensor *attenMaskOptional, const aclIntArray *actualSeqLengthsOptional,
-    const aclIntArray *actualSeqLengthsKvOptional, const aclTensor *deqScale1Optional,
-    const aclTensor *quantScale1Optional, const aclTensor *deqScale2Optional, const aclTensor *quantScale2Optional,
-    const aclTensor *quantOffset2Optional, const aclTensor *antiquantScaleOptional,
-    const aclTensor *antiquantOffsetOptional, const aclTensor *blockTableOptional,
-    const aclTensor *queryPaddingSizeOptional, const aclTensor *kvPaddingSizeOptional,
-    const aclTensor *keyAntiquantScaleOptional, const aclTensor *keyAntiquantOffsetOptional,
-    const aclTensor *valueAntiquantScaleOptional, const aclTensor *valueAntiquantOffsetOptional,
-    const aclTensor *keySharedPrefixOptional, const aclTensor *valueSharedPrefixOptional,
-    const aclIntArray *actualSharedPrefixLenOptional, int64_t numHeads, double scaleValue, int64_t preTokens,
-    int64_t nextTokens, char *inputLayout, int64_t numKeyValueHeads, int64_t sparseMode, int64_t innerPrecise,
-    int64_t blockSize, int64_t antiquantMode, bool softmaxLseFlag, int64_t keyAntiquantMode, int64_t valueAntiquantMode,
+    const aclTensor *query, const aclTensorList *key, const aclTensorList *value,
+    const aclTensor *pseShiftOptional,
+    const aclTensor *attenMaskOptional,
+    const aclIntArray *actualSeqLengthsOptional,
+    const aclIntArray *actualSeqLengthsKvOptional,
+    const aclTensor *deqScale1Optional,
+    const aclTensor *quantScale1Optional,
+    const aclTensor *deqScale2Optional,
+    const aclTensor *quantScale2Optional,
+    const aclTensor *quantOffset2Optional,
+    const aclTensor *antiquantScaleOptional,
+    const aclTensor *antiquantOffsetOptional,
+    const aclTensor *blockTableOptional,
+    const aclTensor *queryPaddingSizeOptional,
+    const aclTensor *kvPaddingSizeOptional,
+    const aclTensor *keyAntiquantScaleOptional,
+    const aclTensor *keyAntiquantOffsetOptional,
+    const aclTensor *valueAntiquantScaleOptional,
+    const aclTensor *valueAntiquantOffsetOptional,
+    const aclTensor *keySharedPrefixOptional,
+    const aclTensor *valueSharedPrefixOptional,
+    const aclIntArray *actualSharedPrefixLenOptional,
+    int64_t numHeads, double scaleValue, int64_t preTokens,
+    int64_t nextTokens, char *inputLayout, int64_t numKeyValueHeads,
+    int64_t sparseMode, int64_t innerPrecise, int64_t blockSize,
+    int64_t antiquantMode, bool softmaxLseFlag, int64_t keyAntiquantMode, int64_t valueAntiquantMode,
     const aclTensor *attentionOut, const aclTensor *softmaxLse, uint64_t *workspaceSize, aclOpExecutor **executor)
 {
     const aclTensorList *tensorListKey = key;
@@ -153,11 +166,11 @@ aclnnStatus aclnnFusedInferAttentionScoreV2GetWorkspaceSize(
     const aclTensor *placeHolder = nullptr;
     const aclTensor *tempTensor = nullptr;
     if (softmaxLseFlag == false) {
-        std::vector<int64_t> shape = {2, 2, 1, 1};
+        std::vector<int64_t> shape = {0};
         int64_t addr = 0xff;
         tempTensor = aclCreateTensor(shape.data(), shape.size(), aclDataType::ACL_FLOAT, shape.data(), 0, ACL_FORMAT_ND,
                                      shape.data(), shape.size(), (void *)&addr);
-        placeHolder = (softmaxLse == nullptr) ? tempTensor : softmaxLse;
+        placeHolder = tempTensor;
     } else {
         placeHolder = softmaxLse;
     }

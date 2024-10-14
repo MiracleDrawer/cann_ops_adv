@@ -63,12 +63,12 @@ protected:
     TPipe* pipe;
     // define the que
     TBuf<> attenMaskUb_;
+    TBuf<QuePosition::A1> b1Buf_;
+    TBuf<QuePosition::A1> b2Buf_;
     TQue<QuePosition::VECIN, 1> eleWiseInQueue;
     TQue<QuePosition::VECOUT, 1> tempBmm2Queue;
     TQue<QuePosition::VECOUT, 1> Bmm1Queue;
     TQue<QuePosition::VECOUT, 1> softmaxOutQueue;
-    TBuf<QuePosition::A1> b1Buf_;
-    TBuf<QuePosition::A1> b2Buf_;
     TBuf<> selectSpaceUb;
 
     TBuf<> softmaxExpUb_;
@@ -265,11 +265,12 @@ __aicore__ inline void PromptFlashAttentionNZKVBase<T, U, FORMAT, O, M>::Init(__
     initOffset();
 
     isActualLenDimsNull = true;
-    isActualLenDimsKVNull = true;
     if (!tilingData->promptAttentionBaseParams.isActualSeqLengthsNull) {
         actualSeqLengthsGm.SetGlobalBuffer((__gm__ int64_t*)actualSeqLengths, tilingData->promptAttentionBaseParams.batchSize);
         isActualLenDimsNull = false;
     }
+
+    isActualLenDimsKVNull = true;
     if (!tilingData->promptAttentionBaseParams.isActualSeqLengthsKVNull) {
         actualSeqLengthsKVGm.SetGlobalBuffer((__gm__ int64_t*)actualSeqLengthsKV, tilingData->promptAttentionBaseParams.batchSize);
         isActualLenDimsKVNull = false;
@@ -373,10 +374,10 @@ __aicore__ inline void PromptFlashAttentionNZKVBase<T, U, FORMAT, O, M>::InitTen
     mmResUbSize = tensorSizeTiling->mmResUbSize;
     attenMaskUbSize = tensorSizeTiling->attenMaskUbSize;
     maskSize = tensorSizeTiling->maskSize;
-    softmaxMaxSize = tensorSizeTiling->softmaxMaxSize;
+    softmaxMaxSize = tensorSizeTiling->softmaxMaxSize;      // Softmax maximum values UB size
     softmaxSumSize = tensorSizeTiling->softmaxSumSize;
     softmaxExpSize = tensorSizeTiling->softmaxExpSize;
-    spmTmpSize = tensorSizeTiling->spmTmpSize;
+    spmTmpSize = tensorSizeTiling->spmTmpSize;              // Temp UB size for sparse matrices
     scmTmpSize = tensorSizeTiling->scmTmpSize;
     bmm2ResUbSize = tensorSizeTiling->bmm2ResUbSize;
     tmpMMResBmm2PreUbSize = tensorSizeTiling->tmpMMResBmm2PreUbSize;
@@ -531,15 +532,16 @@ template<typename T, typename U, CubeFormat FORMAT, typename O,  ModeNZ M>
 __aicore__ inline void PromptFlashAttentionNZKVBase<T, U, FORMAT, O, M>::DataCopyTransposeOut(LocalTensor<mmOutputType>& bmm2ResUb) {
     // Copying here needs to consider the conversion from BNSD to BSH and the conversion from NZ to ND.
     struct DataCopyParams dataCopyParams;
-    dataCopyParams.blockCount = singleProcessSOuterSize;
-    dataCopyParams.blockLen = 1;
-    dataCopyParams.srcStride = 0;
-    dataCopyParams.dstStride = MultiHeadQ / BLOCK_CUBE - 1;
+    dataCopyParams.blockCount = singleProcessSOuterSize;    // Set block count
+    dataCopyParams.blockLen = 1;                            // Set block length
+    dataCopyParams.srcStride = 0;                           // Set source data stride
+    dataCopyParams.dstStride = MultiHeadQ / BLOCK_CUBE - 1; // Set destination data stride, conversion from NA to ND
     int32_t loop = tilingData->promptAttentionBaseParams.headSize / BLOCK_CUBE;
     event_t enQueEvtID = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE3));
     SetFlag<HardEvent::V_MTE3>(enQueEvtID);
     WaitFlag<HardEvent::V_MTE3>(enQueEvtID);
-    int64_t startAddr = this->multiSeqOffset + batchNOffset * tilingData->promptAttentionBaseParams.headSize +
+    int64_t startAddr = this->multiSeqOffset +
+        batchNOffset * tilingData->promptAttentionBaseParams.headSize +
         sOuterOffset * MultiHeadQ;
     for(int i = 0; i < loop; i++) {
         DataCopy(attentionOutGm[startAddr + i * BLOCK_CUBE], bmm2ResUb[i * BLOCK_CUBE * singleProcessSOuterSize], dataCopyParams);
@@ -601,13 +603,13 @@ __aicore__ inline void PromptFlashAttentionNZKVBase<T, U, FORMAT, O, M>::LoopSOu
 template<typename T, typename U, CubeFormat FORMAT, typename O,  ModeNZ M>
 __aicore__ inline void PromptFlashAttentionNZKVBase<T, U, FORMAT, O, M>::LoopSOuterOffsetInitWithBNSD(uint32_t seqListOffsetSize,
                                                                                     int sIdx) {
+    uint64_t attenMaskBatchOffset = 0;
     uint32_t head_stride_q = tilingData->promptAttentionBaseParams.headSize *
                              tilingData->promptAttentionBaseParams.seqSize;
     uint32_t head_stride_kv = tilingData->promptAttentionBaseParams.headSize *
                               tilingData->promptAttentionBaseParams.seqInnerSize;
     uint32_t seq_stride = tilingData->promptAttentionBaseParams.headSize;
 
-    uint64_t attenMaskBatchOffset = 0;
     if (attenMaskBatch != 1) {
         attenMaskBatchOffset = (uint64_t)sIdx * (uint64_t)tilingData->promptAttentionBaseParams.maskKVsSize *
                                (uint64_t)tilingData->promptAttentionBaseParams.maskQsSize;
@@ -616,6 +618,7 @@ __aicore__ inline void PromptFlashAttentionNZKVBase<T, U, FORMAT, O, M>::LoopSOu
 
     tensorACoreOffset = seqListOffsetSize + batchNOffset * head_stride_q + sOuterOffset*seq_stride;
 
+    // calculate the sequence inner offset size based on whether the sequence size equals the inner sequence size.
     uint32_t seqInnerOffsetSize =
         tilingData->promptAttentionBaseParams.seqSize == tilingData->promptAttentionBaseParams.seqInnerSize ?
         seqListOffsetSize / headNumRatio : sIdx * head_stride_kv *
@@ -646,7 +649,8 @@ __aicore__ inline void PromptFlashAttentionNZKVBase<T, U, FORMAT, O, M>::GetSing
     actualSeqLengthPerBatch = ((int64_t)actualSeqLengthPerBatch >
                                (int64_t)tilingData->promptAttentionBaseParams.seqInnerSize +
                                (int64_t)tilingData->promptAttentionBaseParams.preTokens) ?
-                               tilingData->promptAttentionBaseParams.seqInnerSize + tilingData->promptAttentionBaseParams.preTokens :
+                               tilingData->promptAttentionBaseParams.seqInnerSize +
+                               tilingData->promptAttentionBaseParams.preTokens :
                                actualSeqLengthPerBatch;
     actualSeqLengthKVPerBatch = isActualLenDimsKVNull ? tilingData->promptAttentionBaseParams.seqInnerSize : actualSeqLengthsKVGm.GetValue(sIdx);
     singleProcessSOuterSizeTail = (actualSeqLengthPerBatch % singleProcessSOuterSizeWhole != 0) ?

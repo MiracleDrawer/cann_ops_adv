@@ -567,12 +567,14 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::SoftmaxBasicC
     SoftmaxFlashV2<softmaxType, true, true, true, true>(mmResUb, softmaxSumUb, softmaxMaxUb,
                                         mmResUb, softmaxExpUb, softmaxSumUb, softmaxMaxUb, sharedTmpUb, softmaxFlashTilingData, softmaxShapeInfo);
     if (this->isSoftmaxResNeedUpdate) {
+        // Updates the softmaxSapeInfo using parameters from tilingData
         SoftMaxShapeInfo softmaxShapeInfo{
             static_cast<uint32_t>(tilingData->promptAttentionSingleCoreParams.singleProcessSOuterSize),
             static_cast<uint32_t>(tilingData->promptAttentionSingleCoreParams.singleProcessSInnerSize),
             static_cast<uint32_t>(tilingData->promptAttentionSingleCoreParams.singleProcessSOuterSize),
             static_cast<uint32_t>(tilingData->promptAttentionSingleCoreParams.singleProcessSInnerSize)
         };
+        // Invokes the AdjustSoftMaxRes function to update the softmax results
         this->isSoftmaxResNeedUpdate = AdjustSoftMaxRes<mmOutputType, float, true>(mmResUb,
             softmaxMaxUb, this->negativeScalar, 0.0, softmaxShapeInfo);
     }
@@ -591,8 +593,11 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::SoftmaxBasicC
             static_cast<uint32_t>(tilingData->promptAttentionSingleCoreParams.singleProcessSOuterSize),
             static_cast<uint32_t>(tilingData->promptAttentionSingleCoreParams.singleProcessSInnerSize)
         };
-        this->isSoftmaxResNeedUpdate = AdjustSoftMaxRes<mmOutputType, mmOutputType, true>(mmResUb,
-            softmaxMaxUb, this->negativeScalar, 0.0, softmaxShapeInfo);
+        this->isSoftmaxResNeedUpdate = AdjustSoftMaxRes<mmOutputType,mmOutputType, true>(mmResUb,
+                                                                                         softmaxMaxUb,
+                                                                                         this->negativeScalar,
+                                                                                         0.0,
+                                                                                         softmaxShapeInfo);
     }
 }
 
@@ -622,12 +627,13 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::Bmm2UpdateDiv
     constexpr int32_t REPEAT_DATA_NUM = 256 / sizeof(softmaxType);
     BinaryRepeatParams repeatParams;
     // Default values of continuous calculation
+    repeatParams.dstBlkStride = 1;
+    repeatParams.dstRepStride = 8;
     repeatParams.src0BlkStride = 1;
     repeatParams.src0RepStride = 8;
     repeatParams.src1BlkStride = 1;
     repeatParams.src1RepStride = 8;
-    repeatParams.dstBlkStride = 1;
-    repeatParams.dstRepStride = 8;
+
 
     int32_t loop = tilingData->promptAttentionBaseParams.headSize / BLOCK_CUBE;
     int32_t outerSize = isOuterTail_ ? singleProcessSOuterSizeTailAlign : singleProcessSOuterSize;
@@ -661,10 +667,11 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::Bmm2UpdateDiv
     BinaryRepeatParams repeatParams;
     // Default values of continuous calculation
     repeatParams.src0BlkStride = 1;
-    repeatParams.src0RepStride = 8;
     repeatParams.src1BlkStride = 1;
-    repeatParams.src1RepStride = 8;
     repeatParams.dstBlkStride = 1;
+    
+    repeatParams.src0RepStride = 8;
+    repeatParams.src1RepStride = 8;
     repeatParams.dstRepStride = 8;
 
     int32_t loop = tilingData->promptAttentionBaseParams.headSize / BLOCK_CUBE;
@@ -811,6 +818,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::LoopSOuterOff
     uint32_t seqInnerOffsetSize =
         tilingData->promptAttentionBaseParams.seqSize == tilingData->promptAttentionBaseParams.seqInnerSize ?
         seqListOffsetSize / headNumRatio : sIdx * tilingData->promptAttentionBaseParams.seqInnerSize * MultiHeadKV;
+    // calculate the offset for tensor B (key or value tensor).
     tensorBCoreOffset = seqInnerOffsetSize +
                         batchNOffset / headNumRatio * tilingData->promptAttentionBaseParams.headSize;
 

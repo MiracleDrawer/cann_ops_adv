@@ -397,6 +397,7 @@ private:
     ge::graphStatus InputAttrsPreProcess();
     ge::graphStatus QKVPreProcess();
     ge::graphStatus KvShapePostProcess();
+    ge::graphStatus CheckKVHeadNum(gert::StorageShape *inputShape);
     ge::graphStatus CheckKVShape();
     ge::graphStatus CheckQKOutShape();
     ge::graphStatus CheckKeyShapeTensor(const gert::Shape &aShape);

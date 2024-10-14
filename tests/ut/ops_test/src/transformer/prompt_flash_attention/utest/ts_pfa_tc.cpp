@@ -461,8 +461,9 @@ TEST_F(Ts_Pfa_Ascend910B2, case_kvAntiQuant_bf16)
     cs.mParam.quantType = QuantShapeType::POST_1;
     cs.mParam.actualSeqLength = {1000,1000,1000,1000,1000};
     cs.mParam.numHeads = 40;
+    cs.mOpInfo.mExp.mSuccess = false;
     ASSERT_TRUE(cs.Init());
-    ASSERT_TRUE(cs.Run());
+    ASSERT_EQ(cs.Run(), cs.mOpInfo.mExp.mSuccess);
 }
 
 TEST_F(Ts_Pfa_Ascend910B2, case_kvAntiQuant_bf16_01)
@@ -480,8 +481,9 @@ TEST_F(Ts_Pfa_Ascend910B2, case_kvAntiQuant_bf16_01)
     cs.mParam.quantType = QuantShapeType::POST_1;
     cs.mParam.actualSeqLength = {1000,1000,1000,1000,1000};
     cs.mParam.numHeads = 40;
+    cs.mOpInfo.mExp.mSuccess = false;
     ASSERT_TRUE(cs.Init());
-    ASSERT_TRUE(cs.Run());
+    ASSERT_EQ(cs.Run(), cs.mOpInfo.mExp.mSuccess);
 }
 
 
@@ -499,8 +501,9 @@ TEST_F(Ts_Pfa_Ascend910B2, case_kvAntiQuant_unflash_splitB_largeS)
     cs.mParam.attenMaskType = AttenMaskShapeType::B_1_S;
     cs.mParam.numHeads = 11;
     cs.mParam.kvNumHeads=1;
+    cs.mOpInfo.mExp.mSuccess = false;
     ASSERT_TRUE(cs.Init());
-    ASSERT_TRUE(cs.Run());
+    ASSERT_EQ(cs.Run(), cs.mOpInfo.mExp.mSuccess);
 }
 
 TEST_F(Ts_Pfa_Ascend910B2, case_empty_kvPadding)
@@ -598,8 +601,9 @@ TEST_F(Ts_Pfa_Ascend910B2, case_kvAntiquant_bf16_quant_scale2_type_3)
     cs.mParam.outDataType = ge::DT_INT8;
     cs.mParam.actualSeqLength = {1};
     cs.mParam.quantType = QuantShapeType::POST_1;
+    cs.mOpInfo.mExp.mSuccess = false;
     ASSERT_TRUE(cs.Init());
-    ASSERT_TRUE(cs.Run());
+     ASSERT_EQ(cs.Run(), cs.mOpInfo.mExp.mSuccess);
 }
 TEST_F(Ts_Pfa_Ascend910B2, case_kvAntiquant_workspace_opt_unflashSplitB_largeS)
 {
@@ -616,8 +620,9 @@ TEST_F(Ts_Pfa_Ascend910B2, case_kvAntiquant_workspace_opt_unflashSplitB_largeS)
     cs.mParam.kvDataType = ge::DT_INT8;
     cs.mParam.outDataType = ge::DT_BF16;
     cs.mParam.actualSeqLength = {1};
+    cs.mOpInfo.mExp.mSuccess = false;
     ASSERT_TRUE(cs.Init());
-    ASSERT_TRUE(cs.Run());
+    ASSERT_EQ(cs.Run(), cs.mOpInfo.mExp.mSuccess);
 }
 
 TEST_F(Ts_Pfa_Ascend910B2, case_kvAntiquant_workspace_opt_unflashSplitB)
@@ -635,8 +640,9 @@ TEST_F(Ts_Pfa_Ascend910B2, case_kvAntiquant_workspace_opt_unflashSplitB)
     cs.mParam.kvDataType = ge::DT_INT8;
     cs.mParam.outDataType = ge::DT_BF16;
     cs.mParam.actualSeqLength = {1};
+    cs.mOpInfo.mExp.mSuccess = false;
     ASSERT_TRUE(cs.Init());
-    ASSERT_TRUE(cs.Run());
+    ASSERT_EQ(cs.Run(), cs.mOpInfo.mExp.mSuccess);
 }
 
 TEST_F(Ts_Pfa_Ascend910B2, case_invalid_hn_bsh)
@@ -728,4 +734,24 @@ TEST_F(Ts_Pfa_Ascend910B2, prompt_flash_attention_tiling_10)
     ASSERT_TRUE(cs.Init());
     cs.query = Tensor("query", {cs.mParam.b, cs.mParam.n, cs.mParam.s, cs.mParam.d}, "BNSD", cs.mParam.qDataType,
     ge::FORMAT_ND); ASSERT_EQ(cs.Run(), cs.mOpInfo.mExp.mSuccess);
+}
+
+TEST_F(Ts_Pfa_Ascend910B2, case_attenmask_fp16_wrong)
+{
+    PfaCase cs;
+    cs.mParam.b = 1;
+    cs.mParam.n = 4;
+    cs.mParam.s = 8192;
+    cs.mParam.d = 256;
+    cs.mParam.layout = "BNSD";
+    cs.mParam.numHeads = 4;
+    cs.mParam.actualSeqLength = {1};
+    cs.mParam.attenMaskType = AttenMaskShapeType::B_N_1_S;
+    cs.mParam.pseShiftType = PseShiftShapeType::B_1_N_S;
+    cs.mParam.qDataType = ge::DT_BF16;
+    cs.mOpInfo.mExp.mSuccess = false;
+    cs.pseShift = Tensor("pseShift", {cs.mParam.b, cs.mParam.n, 1, cs.mParam.s}, "B_1_N_S", ge::DT_FLOAT16,
+    ge::FORMAT_ND);
+    ASSERT_TRUE(cs.Init());
+    ASSERT_EQ(cs.Run(), cs.mOpInfo.mExp.mSuccess);
 }

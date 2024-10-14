@@ -7,11 +7,11 @@
 - Atlas A2 训练系列产品
 - Atlas 推理系列产品（Ascend 310P处理器）中的加速卡
 
-产品形态详细说明请参见[昇腾产品形态说明](https://www.hiascend.com/document/redirect/CannCommunityProductForm)。
+产品形态详细说明请参见[昇腾产品形态说明](https://www.hiascend.com/document/redirect/CannCommunityProductForm)
 
 ## 实现原理
 
-详细实现原理参考[IFA设计](./common/IFA算子设计介绍.md)。
+详细实现原理参考[IFA设计](./common/IFA算子设计介绍.md)
 
 ## 接口原型
 
@@ -102,7 +102,7 @@
 
   ```
   第一段接口完成入参校验，出现以下场景时报错：
-  - 返回161001（ACLNN_ERR_PARAM_NULLPTR）：如果传入参数是必选输入，输出或者必选属性，且是空指针，则返回161001。
+  - 返回161001（ACLNN\_ERR\_PARAM\_NULLPTR）：如果传入参数是必选输入，输出或者必选属性，且是空指针，则返回161001。
   ```
 
 ## aclnnIncreFlashAttentionV2

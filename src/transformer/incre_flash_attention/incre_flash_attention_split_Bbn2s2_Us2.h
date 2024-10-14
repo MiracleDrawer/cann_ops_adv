@@ -202,16 +202,18 @@ public:
             uint32_t alignedUseN = ((useN - 1 + ALIGN_BLOCK_SIZE) / ALIGN_BLOCK_SIZE) * ALIGN_BLOCK_SIZE;
 
             if (bmm1BaseN == kvCacheBlockSize) { // bmm1BaseN = kvCacheBlockSize时不需要考虑k方向step，一次拷贝效率更高
-                CopyND2NZ(dst[copyFinishRowCnt * blockElementCnt], src[srcOffset], 0, 0, currentCopyRowCnt, useK,
-                          bmm1Kb, 1, 0, 0, alignedUseN);
+                CopyND2NZ(dst[copyFinishRowCnt * blockElementCnt], src[srcOffset + row * bmm1BaseK], 0, 0,
+                          currentCopyRowCnt, useK, bmm1Kb, 1, 0, 0, alignedUseN);
             } else {
                 for (int i = 0; i < bmm1StepKb; i++) { // K方向多Step
-                    uint32_t dstOffset = copyFinishRowCnt * blockElementCnt + i * bmm1BaseK * currentCopyRowCnt;
+                    uint32_t alignedCurrentCopyRowCnt = (currentCopyRowCnt + blockElementCnt - 1) / blockElementCnt * blockElementCnt;
                     // K方向上尾块，需要特殊处理拷贝列数
-                    uint32_t remainColCnt = headSize - row * bmm1StepKb * bmm1BaseK - i * bmm1BaseK;
+                    uint32_t remainColCnt = headSize - row * bmm1BaseK - i * bmm1BaseK;
                     uint32_t currentCopyColCnt = remainColCnt < bmm1BaseK ? remainColCnt : bmm1BaseK;
-
-                    CopyND2NZ(dst[dstOffset], src[srcOffset + i * bmm1BaseK], baseRowOffsetInBlock, 0,
+                    uint32_t dstOffset = copyFinishRowCnt * blockElementCnt;
+                    // Kb方向多step时，算dst L1上偏移时N方向需要考虑完整的useN，且需要对齐处理
+                    dstOffset += i * bmm1BaseK * alignedUseN;
+                    CopyND2NZ(dst[dstOffset], src[srcOffset + row * bmm1BaseK + i * bmm1BaseK], baseRowOffsetInBlock, 0,
                               currentCopyRowCnt, currentCopyColCnt, bmm1Kb, 1, 0, 0, alignedUseN);
                 }
             }
@@ -3037,16 +3039,27 @@ IncreFlashAttentionAttenSplitBbn2s2Us2<IFAT>::DealBmm2ResBaseBlock(const uint32_
 
     // 除第一个循环外，均需要更新中间计算结果
     if (sInnerLoopIdx > 0) {
-        LocalTensor<T> bmm2ResPreUb = inputQue2.AllocTensor<T>();
-        DataCopy(bmm2ResPreUb, vec2ResGm[batchBase + startRow * columnCount], vec2ComputeSize);
-        inputQue2.EnQue(bmm2ResPreUb);
+        uint32_t singleDealRowCount = BASE_BLOCK_MAX_ELEMENT_NUM / 2 / columnCount; // 16K(inputQue2 Size)/D
+        uint32_t loopCnt = (dealRowCount + singleDealRowCount - 1) / singleDealRowCount;
+        uint32_t tailDealRowCount = dealRowCount - (loopCnt - 1) * singleDealRowCount;
+        for (int i = 0, curDealRowCount = singleDealRowCount; i < loopCnt; i++) {
+            if (i + 1 == loopCnt) {
+                curDealRowCount = tailDealRowCount;
+            }
+            LocalTensor<T> bmm2ResPreUb = inputQue2.AllocTensor<T>();
+            DataCopy(bmm2ResPreUb, vec2ResGm[batchBase + startRow * columnCount + i * singleDealRowCount * columnCount],
+                     curDealRowCount * columnCount);
+            inputQue2.EnQue(bmm2ResPreUb);
 
-        inputQue2.DeQue<T>();
-        pipe_barrier(PIPE_V);
-        RowMuls(bmm2ResPreUb, bmm2ResPreUb, softmaxExpUb[baseOffset], dealRowCount, columnCount, actualColumnCount);
-        pipe_barrier(PIPE_V);
-        Add(bmm2ResUb, bmm2ResUb, bmm2ResPreUb, vec2ComputeSize);
-        inputQue2.FreeTensor(bmm2ResPreUb);
+            inputQue2.DeQue<T>();
+            pipe_barrier(PIPE_V);
+            RowMuls(bmm2ResPreUb, bmm2ResPreUb, softmaxExpUb[baseOffset + i * singleDealRowCount * BLOCK_ELEMENT_NUM],
+                    curDealRowCount, columnCount, actualColumnCount);
+            pipe_barrier(PIPE_V);
+            Add(bmm2ResUb[i * singleDealRowCount * columnCount], bmm2ResUb[i * singleDealRowCount * columnCount],
+                bmm2ResPreUb, curDealRowCount * columnCount);
+            inputQue2.FreeTensor(bmm2ResPreUb);
+        }
     }
 
     // 最后一次输出计算结果，否则将中间结果暂存至workspace
@@ -3187,16 +3200,27 @@ IncreFlashAttentionAttenSplitBbn2s2Us2<IFAT>::DealAntiqBmm2ResBaseBlock(const ui
 
     // 除第一个循环外，均需要更新中间计算结果
     if (sInnerLoopIdx > 0) {
-        LocalTensor<T> bmm2ResPreUb = inputQue2.AllocTensor<T>();
-        DataCopy(bmm2ResPreUb, vec2ResGm[startRow * columnCount + batchBase], vec2ComputeSize);
-        inputQue2.EnQue(bmm2ResPreUb);
+        uint32_t singleDealRowCount = BASE_BLOCK_MAX_ELEMENT_NUM / 2 / columnCount; // 16K(inputQue2 Size)/D
+        uint32_t loopCnt = (dealRowCount + singleDealRowCount - 1) / singleDealRowCount;
+        uint32_t tailDealRowCount = dealRowCount - (loopCnt - 1) * singleDealRowCount;
+        for (int i = 0, curDealRowCount = singleDealRowCount; i < loopCnt; i++) {
+            if (i + 1 == loopCnt) {
+                curDealRowCount = tailDealRowCount;
+            }
+            LocalTensor<T> bmm2ResPreUb = inputQue2.AllocTensor<T>();
+            DataCopy(bmm2ResPreUb, vec2ResGm[batchBase + startRow * columnCount + i * singleDealRowCount * columnCount],
+                     curDealRowCount * columnCount);
+            inputQue2.EnQue(bmm2ResPreUb);
 
-        inputQue2.DeQue<T>();
-        pipe_barrier(PIPE_V);
-        RowMuls(bmm2ResPreUb, bmm2ResPreUb, softmaxExpUb[baseOffset], dealRowCount, columnCount, actualColumnCount);
-        pipe_barrier(PIPE_V);
-        Add(bmm2ResUb, bmm2ResUb, bmm2ResPreUb, vec2ComputeSize);
-        inputQue2.FreeTensor(bmm2ResPreUb);
+            inputQue2.DeQue<T>();
+            pipe_barrier(PIPE_V);
+            RowMuls(bmm2ResPreUb, bmm2ResPreUb, softmaxExpUb[baseOffset + i * singleDealRowCount * BLOCK_ELEMENT_NUM],
+                    curDealRowCount, columnCount, actualColumnCount);
+            pipe_barrier(PIPE_V);
+            Add(bmm2ResUb[i * singleDealRowCount * columnCount], bmm2ResUb[i * singleDealRowCount * columnCount],
+                bmm2ResPreUb, curDealRowCount * columnCount);
+            inputQue2.FreeTensor(bmm2ResPreUb);
+        }
     }
 
     // 最后一次输出计算结果，否则将中间结果暂存至workspace
@@ -3288,16 +3312,27 @@ __aicore__ inline void IncreFlashAttentionAttenSplitBbn2s2Us2<IFAT>::DealAntiqBm
 
     // 除第一个循环外，均需要更新中间计算结果
     if (sInnerLoopIdx > 0) {
-        LocalTensor<T> bmm2ResPreUb = inputQue2.AllocTensor<T>();
-        DataCopy(bmm2ResPreUb, vec2ResGm[startRow * columnCount + batchBase], vec2ComputeSize);
-        inputQue2.EnQue(bmm2ResPreUb);
+        uint32_t singleDealRowCount = BASE_BLOCK_MAX_ELEMENT_NUM / 2 / columnCount; // 16K(inputQue2 Size)/D
+        uint32_t loopCnt = (dealRowCount + singleDealRowCount - 1) / singleDealRowCount;
+        uint32_t tailDealRowCount = dealRowCount - (loopCnt - 1) * singleDealRowCount;
+        for (int i = 0, curDealRowCount = singleDealRowCount; i < loopCnt; i++) {
+            if (i + 1 == loopCnt) {
+                curDealRowCount = tailDealRowCount;
+            }
+            LocalTensor<T> bmm2ResPreUb = inputQue2.AllocTensor<T>();
+            DataCopy(bmm2ResPreUb, vec2ResGm[batchBase + startRow * columnCount + i * singleDealRowCount * columnCount],
+                     curDealRowCount * columnCount);
+            inputQue2.EnQue(bmm2ResPreUb);
 
-        inputQue2.DeQue<T>();
-        pipe_barrier(PIPE_V);
-        RowMuls(bmm2ResPreUb, bmm2ResPreUb, softmaxExpUb[baseOffset], dealRowCount, columnCount, actualColumnCount);
-        pipe_barrier(PIPE_V);
-        Add(bmm2ResUb, bmm2ResUb, bmm2ResPreUb, vec2ComputeSize);
-        inputQue2.FreeTensor(bmm2ResPreUb);
+            inputQue2.DeQue<T>();
+            pipe_barrier(PIPE_V);
+            RowMuls(bmm2ResPreUb, bmm2ResPreUb, softmaxExpUb[baseOffset + i * singleDealRowCount * BLOCK_ELEMENT_NUM],
+                    curDealRowCount, columnCount, actualColumnCount);
+            pipe_barrier(PIPE_V);
+            Add(bmm2ResUb[i * singleDealRowCount * columnCount], bmm2ResUb[i * singleDealRowCount * columnCount],
+                bmm2ResPreUb, curDealRowCount * columnCount);
+            inputQue2.FreeTensor(bmm2ResPreUb);
+        }
     }
 
     // 最后一次输出计算结果，否则将中间结果暂存至workspace

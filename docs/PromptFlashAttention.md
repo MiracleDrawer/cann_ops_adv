@@ -93,11 +93,10 @@
 
   返回aclnnStatus状态码，具体参见[aclnn返回码](common/aclnn返回码.md)。
 
-  ```
+  说明：
   第一段接口完成入参校验，若出现以下错误码，则对应原因为：
   -  返回161001（ACLNN_ERR_PARAM_NULLPTR）：如果传入参数是必选输入，输出或者必选属性，且是空指针，则返回161001。
   -  返回161002（ACLNN_ERR_PARAM_INVALID）：query、key、value、pseShift、attenMask、attentionOut的数据类型和数据格式不在支持的范围内。
-  ```
 
 ## aclnnPromptFlashAttention
 
@@ -150,7 +149,7 @@ REG_OP(PromptFlashAttention)
     .OUTPUT(attention_out, TensorType({DT_FLOAT16, DT_BF16, DT_INT8}))
     .REQUIRED_ATTR(num_heads, Int)
     .ATTR(scale_value, Float, 1.0)
-    .ATTR(pre_tokens, Int, 2147483647)
+    .ATTR(pre_tokens, Int, 214748647)
     .ATTR(next_tokens, Int, 0)
     .ATTR(input_layout, String, "BSH")
     .ATTR(num_key_value_heads, Int, 0)

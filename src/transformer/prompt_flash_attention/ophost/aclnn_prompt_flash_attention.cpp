@@ -14,8 +14,8 @@
 #include "aclnn_kernels/contiguous.h"
 #include "aclnn_kernels/pad.h"
 #include "aclnn_kernels/reshape.h"
-#include "aclnn_kernels/slice.h"
 #include "aclnn_kernels/transpose.h"
+#include "aclnn_kernels/slice.h"
 #include "opdev/common_types.h"
 #include "opdev/fast_vector.h"
 #include "opdev/op_errno.h"
@@ -66,6 +66,7 @@ aclnnStatus aclnnPromptFlashAttention(
     uint64_t workspaceSize,
     aclOpExecutor *executor,
     const aclrtStream stream) {
+        // perform attention computations.
         return aclnnInnerPromptFlashAttention(workspace, workspaceSize, executor, stream);
     }
 

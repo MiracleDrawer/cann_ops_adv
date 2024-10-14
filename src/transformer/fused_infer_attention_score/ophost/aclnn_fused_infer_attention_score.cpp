@@ -20,14 +20,18 @@ namespace {
 extern aclnnStatus aclnnInnerFusedInferAttentionScoreGetWorkspaceSize(
     const aclTensor *query, const aclTensorList *key, const aclTensorList *value, const aclTensor *pseShift,
     const aclTensor *attenMask, const aclIntArray *actualSeqLengths, const aclIntArray *actualSeqLengthsKv,
-    const aclTensor *deqScale1, const aclTensor *quantScale1, const aclTensor *deqScale2, const aclTensor *quantScale2,
+    const aclTensor *deqScale1, const aclTensor *quantScale1,
+    const aclTensor *deqScale2, const aclTensor *quantScale2,
     const aclTensor *quantOffset2, const aclTensor *antiquantScale, const aclTensor *antiquantOffset,
     const aclTensor *blockTable, const aclTensor *queryPaddingSize, const aclTensor *kvPaddingSize,
-    const aclTensor *keyAntiquantScale, const aclTensor *keyAntiquantOffset, const aclTensor *valueAntiquantScale,
-    const aclTensor *valueAntiquantOffset, const aclTensor *keySharedPrefix, const aclTensor *valueSharedPrefix,
+    const aclTensor *keyAntiquantScale, const aclTensor *keyAntiquantOffset,
+    const aclTensor *valueAntiquantScale, const aclTensor *valueAntiquantOffset,
+    const aclTensor *keySharedPrefix, const aclTensor *valueSharedPrefix,
     const aclIntArray *actualSharedPrefixLen, int64_t numHeads, double scaleValue, int64_t preTokens,
-    int64_t nextTokens, char *inputLayout, int64_t numKeyValueHeads, int64_t sparseMode, int64_t innerPrecise,
-    int64_t blockSize, int64_t antiquantMode, bool softmaxLseFlag, int64_t keyAntiquantMode, int64_t valueAntiquantMode,
+    int64_t nextTokens, char *inputLayout,
+    int64_t numKeyValueHeads, int64_t sparseMode, int64_t innerPrecise,
+    int64_t blockSize, int64_t antiquantMode, bool softmaxLseFlag,
+    int64_t keyAntiquantMode, int64_t valueAntiquantMode,
     const aclTensor *attentionOut, const aclTensor *softmaxLse, uint64_t *workspaceSize, aclOpExecutor **executor);
 
 extern aclnnStatus aclnnInnerFusedInferAttentionScore(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor,
@@ -46,11 +50,11 @@ aclnnStatus aclnnFusedInferAttentionScoreGetWorkspaceSize(
     const aclTensor *placeHolder = nullptr;
     const aclTensor *tempTensor = nullptr;
     if (softmaxLseFlag == false) {
-        std::vector<int64_t> shape = {1};
+        std::vector<int64_t> shape = {0};
         int64_t addr = 0xff;
         tempTensor = aclCreateTensor(shape.data(), shape.size(), aclDataType::ACL_FLOAT, shape.data(), 0, ACL_FORMAT_ND,
                                      shape.data(), shape.size(), (void *)&addr);
-        placeHolder = (softmaxLse == nullptr) ? tempTensor : softmaxLse;
+        placeHolder = tempTensor;
     } else {
         placeHolder = softmaxLse;
     }

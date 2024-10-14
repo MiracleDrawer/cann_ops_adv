@@ -33,6 +33,12 @@ target_sources(optiling PRIVATE
         fallback_fused_infer_attention_score.cpp
 )
 
+if (NOT BUILD_OPEN_PROJECT)
+    target_sources(opmaster_ct PRIVATE
+        fused_infer_attention_score_tiling.cpp
+    )
+endif ()
+
 target_include_directories(optiling PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
 )

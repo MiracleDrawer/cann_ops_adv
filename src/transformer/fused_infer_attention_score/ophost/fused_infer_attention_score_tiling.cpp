@@ -193,9 +193,8 @@ static ge::graphStatus ConvertContextToParamsPFA(gert::TilingContext *context,
                 }
                 cumulativeKeyS += contextKeyParams.kTensorList[tmpIdx]->GetStorageShape().GetDim(1);
                 cumulativeValueS += contextKeyParams.vTensorList[tmpIdx]->GetStorageShape().GetDim(1);
-                contextKeyParams.maxKVs =
-                    std::max(contextKeyParams.maxKVs,
-                             uint32_t(contextKeyParams.kTensorList[tmpIdx]->GetStorageShape().GetDim(1)));
+                contextKeyParams.maxKVs = std::max(contextKeyParams.maxKVs,
+                    uint32_t(contextKeyParams.kTensorList[tmpIdx]->GetStorageShape().GetDim(1)));
             }
         } else if (layoutStr == "BNSD" || layoutStr == "BNSD_BSND") { // check N and D, respectively, are the same
                                                                       // across batches and KVs under BNSD/BNSD_BSND

@@ -425,11 +425,11 @@ TEST_F(Ts_Fia_Ascend910B1, case_antiquant_mode_msd7) // for msd PFA
     ASSERT_EQ(cs.Run(), cs.mOpInfo.mExp.mSuccess);
 }
 
-TEST_F(Ts_Fia_Ascend910B1, case_antiquant_mode_msd8) // for msd PFA
+TEST_F(Ts_Fia_Ascend910B1, case_antiquant_mode_msd9) // for msd PFA
 {
     FiaCase cs;
     cs.mParam.b = 4;
-    cs.mParam.s = 256;
+    cs.mParam.s = 16;
     cs.mParam.layout = "BSH";
     cs.mParam.numHeads = 1;
     cs.mParam.scaleValue = 1.0f;
@@ -437,18 +437,18 @@ TEST_F(Ts_Fia_Ascend910B1, case_antiquant_mode_msd8) // for msd PFA
     cs.mParam.value_antiquant_mode = 1;
     cs.mParam.kvDataType = ge::DT_INT8;
     ASSERT_TRUE(cs.Init());
-    cs.query = Tensor("query", {4, 256, 128}, "BSH", ge::DT_BF16, ge::FORMAT_ND);
-    cs.key = Tensor("key", {4, 256, 128}, "BSH", ge::DT_INT8, ge::FORMAT_ND);
-    cs.value = Tensor("value", {4, 256, 128}, "BSH", ge::DT_INT8, ge::FORMAT_ND);
+    cs.query = Tensor("query", {4, 6, 512}, "BSH", ge::DT_BF16, ge::FORMAT_ND);
+    cs.key = Tensor("key", {4, 16, 512}, "BSH", ge::DT_INT8, ge::FORMAT_ND);
+    cs.value = Tensor("value", {4, 16, 512}, "BSH", ge::DT_INT8, ge::FORMAT_ND);
     cs.quantScale2 = Tensor("quantScale2", {2, 2, 2, 2, 2}, "5", ge::DT_FLOAT, ge::FORMAT_ND);
-    cs.attentionOut = Tensor("attentionOut", {4, 6, 128}, "BSH", ge::DT_BF16, ge::FORMAT_ND);
+    cs.attentionOut = Tensor("attentionOut", {4, 6, 512}, "BSH", ge::DT_BF16, ge::FORMAT_ND);
     cs.antiquantScale = Tensor("antiquantScale", {2}, "1", ge::DT_FLOAT, ge::FORMAT_ND);
     cs.antiquantOffset = Tensor("antiquantOffset", {2}, "1", ge::DT_FLOAT, ge::FORMAT_ND);
-    cs.keyAntiquantScale = Tensor("keyAntiquantScale", {4, 256}, "2", ge::DT_FLOAT, ge::FORMAT_ND);
-    cs.valueAntiquantScale = Tensor("valueAntiquantScale", {4, 256}, "2", ge::DT_FLOAT, ge::FORMAT_ND);
-    cs.keyAntiquantOffset = Tensor("keyAntiquantOffset", {4, 256}, "2", ge::DT_FLOAT, ge::FORMAT_ND);
-    cs.valueAntiquantOffset = Tensor("valueAntiquantOffset", {4, 256}, "2", ge::DT_FLOAT, ge::FORMAT_ND);
-    cs.mOpInfo.mExp.mSuccess = false;
+    cs.keyAntiquantScale = Tensor("keyAntiquantScale", {4, 16}, "2", ge::DT_FLOAT, ge::FORMAT_ND);
+    cs.valueAntiquantScale = Tensor("valueAntiquantScale", {4, 16}, "2", ge::DT_FLOAT, ge::FORMAT_ND);
+    cs.keyAntiquantOffset = Tensor("keyAntiquantOffset", {4, 16}, "2", ge::DT_FLOAT, ge::FORMAT_ND);
+    cs.valueAntiquantOffset = Tensor("valueAntiquantOffset", {4, 16}, "2", ge::DT_FLOAT, ge::FORMAT_ND);
+    cs.mOpInfo.mExp.mSuccess = true;
     ASSERT_EQ(cs.Run(), cs.mOpInfo.mExp.mSuccess);
 }
 

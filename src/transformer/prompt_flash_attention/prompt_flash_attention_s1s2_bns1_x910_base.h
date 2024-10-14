@@ -215,7 +215,7 @@ public:
     template <class SRC_T>
     static __aicore__ void CopyND2NZ(const LocalTensor<SRC_T>& dst, const GlobalTensor<SRC_T>& src, const int row, const int col, const int height,
                                     const int width, const int gCol, const int ndNum = 1, const int srcNdMatrixStride = 0,
-                                    const int dstNzMatrixStride = 1, const bool kAlignToC0Size = false) {  // The minimum range of parameter values is 1.
+                                    const int dstNzMatrixStride = 1, const bool kAlignToC0Size = false, const int dstNzC0Stride = 0) {  // The minimum range of parameter values is 1.
         int64_t srcOffset = (int64_t)row * (int64_t)gCol + (int64_t)col;
         int32_t alignNum = 16;
         Nd2NzParams nd2nzParams;
@@ -231,7 +231,7 @@ public:
                 alignNum = 8;
             }
         }
-        nd2nzParams.dstNzC0Stride = Ceil(height, alignNum) * alignNum;
+        nd2nzParams.dstNzC0Stride = Ceil(dstNzC0Stride, alignNum) * alignNum;
         nd2nzParams.dstNzNStride = 1;
         nd2nzParams.dstNzMatrixStride = dstNzMatrixStride;
         DataCopy(dst, src[srcOffset], nd2nzParams);
@@ -299,7 +299,7 @@ public:
         uint32_t copyFinishRowCnt = 0;
         uint64_t blockTableIdx = 0;
         uint64_t offsetInBlock = 0;
-        uint32_t blockRowOffsetInSingle = 0;
+        int64_t blockRowOffsetInSingle = 0;
         uint32_t blockId = 0;
         uint32_t copyRowCnt = 0;
         uint64_t curOffset = 0;
@@ -342,13 +342,8 @@ public:
                  baseRowOffsetInSingle -= blockRowOffsetInSingle;
             }
 
-            if (blockSize < useN) {
-                ndNum = useK / colElementCnt;
-                CopyND2NZ(dst[copyFinishRowCnt * colElementCnt], src[curOffset], baseRowOffsetInSingle,
-                           baseColOffsetInSingle, copyRowCnt, colElementCnt, Kb, ndNum, colElementCnt, alignUseN * colElementCnt);
-            } else {
-                CopyND2NZ(dst[0], src[curOffset], baseRowOffsetInSingle, baseColOffsetInSingle, copyRowCnt, useK, Kb);
-            }
+            CopyND2NZ(dst[copyFinishRowCnt * colElementCnt], src[curOffset], baseRowOffsetInSingle, baseColOffsetInSingle, 
+                        copyRowCnt, useK, Kb, 1, 0, 1, true, useN);
 
             // Update loop variables
             copyFinishRowCnt += copyRowCnt;
@@ -376,16 +371,16 @@ public:
         __gm__ PromptFlashAttentionTilingData* tilingDataPtr = reinterpret_cast<__gm__ PromptFlashAttentionTilingData*>(tilingPtr);
         PromptFlashAttentionTilingData allTilingData;
 
-        uint32_t blockTableDim2;
-        uint32_t blockSize;
-        uint32_t isLayoutBSH;  // BSH:1  BNSD:0
-        uint32_t headNumSize;
-        uint32_t headNumRatio;
         uint32_t kvD;
         uint32_t PABlockNumSum;
         uint32_t baseK;
         uint32_t baseN;
         uint32_t N;
+        uint32_t blockTableDim2;
+        uint32_t blockSize;
+        uint32_t isLayoutBSH;  // BSH:1  BNSD:0
+        uint32_t headNumSize;
+        uint32_t headNumRatio;
 
         if (tilingDataPtr != nullptr) {
             blockTableDim2 = tilingDataPtr->promptAttentionBaseParams.blockTableDim2;
@@ -418,7 +413,7 @@ public:
         uint32_t copyFinishRowCnt = 0;
         uint64_t blockTableIdx = 0;
         uint64_t offsetInBlock = 0;
-        uint32_t blockRowOffsetInSingle = 0;
+        int64_t blockRowOffsetInSingle = 0;
         uint32_t blockId = 0;
         uint32_t copyRowCnt = 0;
         uint64_t curOffset = 0;
@@ -461,15 +456,9 @@ public:
             } else {
                  baseRowOffsetInSingle -= blockRowOffsetInSingle;
             }
-
-            if (blockSize < useK) {
-                ndNum = useN / colElementCnt;
-                CopyND2NZ(dst[copyFinishRowCnt * colElementCnt], src[curOffset], baseRowOffsetInSingle,
-                           baseColOffsetInSingle, copyRowCnt, colElementCnt, N, ndNum, colElementCnt, alignUseK * colElementCnt, true);
-            } else {
-                CopyND2NZ(dst[0], src[curOffset], baseRowOffsetInSingle,
-                           baseColOffsetInSingle, copyRowCnt, useN, N, 1, 0, 1, true);
-            }
+            
+            CopyND2NZ(dst[copyFinishRowCnt * colElementCnt], src[curOffset], baseRowOffsetInSingle,
+                           baseColOffsetInSingle, copyRowCnt, useN, N, 1, 0, 1, true, useK);
 
             // Update loop variables
             copyFinishRowCnt += copyRowCnt;
@@ -863,6 +852,7 @@ protected:
         if constexpr (IsSameType<O, int8_t>::value) {
             LocalTensor<int8_t> outputQuantRes;
             outputQuantRes = bmm2ResUb.template ReinterpretCast<int8_t>();
+            // Set the output size
             outputQuantRes.SetSize(bmm2ResUb.GetSize());
             if (isQuant2PerChn) {                                         // per-channel
                 if (isQuant2BF16) {                                       // scale2 and offset2 is bf16，now qkv is also bf16，bmm2 output is fp32，scale2 and offset2 need to cast to FP32.
@@ -870,7 +860,7 @@ protected:
                 } else {                                                  // scale2 and offset2 is fp32. High performance requires casting to fp16，high-precision/bf16 directly do quant.
                     PostQuant2PerChannelFP32(bmm2ResUb, outputQuantRes);
                 }
-            } else {
+            } else {    // Perform per-channel quantiation, high performance requires conversion to fp16, high precision or bf16 directly quantizes.
                 QuantCompute(outputQuantRes, bmm2ResUb, quantScale2, quantOffset2, bmm2ResUbSize);
             }
             event_t enQueEvtID = static_cast<event_t>(GetTPipePtr()->FetchEventID(HardEvent::V_MTE3));
@@ -1243,10 +1233,12 @@ protected:
         uint32_t sInnerSize, uint32_t maskCopyInCol, bool useMask, event_t &copyIn, uint32_t type)
     {
         if (useMask) {
+            // Dequeue the attentio mask tensor from the queue.
             this->attenMaskUb = this->tempBmm2Queue.template DeQue<U>();
             this->attenMaskUb.SetSize(sOuterSize * maskCopyInCol);
             LocalTensor<uint8_t> selectSpace = selectSpaceUb.Get<uint8_t>(this->selectSpaceUbSize);
             computeType scalar;
+            // Set the size of the attention mask tensor.
             if constexpr (PFAT::calcMode == Mode::HighPrecision ||
                 IsSameType<T, bfloat16_t>::value) {
                 uint32_t tmp = 0xFF7FFFFF;  // minimum value of fp32
@@ -1847,8 +1839,11 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910Base<PFAT>::InitTensorSiz
 }
 
 template<typename PFAT>
-__aicore__ inline void PromptFlashAttentionS1s2Bns1X910Base<PFAT>::SoftmaxBasicComputeFirstNoTail(LocalTensor<computeType>& mmResUb,
-                                            LocalTensor<float>& softmaxMaxUb, LocalTensor<float>& softmaxSumUb, uint32_t souterSize) {
+__aicore__ inline void PromptFlashAttentionS1s2Bns1X910Base<PFAT>::SoftmaxBasicComputeFirstNoTail(
+    LocalTensor<computeType>& mmResUb,
+    LocalTensor<float>& softmaxMaxUb,
+    LocalTensor<float>& softmaxSumUb,
+    uint32_t souterSize) {
     LocalTensor<computeType> null;
     SoftMaxShapeInfo softmaxShapeInfo;
     if (this->headParams->isInnerTail) {
@@ -2184,4 +2179,3 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910Base<PFAT>::GetSparsePara
 }
 
 #endif  // PROMPT_FLASH_ATTENTION_S1S2_BNS1_X910_BASE_H
-

@@ -532,6 +532,27 @@ ge::graphStatus IFATiling::CheckInputFormatAndLimits() {
     return ge::GRAPH_SUCCESS;
 }
 
+ge::graphStatus IFATiling::CheckKVHeadNum(gert::StorageShape *inputShape)
+{
+    uint32_t tmpNumHeads = 0;
+    std::string layOutStr = context_->layOut;
+    if (layOutStr == "BSH") {
+        auto H = inputShape->GetStorageShape().GetDim(2);
+        tmpNumHeads = H / headDim_;
+    } else if (layOutStr == "BNSD") {
+        tmpNumHeads = inputShape->GetStorageShape().GetDim(1);
+    } else if (layOutStr == "BSND") {
+        tmpNumHeads = inputShape->GetStorageShape().GetDim(2);
+    }
+    OPS_ERR_IF(tmpNumHeads != numKvHeads_,
+               OPS_LOG_E(context_->opName, "IFA check input param failed, tensor in list head num(%u) should be %u.",
+                         tmpNumHeads, numKvHeads_),
+               return ge::GRAPH_FAILED);
+
+    return ge::GRAPH_SUCCESS;
+}
+
+
 ge::graphStatus IFATiling::CheckKVShape()
 {
     if (pageAttentionFlag_) {
@@ -580,6 +601,10 @@ ge::graphStatus IFATiling::CheckKVShape()
                 "IFA check input param failed, b of tensor in tensor list should be 1, now b is: %ld, list index: %ld",
                 keyTensorInList->GetStorageShape().GetDim(0), size),
             return ge::GRAPH_FAILED);
+        if (CheckKVHeadNum(keyTensorInList) != ge::GRAPH_SUCCESS ||
+            CheckKVHeadNum(valueTensorInList) != ge::GRAPH_SUCCESS) {
+            return ge::GRAPH_FAILED;
+        }
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -610,8 +635,9 @@ ge::graphStatus IFATiling::CheckQKOutShape()
                    return ge::GRAPH_FAILED);
         OPS_ERR_IF(queryShape->GetStorageShape().GetDim(2) / numHeads_ !=
                        keyShape->GetStorageShape().GetDim(2) / numKvHeads_,
-                   OPS_LOG_E("[IFA]", "When input layout is BSH, "
-                             "the 3rd dimOfQ/numHeads(%ld) should be equal to the 3rd dimOfK/numKvHeads(%ld), ",
+                   OPS_LOG_E("[IFA]",
+                             "When input layout is BSH, the 3rd dimOfQ/numHeads not equal the 3rd dimOfK/numKvHeads, "
+                             "3rd dimOfQ/numHeads: %ld, 3rd dimOfK/numKvHeads: %ld",
                              queryShape->GetStorageShape().GetDim(2) / numHeads_,
                              keyShape->GetStorageShape().GetDim(2) / numKvHeads_),
                    return ge::GRAPH_FAILED);
@@ -920,7 +946,7 @@ ge::graphStatus IFATiling::ProcessAttenMask()
 
     ge::DataType attenMaskType = context_->attenMask.desc->GetDataType();
     if (attenMaskType != ge::DT_BOOL && attenMaskType != ge::DT_INT8 && attenMaskType != ge::DT_UINT8) {
-        OPS_LOG_E(context_->opName, "not support atten_mask type %d, only support bool, int8 and uint8.\n",
+        OPS_LOG_E(context_->opName, "not support atten_mask type %d, only support bool, int8 and uint8.",
                   attenMaskType);
         return ge::GRAPH_FAILED;
     }

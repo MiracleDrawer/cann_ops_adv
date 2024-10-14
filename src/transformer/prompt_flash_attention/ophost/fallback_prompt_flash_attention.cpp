@@ -74,33 +74,33 @@ static graphStatus PromptHostExecuteFunc(OpExecuteContext* host_api_ctx)
   }
 
   auto attrs = host_api_ctx->GetAttrs();
-  const uint32_t* get_num_heads = attrs->GetAttrPointer<uint32_t>(0);
+  const uint32_t* getNumHeads = attrs->GetAttrPointer<uint32_t>(0);
   const float* scaleValue = attrs->GetAttrPointer<float>(1);
-  const int64_t* get_pre_tokens = attrs->GetAttrPointer<int64_t>(2);
-  const int64_t* get_next_tokens = attrs->GetAttrPointer<int64_t>(3);
+  const int64_t* getPreTokens = attrs->GetAttrPointer<int64_t>(2);
+  const int64_t* getNextTokens = attrs->GetAttrPointer<int64_t>(3);
   const char* layout = attrs->GetAttrPointer<char>(4);
-  const uint32_t* get_kvHeadNum = attrs->GetAttrPointer<uint32_t>(5);
-  const uint32_t* get_sparseMode = attrs->GetAttrPointer<uint32_t>(6);
-  const uint32_t* get_innerPrecise = attrs->GetAttrPointer<uint32_t>(7);
+  const uint32_t* getKVHeadNum = attrs->GetAttrPointer<uint32_t>(5);
+  const uint32_t* getSparseMode = attrs->GetAttrPointer<uint32_t>(6);
+  const uint32_t* getInnerPrecise = attrs->GetAttrPointer<uint32_t>(7);
 
-  int64_t num_heads = *get_num_heads;
+  int64_t numHeads = *getNumHeads;
   double dScaleValue = *scaleValue;
-  int64_t pre_tokens = *get_pre_tokens;
-  int64_t next_tokens = *get_next_tokens;
-  int64_t kvHeadNum = *get_kvHeadNum;
-  int64_t sparseMode = *get_sparseMode;
-  int64_t innerPrecise = *get_innerPrecise;
+  int64_t preTokens = *getPreTokens;
+  int64_t nextTokens = *getNextTokens;
+  int64_t kvHeadNum = *getKVHeadNum;
+  int64_t sparseMode = *getSparseMode;
+  int64_t innerPrecise = *getInnerPrecise;
 
   if (innerPrecise < 0 || innerPrecise > 3) {   // innerPrecise=2,3 corresponds to high-precision mode with invalid rows.
     OPS_LOG_E("aclnnfallback", "invalid innerPrecise(%ld). Only support 0~3 now.", innerPrecise);
     return GRAPH_FAILED;
   }
   OPS_LOG_D("aclnnFallback",
-          "PromptFlashAttentionV3 fallback begin, num_heads = %ld, dScaleValue = %lf",
-          num_heads, dScaleValue);
+          "PromptFlashAttentionV3 fallback begin, numHeads = %ld, dScaleValue = %lf",
+          numHeads, dScaleValue);
   OPS_LOG_D("aclnnFallback",
-          "pre_tokens = %ld, next_tokens = %ld, kvHeadNum = %ld, sparseMode = %ld, innerPrecise = %ld",
-          pre_tokens, next_tokens, kvHeadNum, sparseMode, innerPrecise);
+          "preTokens = %ld, nextTokens = %ld, kvHeadNum = %ld, sparseMode = %ld, innerPrecise = %ld",
+          preTokens, nextTokens, kvHeadNum, sparseMode, innerPrecise);
 
   if (sparseMode >= 10 && sparseMode <= 14) {  // 10: min  14: max 
     innerPrecise = 0;
@@ -112,7 +112,7 @@ static graphStatus PromptHostExecuteFunc(OpExecuteContext* host_api_ctx)
 
   auto api_ret = EXEC_OPAPI_CMD(aclnnPromptFlashAttentionV3, query, key, value, pseShiftGe, attenMaskGe, actSeqArray,
                                 actSeqArrayKv, deq_scale1, quant_scale1, deq_scale2, quant_scale2, quant_offset2,
-                                num_heads, dScaleValue, pre_tokens, next_tokens, layout, kvHeadNum, sparseMode,
+                                numHeads, dScaleValue, preTokens, nextTokens, layout, kvHeadNum, sparseMode,
                                 innerPrecise, output);
 
   OPS_ERR_IF(api_ret != GRAPH_SUCCESS,

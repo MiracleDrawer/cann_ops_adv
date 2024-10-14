@@ -12,8 +12,8 @@
 #include "aclnn_prompt_flash_attention_inner.h"
 #include "aclnn_kernels/contiguous.h"
 #include "aclnn_kernels/pad.h"
-#include "aclnn_kernels/reshape.h"
 #include "aclnn_kernels/slice.h"
+#include "aclnn_kernels/reshape.h"
 #include "aclnn_kernels/transpose.h"
 #include "opdev/common_types.h"
 #include "opdev/fast_vector.h"
@@ -42,12 +42,12 @@ aclnnStatus aclnnPromptFlashAttentionV2GetWorkspaceSize(
     const aclTensor *quantOffset2,
     int64_t numHeads,
     double scaleValue,
-    int64_t preTokens,
-    int64_t nextTokens,
+    int64_t preTokens,  // Preceding tokens count
+    int64_t nextTokens, // Subsequent tokens count
     char *inputLayout,
     int64_t numKeyValueHeads,
     int64_t sparseMode,
-    const aclTensor *attentionOut,
+    const aclTensor *attentionOut,  // Attention output tensor
     uint64_t *workspaceSize,
     aclOpExecutor **executor) {
         int64_t innerPrecise = 1;
@@ -61,7 +61,7 @@ aclnnStatus aclnnPromptFlashAttentionV2GetWorkspaceSize(
     }
 
 aclnnStatus aclnnPromptFlashAttentionV2(
-    void *workspace,
+    void *workspace,    // pointer for storing temporary data
     uint64_t workspaceSize,
     aclOpExecutor *executor,
     const aclrtStream stream) {
