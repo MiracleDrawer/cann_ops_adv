@@ -81,7 +81,7 @@ public:
                        ge::DT_BF16,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,
                        ge::DT_INT8,    ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,
                        ge::DT_INT8,    ge::DT_FLOAT16, ge::DT_INT8,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,
-                       ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_BF16,    ge::DT_BF16,
+                       ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_BF16,    ge::DT_BF16,  // key datatype
                        ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,
                        ge::DT_BF16,    ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_INT8,    ge::DT_INT8,
                        ge::DT_INT8,    ge::DT_INT8,    ge::DT_BF16,    ge::DT_BF16,    ge::DT_INT8,    ge::DT_INT8,
@@ -129,7 +129,7 @@ public:
                        ge::DT_BF16,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,
                        ge::DT_INT8,    ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,
                        ge::DT_INT8,    ge::DT_FLOAT16, ge::DT_INT8,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,
-                       ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_BF16,    ge::DT_BF16,
+                       ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_BF16,    ge::DT_BF16,  // value datatype
                        ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,
                        ge::DT_BF16,    ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_INT8,    ge::DT_INT8,
                        ge::DT_INT8,    ge::DT_INT8,    ge::DT_BF16,    ge::DT_BF16,    ge::DT_INT8,    ge::DT_INT8,
@@ -371,7 +371,7 @@ public:
                        ge::DT_UINT64, ge::DT_UINT64, ge::DT_UINT64, ge::DT_UINT64, ge::DT_UINT64, ge::DT_UINT64,
                        ge::DT_UINT64, ge::DT_UINT64, ge::DT_UINT64, ge::DT_UINT64, ge::DT_UINT64, ge::DT_UINT64,
                        ge::DT_UINT64, ge::DT_UINT64, ge::DT_UINT64, ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
-                       ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
+                       ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  // dequant scale1 datatype
                        ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
                        ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
                        ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
@@ -467,7 +467,7 @@ public:
                        ge::DT_UINT64, ge::DT_UINT64, ge::DT_UINT64, ge::DT_UINT64, ge::DT_UINT64, ge::DT_UINT64,
                        ge::DT_UINT64, ge::DT_UINT64, ge::DT_UINT64, ge::DT_UINT64, ge::DT_UINT64, ge::DT_UINT64,
                        ge::DT_UINT64, ge::DT_UINT64, ge::DT_UINT64, ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
-                       ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
+                       ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  // dequant scale2 datatype
                        ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
                        ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
                        ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
@@ -515,7 +515,7 @@ public:
                        ge::DT_FLOAT, ge::DT_BF16,  ge::DT_BF16,  ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,
                        ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_BF16,  ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,
                        ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_BF16,  ge::DT_FLOAT,
-                       ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_BF16,
+                       ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_BF16,  // quant scale2 datatype
                        ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,
                        ge::DT_BF16,  ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_BF16,  ge::DT_BF16,
                        ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,
@@ -561,7 +561,7 @@ public:
                        ge::DT_FLOAT, ge::DT_BF16,  ge::DT_BF16,  ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,
                        ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_BF16,  ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,
                        ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_BF16,  ge::DT_FLOAT,
-                       ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_BF16,
+                       ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_BF16,  // quant offset2 datatype
                        ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,
                        ge::DT_BF16,  ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_BF16,  ge::DT_BF16,
                        ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,
@@ -607,7 +607,7 @@ public:
                        ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_BF16,    ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
                        ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
                        ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,
-                       ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,
+                       ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,  // antiquant scale datatype
                        ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,
                        ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16,
                        ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_BF16,
@@ -655,7 +655,7 @@ public:
                        ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_BF16,    ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
                        ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
                        ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,
-                       ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,
+                       ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,  // antiquant offset datatype
                        ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,
                        ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16,
                        ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_BF16,
@@ -847,7 +847,7 @@ public:
                        ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_BF16,    ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
                        ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
                        ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,
-                       ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,
+                       ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,  // key antiquant scale datatype
                        ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,
                        ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16,
                        ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_BF16,
@@ -895,7 +895,7 @@ public:
                        ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_BF16,    ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
                        ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
                        ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,
-                       ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,
+                       ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,  // key antiquant offset datatype
                        ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,
                        ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16,
                        ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_BF16,
@@ -943,7 +943,7 @@ public:
                        ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_BF16,    ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
                        ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
                        ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,
-                       ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,
+                       ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,  // value antiquant scale datatype
                        ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,
                        ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16,
                        ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_BF16,
@@ -991,7 +991,7 @@ public:
                        ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_BF16,    ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
                        ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
                        ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,
-                       ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,
+                       ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,  // value antiquant offset datatype
                        ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,
                        ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16,
                        ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_BF16,
@@ -1039,7 +1039,7 @@ public:
                        ge::DT_BF16,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,
                        ge::DT_INT8,    ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,
                        ge::DT_INT8,    ge::DT_FLOAT16, ge::DT_INT8,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,
-                       ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_BF16,    ge::DT_BF16,
+                       ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_BF16,    ge::DT_BF16,  // key shared prefix datatype
                        ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,
                        ge::DT_BF16,    ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_INT8,    ge::DT_INT8,
                        ge::DT_INT8,    ge::DT_INT8,    ge::DT_BF16,    ge::DT_BF16,    ge::DT_INT8,    ge::DT_INT8,
@@ -1087,7 +1087,7 @@ public:
                        ge::DT_BF16,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,
                        ge::DT_INT8,    ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,
                        ge::DT_INT8,    ge::DT_FLOAT16, ge::DT_INT8,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,
-                       ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_BF16,    ge::DT_BF16,
+                       ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_BF16,    ge::DT_BF16,  // value shared prefix datatype
                        ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,
                        ge::DT_BF16,    ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_INT8,    ge::DT_INT8,
                        ge::DT_INT8,    ge::DT_INT8,    ge::DT_BF16,    ge::DT_BF16,    ge::DT_INT8,    ge::DT_INT8,

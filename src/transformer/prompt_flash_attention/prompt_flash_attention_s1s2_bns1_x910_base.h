@@ -300,7 +300,7 @@ public:
         uint64_t blockTableIdx = 0;
         uint64_t offsetInBlock = 0;
         int64_t blockRowOffsetInSingle = 0;
-        uint32_t blockId = 0;
+        uint32_t blockId = 0; // Initialize blockId
         uint32_t copyRowCnt = 0;
         uint64_t curOffset = 0;
         uint32_t baseRowOffsetInSingle = 0;
@@ -854,10 +854,10 @@ protected:
             outputQuantRes = bmm2ResUb.template ReinterpretCast<int8_t>();
             // Set the output size
             outputQuantRes.SetSize(bmm2ResUb.GetSize());
-            if (isQuant2PerChn) {                                         // per-channel
-                if (isQuant2BF16) {                                       // scale2 and offset2 is bf16，now qkv is also bf16，bmm2 output is fp32，scale2 and offset2 need to cast to FP32.
+            if (isQuant2PerChn) {                                        // per-channel
+                if (isQuant2BF16) {                                      // scale2 and offset2 is bf16，now qkv is also bf16，bmm2 output is fp32，scale2 and offset2 need to cast to FP32.
                     PostQuant2PerChannelBF16(bmm2ResUb, outputQuantRes);
-                } else {                                                  // scale2 and offset2 is fp32. High performance requires casting to fp16，high-precision/bf16 directly do quant.
+                } else {                                                 // scale2 and offset2 is fp32. High performance requires casting to fp16，high-precision/bf16 directly do quant.
                     PostQuant2PerChannelFP32(bmm2ResUb, outputQuantRes);
                 }
             } else {    // Perform per-channel quantiation, high performance requires conversion to fp16, high precision or bf16 directly quantizes.
@@ -1233,18 +1233,16 @@ protected:
         uint32_t sInnerSize, uint32_t maskCopyInCol, bool useMask, event_t &copyIn, uint32_t type)
     {
         if (useMask) {
-            // Dequeue the attentio mask tensor from the queue.
-            this->attenMaskUb = this->tempBmm2Queue.template DeQue<U>();
+            this->attenMaskUb = this->tempBmm2Queue.template DeQue<U>(); // Dequeue the attentio mask tensor from the queue.
             this->attenMaskUb.SetSize(sOuterSize * maskCopyInCol);
             LocalTensor<uint8_t> selectSpace = selectSpaceUb.Get<uint8_t>(this->selectSpaceUbSize);
             computeType scalar;
-            // Set the size of the attention mask tensor.
             if constexpr (PFAT::calcMode == Mode::HighPrecision ||
-                IsSameType<T, bfloat16_t>::value) {
+                IsSameType<T, bfloat16_t>::value) { // Set the size of the attention mask tensor.
                 uint32_t tmp = 0xFF7FFFFF;  // minimum value of fp32
                 scalar = *((float*)&tmp);
             } else {
-                uint32_t tmp = 0xFBFF;  // minimum value of fp16
+                uint32_t tmp = 0xFBFF;   // minimum value of fp16
                 scalar = *((half*)&tmp);
             }
             SelectWithBytesMaskShapeInfo selectWithBytesMaskShapeInfo;
@@ -1254,9 +1252,9 @@ protected:
             if(type == 0){
                 SelectWithBytesMask(mmResUb, mmResUb, scalar, this->attenMaskUb, selectSpace,
                                     selectWithBytesMaskShapeInfo);
-            } else if(type == 1) {
+            } else if(type == 1) { //  swape param 2 and param 3 of SelectWithBytesMask to compute attenMaskPre for band mode
                 SelectWithBytesMask(mmResUb, scalar, mmResUb, this->attenMaskUb, selectSpace,
-                                    selectWithBytesMaskShapeInfo); // swape param 2 and param 3 of SelectWithBytesMask to compute attenMaskPre for band mode
+                                    selectWithBytesMaskShapeInfo);
             }
             pipe_barrier(PIPE_V);
             tempBmm2Queue.FreeTensor(this->attenMaskUb);
@@ -1855,7 +1853,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910Base<PFAT>::SoftmaxBasicC
         };
     } else {
         softmaxShapeInfo = {
-            static_cast<uint32_t>(souterSize),
+            static_cast<uint32_t>(souterSize), // translate into type uint32_t
             static_cast<uint32_t>(this->headParams->singleProcessSInnerSizeNow),
             static_cast<uint32_t>(souterSize),
             static_cast<uint32_t>(this->headParams->singleProcessSInnerSizeNow)
@@ -1884,7 +1882,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910Base<PFAT>::SoftmaxBasicC
             static_cast<uint32_t>(souterSize),
             static_cast<uint32_t>(this->headParams->singleProcessSInnerBmmTail)
         };
-    } else {
+    } else { // if inner has no tail
         softmaxShapeInfo = {
             static_cast<uint32_t>(souterSize),
             static_cast<uint32_t>(this->headParams->singleProcessSInnerSizeNow),

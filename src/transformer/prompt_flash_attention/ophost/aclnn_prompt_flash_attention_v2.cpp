@@ -23,7 +23,7 @@
 using namespace op;
 
 #ifdef __cplusplus
-extern "C" {
+extern "C" { // Compile in C format
 #endif
 
 namespace {
@@ -36,7 +36,7 @@ aclnnStatus aclnnPromptFlashAttentionV2GetWorkspaceSize(
     const aclIntArray *actualSeqLengths,
     const aclIntArray *actualSeqLengthsKv,
     const aclTensor *deqScale1,
-    const aclTensor *quantScale1,
+    const aclTensor *quantScale1, // quantScale1 of V2
     const aclTensor *deqScale2,
     const aclTensor *quantScale2,
     const aclTensor *quantOffset2,
@@ -64,7 +64,7 @@ aclnnStatus aclnnPromptFlashAttentionV2(
     void *workspace,    // pointer for storing temporary data
     uint64_t workspaceSize,
     aclOpExecutor *executor,
-    const aclrtStream stream) {
+    const aclrtStream stream) { // V2 call aclnn inner
         return aclnnInnerPromptFlashAttention(workspace, workspaceSize, executor, stream);
     }
 

@@ -221,7 +221,7 @@ protected:
             this->kvAntiquantDstQueue.EnQue(dstLocal);
 
             dstLocal = this->kvAntiquantDstQueue.template DeQue<T>();
-            DataCopy(this->valueGmAntiquant[loopIdx * step * headSize], dstLocal, kvComputeSInnerSize * headSize);
+            DataCopy(this->valueGmAntiquant[static_cast<int64_t>(loopIdx) * step * headSize], dstLocal, kvComputeSInnerSize * headSize);
 
             this->kvAntiquantSrcQueue.FreeTensor(srcLocal);
             this->kvAntiquantDstQueue.FreeTensor(dstLocal);
@@ -302,7 +302,7 @@ protected:
             this->kvAntiquantDstQueue.EnQue(dstLocal);
 
             dstLocal = this->kvAntiquantDstQueue.template DeQue<T>();
-            DataCopy(this->keyGmAntiquant[loopIdx * step * headSize], dstLocal, kvComputeSInnerSize * headSize);
+            DataCopy(this->keyGmAntiquant[static_cast<int64_t>(loopIdx) * step * headSize], dstLocal, kvComputeSInnerSize * headSize);
 
             this->kvAntiquantSrcQueue.FreeTensor(srcLocal);
             this->kvAntiquantDstQueue.FreeTensor(dstLocal);
@@ -598,7 +598,7 @@ protected:
             }
 
             mm1ResGmOffset = nextMm1ResGmOffset;
-            ubPingpong ^= 1;
+            ubPingpong ^= 1; // change ping/pong ub
         }
     }
 

@@ -18,7 +18,7 @@ const aclTensor *PromptFlashAttention(
     const aclTensor *key,
     const aclTensor *value,
     const aclTensor *pseShift,
-    const aclTensor *attenMask,
+    const aclTensor *attenMask, // attenMask of pfa
     const aclIntArray *actualSeqLengths,
     const aclIntArray *actualSeqLengthsKv,
     const aclTensor *deqScale1,
@@ -26,12 +26,12 @@ const aclTensor *PromptFlashAttention(
     const aclTensor *deqScale2,
     const aclTensor *quantScale2,
     const aclTensor *quantOffset2,
-    int64_t numHeads,
+    int64_t numHeads, // q_n
     double scaleValue,
     int64_t preTokens,
     int64_t nextTokens,
     const char *inputLayout,
-    int64_t numKeyValueHeads,
+    int64_t numKeyValueHeads, // kv_n
     int64_t sparseMode,
     int64_t innerPrecise,
     const aclTensor *attentionOut,

@@ -32,6 +32,7 @@ target_sources(opapi PRIVATE
 
 target_sources(optiling PRIVATE
         incre_flash_attention_tiling.cc
+        incre_flash_attention_tiling_check.cc
         incre_flash_attention_tiling_register.cc
         fallback_incre_flash_attention.cpp
 )
@@ -39,6 +40,7 @@ target_sources(optiling PRIVATE
 if (NOT BUILD_OPEN_PROJECT)
     target_sources(opmaster_ct PRIVATE
         incre_flash_attention_tiling.cc
+        incre_flash_attention_tiling_check.cc
     )
 endif ()
 

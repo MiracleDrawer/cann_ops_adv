@@ -49,7 +49,7 @@ aclnnStatus aclnnFusedInferAttentionScoreGetWorkspaceSize(
 {
     const aclTensor *placeHolder = nullptr;
     const aclTensor *tempTensor = nullptr;
-    if (softmaxLseFlag == false) {
+    if (softmaxLseFlag == false) { // Do not use softmaxLse
         std::vector<int64_t> shape = {0};
         int64_t addr = 0xff;
         tempTensor = aclCreateTensor(shape.data(), shape.size(), aclDataType::ACL_FLOAT, shape.data(), 0, ACL_FORMAT_ND,

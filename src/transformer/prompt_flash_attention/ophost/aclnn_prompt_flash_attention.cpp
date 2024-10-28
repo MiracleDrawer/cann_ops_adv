@@ -35,7 +35,7 @@ aclnnStatus aclnnPromptFlashAttentionGetWorkspaceSize(
     const aclTensor *pseShift,
     const aclTensor *attenMask,
     const aclIntArray *actualSeqLengths,
-    int64_t numHeads,
+    int64_t numHeads, // q_n
     double scaleValue,
     int64_t preTokens,
     int64_t nextTokens,

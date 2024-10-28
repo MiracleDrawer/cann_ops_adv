@@ -14,6 +14,7 @@
 
 set(_FIA_TilingSourcesExt
         ${OPS_ADV_DIR}/src/transformer/incre_flash_attention/ophost/incre_flash_attention_tiling.cc
+        ${OPS_ADV_DIR}/src/transformer/incre_flash_attention/ophost/incre_flash_attention_tiling_check.cc
         ${OPS_ADV_DIR}/src/transformer/incre_flash_attention/ophost/incre_flash_attention_tiling_register.cc
         ${OPS_ADV_DIR}/src/transformer/prompt_flash_attention/ophost/prompt_flash_attention_tiling.cpp
         ${OPS_ADV_DIR}/src/transformer/prompt_flash_attention/ophost/prompt_flash_attention_tiling_register.cc

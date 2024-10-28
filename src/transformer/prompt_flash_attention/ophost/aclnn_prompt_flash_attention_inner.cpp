@@ -58,7 +58,7 @@ struct AxesInfo {
 
 enum class InputLayout { SH, BSH, NSD, BNSD, BSND, BNSD_BSND, NONE, };
 
-static std::unordered_map<DataType, string> StrDataTypePfa = {
+static const std::unordered_map<DataType, string> StrDataTypePfa = {
     {DataType::DT_FLOAT, "DT_FLOAT"},
     {DataType::DT_FLOAT16, "DT_FLOAT16"},
     {DataType::DT_INT8, "DT_INT8"},
@@ -88,6 +88,10 @@ static std::unordered_map<DataType, string> StrDataTypePfa = {
     {DataType::DT_BF16, "DT_BF16"},
     {DataType::DT_UNDEFINED, "DT_UNDEFINED"},
 };
+
+static DataType ValidPfaAclDataType(DataType type) {
+    return (StrDataTypePfa.find(type) == StrDataTypePfa.end()) ? DataType::DT_UNDEFINED : type;
+}
 
 struct FaShapeInfo {
     AxesInfo axes;
@@ -530,7 +534,7 @@ static bool CheckTensorDataType(const aclTensor* query, const aclTensor* key, co
     if ((queryDataType != keyDataType) || (queryDataType != valueDataType)) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Please check input Tensor datatype. "
             "The combination of [queryDataType]: %s, [keyDataType]: %s, [valueDataType]: %s is not supported by PFA.",
-            StrDataTypePfa[queryDataType].c_str(), StrDataTypePfa[keyDataType].c_str(), StrDataTypePfa[valueDataType].c_str());
+            StrDataTypePfa.at(ValidPfaAclDataType(queryDataType)).c_str(), StrDataTypePfa.at(ValidPfaAclDataType(keyDataType)).c_str(), StrDataTypePfa.at(ValidPfaAclDataType(valueDataType)).c_str());
         return false;
     }
     // map for dataType, {q/k/v, pseShift}
@@ -542,16 +546,16 @@ static bool CheckTensorDataType(const aclTensor* query, const aclTensor* key, co
     // check dataType of q/k/v
     if (qkvAndPseTypeRangeMap.find(queryDataType) == qkvAndPseTypeRangeMap.end()) {
         OP_LOGE(ACLNN_ERR_PARAM_INVALID, "query/value/key dataType(%s) is invalid, valid range is {%s, %s, %s}",
-            StrDataTypePfa[queryDataType].c_str(), StrDataTypePfa[DataType::DT_FLOAT16].c_str(),
-            StrDataTypePfa[DataType::DT_BF16].c_str(), StrDataTypePfa[DataType::DT_INT8].c_str());
+            StrDataTypePfa.at(ValidPfaAclDataType(queryDataType)).c_str(), StrDataTypePfa.at(ValidPfaAclDataType(DataType::DT_FLOAT16)).c_str(),
+            StrDataTypePfa.at(ValidPfaAclDataType(DataType::DT_BF16)).c_str(), StrDataTypePfa.at(ValidPfaAclDataType(DataType::DT_INT8)).c_str());
         return false;
     }
     if (pseShift != nullptr) {
         const DataType pseDataType = pseShift->GetDataType(); // check dataType combination of q and pseShift
         if (pseDataType != qkvAndPseTypeRangeMap.at(queryDataType)) {
             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "pseShift dataType(%s) is invalid, should be %s when q/k/v is %s",
-                StrDataTypePfa[pseDataType].c_str(), StrDataTypePfa[qkvAndPseTypeRangeMap.at(queryDataType)].c_str(),
-                StrDataTypePfa[queryDataType].c_str());
+                StrDataTypePfa.at(ValidPfaAclDataType(pseDataType)).c_str(), StrDataTypePfa.at(ValidPfaAclDataType(qkvAndPseTypeRangeMap.at(queryDataType))).c_str(),
+                StrDataTypePfa.at(ValidPfaAclDataType(queryDataType)).c_str());
             return false;
         }
     }
@@ -564,7 +568,7 @@ static bool CheckTensorDataType(const aclTensor* query, const aclTensor* key, co
         if (!isQuant) {
             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Please check input/output Tensor datatype. "
                 "The combination of [queryDataType]: %s, [outputDataType]: %s is not supported by PFA.",
-                StrDataTypePfa[queryDataType].c_str(), StrDataTypePfa[outputDataType].c_str());
+                StrDataTypePfa.at(ValidPfaAclDataType(queryDataType)).c_str(), StrDataTypePfa.at(ValidPfaAclDataType(outputDataType)).c_str());
             return false;
         }
     }
@@ -576,15 +580,15 @@ static bool CheckTensorDataType(const aclTensor* query, const aclTensor* key, co
         const DataType attenMaskDataType = attenMask->GetDataType();
         if (validMaskType.find(attenMaskDataType) == validMaskType.end()) {
             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "attenMask dataType(%s) is invalid, should be in range {%s, %s, %s, %s}",
-                StrDataTypePfa[attenMaskDataType].c_str(), StrDataTypePfa[DataType::DT_FLOAT16].c_str(),
-                StrDataTypePfa[DataType::DT_INT8].c_str(), StrDataTypePfa[DataType::DT_UINT8].c_str(),
-                StrDataTypePfa[DataType::DT_BOOL].c_str());
+                StrDataTypePfa.at(ValidPfaAclDataType(attenMaskDataType)).c_str(), StrDataTypePfa.at(ValidPfaAclDataType(DataType::DT_FLOAT16)).c_str(),
+                StrDataTypePfa.at(ValidPfaAclDataType(DataType::DT_INT8)).c_str(), StrDataTypePfa.at(ValidPfaAclDataType(DataType::DT_UINT8)).c_str(),
+                StrDataTypePfa.at(ValidPfaAclDataType(DataType::DT_BOOL)).c_str());
             return false;
         }
         if ((queryDataType == DataType::DT_INT8) && (attenMaskDataType == DataType::DT_FLOAT16)) {
             OP_LOGE(ACLNN_ERR_PARAM_INVALID, "Please check Tensor datatype. "
                 "When input tensor datatype is %s, attenMaskDataType can not be %s.",
-                StrDataTypePfa[queryDataType].c_str(), StrDataTypePfa[attenMaskDataType].c_str());
+                StrDataTypePfa.at(ValidPfaAclDataType(queryDataType)).c_str(), StrDataTypePfa.at(ValidPfaAclDataType(attenMaskDataType)).c_str());
             return false;
         }
     }

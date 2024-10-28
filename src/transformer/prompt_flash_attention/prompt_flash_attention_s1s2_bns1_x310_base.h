@@ -333,7 +333,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X310Base<PFAT>::Init(__gm__ u
 
     isActualLenDimsNull = true;
     isActualLenDimsKVNull = true;
-    if (!tilingData->promptAttentionBaseParams.isActualSeqLengthsNull) {
+    if (!tilingData->promptAttentionBaseParams.isActualSeqLengthsNull) { // actual seq length is null
         actualSeqLengthsGm.SetGlobalBuffer((__gm__ int64_t*)actualSeqLengths, tilingData->promptAttentionBaseParams.batchSize);
         isActualLenDimsNull = false;
     }

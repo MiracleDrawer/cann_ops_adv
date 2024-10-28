@@ -50,6 +50,10 @@ const aclTensor *PromptFlashAttention(
            sparseMode, innerPrecise);
 
     const aclTensor *actualSeqLengthsTensor = nullptr;
+    if (executor == nullptr) {
+        OP_LOGE(ACLNN_ERR_PARAM_INVALID, "PromptFlashAttention: executor is nullptr.");
+        return nullptr;
+    }
     if (actualSeqLengths) {
         actualSeqLengthsTensor = executor->ConvertToTensor(actualSeqLengths, DataType::DT_INT64);
         const_cast<aclTensor *>(actualSeqLengthsTensor)->SetStorageFormat(Format::FORMAT_ND);

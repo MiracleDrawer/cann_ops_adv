@@ -52,7 +52,7 @@ public:
     using b2Type = MatmulType<TPosition::A1, CubeFormat::NZ, mmInputType, false>;
     using bias2Type = MatmulType<TPosition::GM, CubeFormat::ND, mmBiasType>;
 #if defined(__CCE_KT_TEST__)
-    using c2Type = MatmulType<TPosition::VECCALC, CubeFormat::NZ, mmOutputType>; // cpu
+    using c2Type = MatmulType<TPosition::VECCALC, CubeFormat::NZ, mmOutputType>; //  cpu
 #else
     using c2Type = MatmulType<TPosition::VECCALC, CubeFormat::NZ, mmOutputType>; // npu
 #endif
@@ -91,8 +91,7 @@ protected:
     GlobalTensor<softmaxType> workspaceGm;
     GlobalTensor<mmOutputType> workspaceGmProcessT;
 
-    // quant: define quant variable
-    uint64_t dequantScale1;
+    uint64_t dequantScale1; // quant: define quant variable
     float quantScale1;
     uint64_t dequantScale2;
     float quantScale2;
@@ -109,14 +108,14 @@ protected:
     uint32_t maskOffset;
     uint32_t maskCoreOffset;
     uint64_t attenMaskCoreOffset;
-    uint32_t valueOffset;
+    uint32_t valueOffset; // offset of value
     uint32_t valueCoreOffset;
     uint64_t attenMaskOffset;
     uint32_t tensorAOffset;
     uint32_t tensorBOffset;
     uint32_t tensorACoreOffset;
     uint32_t tensorBCoreOffset;
-    uint32_t attentionOutOffset;
+    uint32_t attentionOutOffset; //offset of out
     uint32_t offsetSS;
     uint32_t offsetSH;
     uint32_t offsetSTypeNum;
@@ -140,7 +139,7 @@ protected:
     uint32_t maskSize;
     uint32_t softmaxMaxSize;
     uint32_t softmaxSumSize;
-    uint32_t softmaxExpSize;
+    uint32_t softmaxExpSize; // size of softmax exp
     uint32_t spmTmpSize;
     uint32_t scmTmpSize;
     uint32_t bmm2ResUbSize;
@@ -157,7 +156,7 @@ protected:
     uint32_t softMaxV2Size_;
     uint32_t mm2TmpUbSize_;
     uint32_t splitS2;
-    uint32_t layoutType;
+    uint32_t layoutType; // type of layout
     uint32_t maskInnerTailAlign;
 
     SoftMaxTiling softmaxTilingData;
@@ -177,7 +176,7 @@ protected:
     int32_t attentionMaskType;
     uint32_t attentionMaskMaxSize;
 
-    bool isActualLenDimsNull;
+    bool isActualLenDimsNull; // true: actual seq length is null
     bool isActualLenDimsKVNull;
     int32_t actualSeqLengthPerBatch;
     int32_t actualSeqLengthKVPerBatch;
@@ -254,7 +253,7 @@ __aicore__ inline void PromptFlashAttentionNZKVBase<T, U, FORMAT, O, M>::Init(__
     workspaceGm.SetGlobalBuffer((__gm__ softmaxType*)workspace);
 
     pipe = tPipe;
-    typeByteNum = tilingData->promptAttentionBaseParams.typeByteNum;
+    typeByteNum = tilingData->promptAttentionBaseParams.typeByteNum; // byte num of type
     outputTypeByteNum = tilingData->promptAttentionBaseParams.outputTypeByteNum;
     softmaxTypeByteNum = tilingData->promptAttentionBaseParams.softmaxTypeByteNum;
     headNumRatio = tilingData->promptAttentionBaseParams.headNumRatio;
@@ -285,7 +284,7 @@ __aicore__ inline void PromptFlashAttentionNZKVBase<T, U, FORMAT, O, M>::Init(__
         actualSeqLengthsIdx = isActualLenDimsNull ? tilingData->promptAttentionBaseParams.seqSize : actualSeqLengthsGm.GetValue(i);
         if (tilingData->promptAttentionBaseParams.isActualSeqLengthsNull) {
             actualSeqOffsets[i] = i * s * h;
-        } else {
+        } else { // actual seq length is not null
             if (tilingData->promptAttentionBaseParams.isLayoutSH) {
                 actualSeqOffsets[i] = middle_actualSeqLengths * h;
                 middle_actualSeqLengths += actualSeqLengthsIdx;
@@ -374,10 +373,10 @@ __aicore__ inline void PromptFlashAttentionNZKVBase<T, U, FORMAT, O, M>::InitTen
     mmResUbSize = tensorSizeTiling->mmResUbSize;
     attenMaskUbSize = tensorSizeTiling->attenMaskUbSize;
     maskSize = tensorSizeTiling->maskSize;
-    softmaxMaxSize = tensorSizeTiling->softmaxMaxSize;      // Softmax maximum values UB size
+    softmaxMaxSize = tensorSizeTiling->softmaxMaxSize;     // Softmax maximum values UB size
     softmaxSumSize = tensorSizeTiling->softmaxSumSize;
     softmaxExpSize = tensorSizeTiling->softmaxExpSize;
-    spmTmpSize = tensorSizeTiling->spmTmpSize;              // Temp UB size for sparse matrices
+    spmTmpSize = tensorSizeTiling->spmTmpSize;             // Temp UB size for sparse matrices
     scmTmpSize = tensorSizeTiling->scmTmpSize;
     bmm2ResUbSize = tensorSizeTiling->bmm2ResUbSize;
     tmpMMResBmm2PreUbSize = tensorSizeTiling->tmpMMResBmm2PreUbSize;
@@ -584,12 +583,11 @@ __aicore__ inline void PromptFlashAttentionNZKVBase<T, U, FORMAT, O, M>::LoopSOu
                                (uint64_t)tilingData->promptAttentionBaseParams.maskQsSize;
     }
 
-    // mask offset of core
-    attenMaskCoreOffset = (uint64_t)sOuterOffset * (uint64_t)tilingData->promptAttentionBaseParams.maskKVsSize + attenMaskBatchOffset;
+    attenMaskCoreOffset = (uint64_t)sOuterOffset * (uint64_t)tilingData->promptAttentionBaseParams.maskKVsSize + attenMaskBatchOffset; // mask offset of core
 
     tensorACoreOffset = seqListOffsetSize +
                         sOuterOffset * MultiHeadQ +
-                        batchNOffset * tilingData->promptAttentionBaseParams.headSize;
+                        batchNOffset * tilingData->promptAttentionBaseParams.headSize; // core offset of tensor A
 
     uint32_t seqInnerOffsetSize =
         tilingData->promptAttentionBaseParams.seqSize == tilingData->promptAttentionBaseParams.seqInnerSize ?
@@ -618,11 +616,10 @@ __aicore__ inline void PromptFlashAttentionNZKVBase<T, U, FORMAT, O, M>::LoopSOu
 
     tensorACoreOffset = seqListOffsetSize + batchNOffset * head_stride_q + sOuterOffset*seq_stride;
 
-    // calculate the sequence inner offset size based on whether the sequence size equals the inner sequence size.
     uint32_t seqInnerOffsetSize =
         tilingData->promptAttentionBaseParams.seqSize == tilingData->promptAttentionBaseParams.seqInnerSize ?
         seqListOffsetSize / headNumRatio : sIdx * head_stride_kv *
-        tilingData->promptAttentionBaseParams.headNumSize / headNumRatio;
+        tilingData->promptAttentionBaseParams.headNumSize / headNumRatio; // calculate the sequence inner offset size based on whether the sequence size equals the inner sequence size.
 
     tensorBCoreOffset = seqInnerOffsetSize + batchNOffset / headNumRatio * head_stride_kv;
 

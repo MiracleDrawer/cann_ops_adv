@@ -19,6 +19,10 @@ approvers:
 - shunqi
 - wangjun-qt
 - jiang-lirui
+- monologue815
+- zhangtj0209
+- turingcomplete
+
 reviewers:
 - li-xulong
 - Allan_Yu
@@ -39,6 +43,13 @@ reviewers:
 - shunqi
 - wangjun-qt
 - jiang-lirui
+- realmadrid1016
+- monologue815
+- zhangtj0209
+- turingcomplete
+- GodantShen
+- Liexss
+- fzzach
 
 files:
   "blacklist.txt":

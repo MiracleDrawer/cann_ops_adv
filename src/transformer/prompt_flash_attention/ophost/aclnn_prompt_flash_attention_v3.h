@@ -26,7 +26,7 @@ __attribute__ ((visibility("default"))) aclnnStatus aclnnPromptFlashAttentionV3G
     const aclTensor *key,
     const aclTensor *value,
     const aclTensor *pseShift,
-    const aclTensor *attenMask,
+    const aclTensor *attenMask, // attenMask of V3
     const aclIntArray *actualSeqLengths,
     const aclIntArray *actualSeqLengthsKv,
     const aclTensor *deqScale1,
@@ -34,13 +34,13 @@ __attribute__ ((visibility("default"))) aclnnStatus aclnnPromptFlashAttentionV3G
     const aclTensor *deqScale2,
     const aclTensor *quantScale2,
     const aclTensor *quantOffset2,
-    int64_t numHeads,
+    int64_t numHeads, // q_n of V3
     double scaleValue,
     int64_t preTokens,
     int64_t nextTokens,
     char *inputLayout,
     int64_t numKeyValueHeads,
-    int64_t sparseMode,
+    int64_t sparseMode, // sparse of V3
     int64_t innerPrecise,
     const aclTensor *attentionOut,
     uint64_t *workspaceSize,

@@ -95,7 +95,7 @@ __aicore__ inline void PromptFlashAttentionSplitNSNoTail<T, U, FORMAT, O, M>::Ps
             Cast(pseShiftCastTensor, pseShiftUb, RoundMode::CAST_NONE, computeSize);
             pipe_barrier(PIPE_V);
             Add(mmResUb, mmResUb, pseShiftCastTensor, computeSize);
-        } else {
+        } else { //     api add pseShiftUb to mmResUb
             Add(mmResUb, mmResUb, pseShiftUb, computeSize);
         }
 
@@ -139,7 +139,7 @@ __aicore__ inline void PromptFlashAttentionSplitNSNoTail<T, U, FORMAT, O, M>::Bm
 
     this->AttenMaskCopyIn(this->attenMaskOffset, this->maskCopyInCol, sInnerLoopIdx);
 
-    if(this->attentionMaskType == 4){ // 4:band mode of sparseMode
+    if(this->attentionMaskType == 4){ // 4: band mode of sparseMode
         this->ElewiseCompute(mmResUb, computeSize, 0);
 
         this->AttenMaskCopyIn(this->attenMaskOffsetPre, this->maskCopyInCol, sInnerLoopIdx);
@@ -147,7 +147,7 @@ __aicore__ inline void PromptFlashAttentionSplitNSNoTail<T, U, FORMAT, O, M>::Bm
     } else {
         this->ElewiseCompute(mmResUb, computeSize, 0);
     }
-    pipe_barrier(PIPE_V);
+    pipe_barrier(PIPE_V); //  Vector pipeline  synchronization
 
     SoftMaxShapeInfo shapeInfo = {this->singleProcessSOuterSize, this->singleProcessSInnerSize,
                                   this->singleProcessSOuterSize, this->singleProcessSInnerSize};
@@ -188,13 +188,13 @@ __aicore__ inline void PromptFlashAttentionSplitNSNoTail<T, U, FORMAT, O, M>::Bm
     uint32_t computeSize = this->singleProcessSInnerSizeNow * this->singleProcessSOuterSize;
 
     Muls(mmResUb, mmResUb, static_cast<mmOutputType>(this->tilingData->promptAttentionBaseParams.scaleValue), computeSize);
-    pipe_barrier(PIPE_V);
+    pipe_barrier(PIPE_V); // Vector pipeline synchronization
 
     this->PseShiftProcess(sInnerLoopIdx, computeSize, mmResUb);
 
     this->AttenMaskCopyIn(this->attenMaskOffset, this->maskCopyInCol, sInnerLoopIdx);
 
-    if(this->attentionMaskType == 4){ // 4:band mode of sparseMode
+    if(this->attentionMaskType == 4){ // 4:  band mode of sparseMode
         this->ElewiseCompute(mmResUb, computeSize, 0);
 
         this->AttenMaskCopyIn(this->attenMaskOffsetPre, this->maskCopyInCol, sInnerLoopIdx);
@@ -203,7 +203,7 @@ __aicore__ inline void PromptFlashAttentionSplitNSNoTail<T, U, FORMAT, O, M>::Bm
         this->ElewiseCompute(mmResUb, computeSize, 0);
     }
 
-    pipe_barrier(PIPE_V);
+    pipe_barrier(PIPE_V); //  Vector pipeline   synchronization
 
     SoftMaxShapeInfo shapeInfo = {this->singleProcessSOuterSize, this->singleProcessSInnerSize,
                                   this->singleProcessSOuterSize, this->singleProcessSInnerSize};

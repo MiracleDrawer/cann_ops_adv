@@ -184,7 +184,7 @@ static ge::graphStatus ConvertContextToParamsPFA(gert::TilingContext *context,
                     return ge::GRAPH_FAILED;
                 }
                 if (contextKeyParams.kTensorList[tmpIdx]->GetStorageShape().GetDim(1) !=
-                    contextKeyParams.vTensorList[tmpIdx]->GetStorageShape().GetDim(1)) {
+                    contextKeyParams.vTensorList[tmpIdx]->GetStorageShape().GetDim(1)) { // k_s != v_s
                     OPS_LOG_E("FusedInferAttentionScore", "S from Key and Value does NOT equal but they should!");
                     return ge::GRAPH_FAILED;
                 }
@@ -215,7 +215,7 @@ static ge::graphStatus ConvertContextToParamsPFA(gert::TilingContext *context,
                     return ge::GRAPH_FAILED;
                 }
                 if ((contextKeyParams.kTensorList[tmpIdx]->GetStorageShape().GetDim(3) != standardD) || // 3: Obtain the third dimension
-                    (contextKeyParams.vTensorList[tmpIdx]->GetStorageShape().GetDim(3) != standardD)) { // 3: Obtain the third dimension
+                    (contextKeyParams.vTensorList[tmpIdx]->GetStorageShape().GetDim(3) != standardD)) { // 3: Obtain the third dimension of v-list
                     OPS_LOG_E("FusedInferAttentionScore",
                               "D is not the same across batch and Key Value under tensorlist mode!");
                     return ge::GRAPH_FAILED;
@@ -427,13 +427,13 @@ ge::graphStatus DoOpTilingFusedInferAttentionScore(gert::TilingContext *context)
     uint32_t tempD = 1;
     OPS_ERR_IF((tempQ == nullptr), OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "Query input is null pointer!"),
                return ge::GRAPH_FAILED);
+    OPS_ERR_IF((tempOut == nullptr),
+               OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "Attention_Out is null pointer!"),
+               return ge::GRAPH_FAILED);
     OPS_ERR_IF((tempQ->GetStorageShape().GetShapeSize() == 0) && (tempOut->GetStorageShape().GetShapeSize() != 0),
                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "Query input is empty!"), return ge::GRAPH_FAILED);
     OPS_ERR_IF((tempQ->GetStorageShape().GetShapeSize() == gert::Shape::kInvalidDimValue),
                OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "Query input dims are invalid!"),
-               return ge::GRAPH_FAILED);
-    OPS_ERR_IF((tempOut == nullptr),
-               OPS_REPORT_VECTOR_INNER_ERR(context->GetNodeName(), "Attention_Out is null pointer!"),
                return ge::GRAPH_FAILED);
     auto attrs = context->GetAttrs();
     OPS_ERR_IF(attrs == nullptr,
@@ -541,7 +541,7 @@ ge::graphStatus DoOpTilingFusedInferAttentionScore(gert::TilingContext *context)
                                               .value = {nullptr, nullptr},
                                               .pseShift = {nullptr, nullptr},
                                               .attenMask = {nullptr, nullptr},
-                                              .actualSeqLengths = {nullptr, nullptr},
+                                              .actualSeqLengths = {nullptr, nullptr}, // Initialize ifa context
                                               .deqScale1 = {nullptr, nullptr},
                                               .quantScale1 = {nullptr, nullptr},
                                               .deqScale2 = {nullptr, nullptr},
@@ -549,7 +549,7 @@ ge::graphStatus DoOpTilingFusedInferAttentionScore(gert::TilingContext *context)
                                               .quantOffset2 = {nullptr, nullptr},
                                               .antiquantScale = {nullptr, nullptr},
                                               .antiquantOffset = {nullptr, nullptr},
-                                              .blockTable = {nullptr, nullptr},
+                                              .blockTable = {nullptr, nullptr}, // Initialize ifa context
                                               .kvPaddingSize = {nullptr, nullptr},
                                               .keyAntiquantScale = {nullptr, nullptr},
                                               .keyAntiquantOffset = {nullptr, nullptr},
@@ -557,7 +557,7 @@ ge::graphStatus DoOpTilingFusedInferAttentionScore(gert::TilingContext *context)
                                               .valueAntiquantOffset = {nullptr, nullptr},
                                               .keySharedPrefix = {nullptr, nullptr},
                                               .valueSharedPrefix = {nullptr, nullptr},
-                                              .actualSharedPrefixLen = {nullptr, nullptr},
+                                              .actualSharedPrefixLen = {nullptr, nullptr}, // Initialize ifa context
                                               .attenOut = {nullptr, nullptr},
                                               .numHeads = nullptr,
                                               .scaleValue = nullptr,
@@ -565,7 +565,7 @@ ge::graphStatus DoOpTilingFusedInferAttentionScore(gert::TilingContext *context)
                                               .layOut = nullptr,
                                               .blockSize = nullptr,
                                               .innerPrecise = nullptr,
-                                              .antiquantMode = nullptr,
+                                              .antiquantMode = nullptr, // Initialize ifa context
                                               .softmaxLseFlag = nullptr,
                                               .keyAntiquantMode = nullptr,
                                               .valueAntiquantMode = nullptr,
@@ -592,7 +592,7 @@ ge::graphStatus DoOpTilingFusedInferAttentionScore(gert::TilingContext *context)
             .actualSeqenceLengthKV = nullptr,
             .antiquantScale = nullptr,
             .antiquantOffset = nullptr,
-            .queryPaddingSize = nullptr,
+            .queryPaddingSize = nullptr, // Initialize pfa context
             .kvPaddingSize = nullptr,
             .blockTable = nullptr,
             .keySharedPrefix = nullptr,
@@ -600,7 +600,7 @@ ge::graphStatus DoOpTilingFusedInferAttentionScore(gert::TilingContext *context)
             .actualSharedPrefixLen = nullptr,
             .KeyAntiquantScale = nullptr,
             .valueAntiquantScale = nullptr,
-            .KeyAntiquantOffset = nullptr,
+            .KeyAntiquantOffset = nullptr, // Initialize pfa context
             .valueAntiquantOffset = nullptr,
             .inputDataType = ge::DataType::DT_FLOAT16,
             .kDataType = ge::DataType::DT_FLOAT16,
@@ -608,7 +608,7 @@ ge::graphStatus DoOpTilingFusedInferAttentionScore(gert::TilingContext *context)
             .pseShiftDataType = ge::DataType::DT_FLOAT16,
             .maskDataType = ge::DataType::DT_FLOAT16,
             .blockTableType = ge::DataType::DT_FLOAT16,
-            .outputDataType = ge::DataType::DT_FLOAT16,
+            .outputDataType = ge::DataType::DT_FLOAT16, // Initialize pfa context
             .opName = nullptr,
             .queryInputShape = nullptr,
             .keyInputShape = nullptr,
@@ -616,7 +616,7 @@ ge::graphStatus DoOpTilingFusedInferAttentionScore(gert::TilingContext *context)
             .pseShiftShape = nullptr,
             .attentionMaskShape = nullptr,
             .deqScale1Shape = nullptr,
-            .scale1Shape = nullptr,
+            .scale1Shape = nullptr, // Initialize pfa context
             .deqScale2Shape = nullptr,
             .scale2Shape = nullptr,
             .offset2Shape = nullptr,
@@ -624,7 +624,7 @@ ge::graphStatus DoOpTilingFusedInferAttentionScore(gert::TilingContext *context)
             .antiquantOffsetShape = nullptr,
             .blockTableShape = nullptr,
             .outputShape = nullptr,
-            .lseoutputShape = nullptr,
+            .lseoutputShape = nullptr, // Initialize pfa context
             .KeyAntiquantScaleShape = nullptr,
             .valueAntiquantScaleShape = nullptr,
             .KeyAntiquantOffsetShape = nullptr,
@@ -632,7 +632,7 @@ ge::graphStatus DoOpTilingFusedInferAttentionScore(gert::TilingContext *context)
             .KeyAntiquantScaleType = ge::DataType::DT_FLOAT16,
             .valueAntiquantScaleType = ge::DataType::DT_FLOAT16,
             .KeyAntiquantOffsetType = ge::DataType::DT_FLOAT16,
-            .valueAntiquantOffsetType = ge::DataType::DT_FLOAT16,
+            .valueAntiquantOffsetType = ge::DataType::DT_FLOAT16, // Initialize pfa context
             .innerPrecisePtr = nullptr,
             .headsNumber = nullptr,
             .sparseMode = nullptr,
@@ -640,7 +640,7 @@ ge::graphStatus DoOpTilingFusedInferAttentionScore(gert::TilingContext *context)
             .nextToken = nullptr,
             .scaleValue = nullptr,
             .blockSize = nullptr,
-            .layout = nullptr,
+            .layout = nullptr, // Initialize pfa context
             .numKeyValueHeads = nullptr,
             .workspaceSize = nullptr,
             .compileInfoPtr = nullptr,
@@ -648,7 +648,7 @@ ge::graphStatus DoOpTilingFusedInferAttentionScore(gert::TilingContext *context)
             .deqScale2Type = ge::DataType::DT_FLOAT16,
             .quantScale2Type = ge::DataType::DT_FLOAT16,
             .quantOffset2Type = ge::DataType::DT_FLOAT16,
-            .isKvContinuous = 0,
+            .isKvContinuous = 0, // Initialize pfa context
             .kTensorList = {nullptr},
             .vTensorList = {nullptr},
             .maxKVs  =0,
@@ -656,7 +656,7 @@ ge::graphStatus DoOpTilingFusedInferAttentionScore(gert::TilingContext *context)
             .emptyTensor = 0,
             .isBSNDOut = 0,
             .softmaxLseFlag = nullptr,
-            .isSoftMaxLseEnable = false,
+            .isSoftMaxLseEnable = false, // Initialize pfa context
             .fromTilingSink = 0,
             .hasKeyAntiquantScale = 0,
             .hasValueAntiquantScale = 0,

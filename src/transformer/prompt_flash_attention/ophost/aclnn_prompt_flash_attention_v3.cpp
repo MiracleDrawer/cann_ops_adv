@@ -37,7 +37,7 @@ aclnnStatus aclnnPromptFlashAttentionV3GetWorkspaceSize(
     const aclIntArray *actualSeqLengths,
     const aclIntArray *actualSeqLengthsKv,
     const aclTensor *deqScale1,
-    const aclTensor *quantScale1,
+    const aclTensor *quantScale1, // quantScale1 of V3
     const aclTensor *deqScale2,
     const aclTensor *quantScale2,
     const aclTensor *quantOffset2,
@@ -45,7 +45,7 @@ aclnnStatus aclnnPromptFlashAttentionV3GetWorkspaceSize(
     double scaleValue,
     int64_t preTokens,
     int64_t nextTokens,
-    char *inputLayout,
+    char *inputLayout, // inputLayout of V3
     int64_t numKeyValueHeads,
     int64_t sparseMode,
     int64_t innerPrecise,
@@ -65,7 +65,7 @@ aclnnStatus aclnnPromptFlashAttentionV3(
     void *workspace,
     uint64_t workspaceSize,
     aclOpExecutor *executor,
-    const aclrtStream stream) {
+    const aclrtStream stream) { // V3 call aclnn inner
         return aclnnInnerPromptFlashAttention(workspace, workspaceSize, executor, stream);
     }
 

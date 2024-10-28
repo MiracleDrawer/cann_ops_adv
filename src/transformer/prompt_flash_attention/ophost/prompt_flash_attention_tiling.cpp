@@ -383,11 +383,11 @@ ge::graphStatus PromptFlashAttentionTiling::TilingGetTilingKeyAttentionAscendC(u
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus PromptFlashAttentionTiling::PromptFlashAttentionSplitNS(ContextParamsForPFATiling& contextKeyParams,
+void PromptFlashAttentionTiling::PromptFlashAttentionSplitNS(ContextParamsForPFATiling& contextKeyParams,
                                             PromptFlashAttentionTilingData& tilingData,
                                             uint32_t curCoreNum, std::vector<int64_t>& actualSeqLengths) {
     if (contextKeyParams.fromTilingSink != 0) {
-        return ge::GRAPH_SUCCESS;
+        return;
     }
     PromptAttentionSingleCoreParams* singleCoreParams = &tilingData.promptAttentionSingleCoreParams;
     PromptAttentionBaseParams* baseParams = &tilingData.promptAttentionBaseParams;
@@ -451,8 +451,6 @@ ge::graphStatus PromptFlashAttentionTiling::PromptFlashAttentionSplitNS(ContextP
     seqParams->set_actualCoreNums(actualCoreNums.data());
 
     singleCoreParams->set_multiSmaxsInnerLoopTimes(multiSmaxsInnerLoopTimes);
-
-    return ge::GRAPH_SUCCESS;
 }
 
 void PromptFlashAttentionTiling::PromptFlashAttentionInitOutputSplit(uint64_t totalSize,
@@ -477,11 +475,11 @@ void PromptFlashAttentionTiling::PromptFlashAttentionInitSoftmaxLseOutputSplit(u
     initParams->set_totalSoftMaxLseOutputSize(totalSize);
 }
 
-ge::graphStatus PromptFlashAttentionTiling::PromptFlashAttentionSplitNSNew(
+void PromptFlashAttentionTiling::PromptFlashAttentionSplitNSNew(
     ContextParamsForPFATiling& contextKeyParams, PromptFlashAttentionTilingData& tilingData,
     uint32_t curCoreNum, std::vector<int64_t>& actualSeqLengths, std::vector<int64_t>& actualSeqLengthsKV, int64_t actualSharedPrefixLen, bool useBalanceTiling) {
     if (contextKeyParams.fromTilingSink != 0) {
-        return ge::GRAPH_SUCCESS;
+        return;
     }
     PromptAttentionSingleCoreParams* singleCoreParams = &tilingData.promptAttentionSingleCoreParams;
     PromptAttentionBaseParams* baseParams = &tilingData.promptAttentionBaseParams;
@@ -608,8 +606,6 @@ ge::graphStatus PromptFlashAttentionTiling::PromptFlashAttentionSplitNSNew(
 
     singleCoreParams->set_multiSmaxsInnerLoopTimes(multiSmaxsInnerLoopTimes);
     singleCoreParams->set_actualCoreNums(curCore + 1);
-
-    return ge::GRAPH_SUCCESS;
 }
 
 void PromptFlashAttentionTiling::GetPreNextTokensLeftUp(PromptFlashAttentionTilingData& tilingData,
@@ -742,7 +738,11 @@ bool PromptFlashAttentionTiling::EnableMTE2BmmPipe(PromptFlashAttentionTilingDat
     if (enablePA) {
         baseN = BLOCK_SIZE_BASE;
     }
-    bmm.SetFixSplit(baseM, baseN, baseK);
+    int32_t ret = 0;
+    ret = bmm.SetFixSplit(baseM, baseN, baseK);
+    OPS_ERR_IF(ret != 0,
+               OPS_REPORT_VECTOR_INNER_ERR("PromptFlashAttention", "bmm SetFixSplit failed, ret = %d!", ret),
+               return false);
     bool res = bmm.GetTiling(bmmTilingData) != -1;
     return res;
 }
@@ -887,7 +887,10 @@ bool PromptFlashAttentionTiling::PromptFlashAttentionCheckBmm1(PromptFlashAttent
             uint32_t baseM = std::min(uint32_t(128), sOuterFactor);
             uint32_t baseN = std::min(uint32_t(128), sInnerFactor);
             uint32_t baseK = 128U;
-            bmm1.SetFixSplit(baseM, baseN, baseK);
+            ret = bmm1.SetFixSplit(baseM, baseN, baseK);
+            OPS_ERR_IF(ret != 0,
+                       OPS_REPORT_VECTOR_INNER_ERR("PromptFlashAttention", "bmm1 SetFixSplit failed, ret = %d!", ret),
+                       return false);
             ret = bmm1.GetTiling(bmm1TilingData);
         } else {
             uint32_t baseM = std::min(uint32_t(128), sOuterFactor);
@@ -897,7 +900,10 @@ bool PromptFlashAttentionTiling::PromptFlashAttentionCheckBmm1(PromptFlashAttent
                 baseN = BLOCK_SIZE_BASE;
             }
             if (ret != 0) {
-                bmm1.SetFixSplit(baseM, baseN, baseK);
+                ret = bmm1.SetFixSplit(baseM, baseN, baseK);
+                OPS_ERR_IF(ret != 0,
+                           OPS_REPORT_VECTOR_INNER_ERR("PromptFlashAttention", "bmm1 SetFixSplit failed, ret = %d!", ret),
+                           return false);
                 ret = bmm1.GetTiling(bmm1TilingData);
             }
         }
@@ -1020,15 +1026,21 @@ bool PromptFlashAttentionTiling::PromptFlashAttentionCheckBmm2(PromptFlashAttent
             uint32_t baseM = std::min(uint32_t(128), sOuterFactor);
             uint32_t baseN = std::min(uint32_t(128), tilingData.promptAttentionBaseParams.get_headSize());
             uint32_t baseK = 128U;
-            bmm2.SetFixSplit(baseM, baseN, baseK);
+            ret = bmm2.SetFixSplit(baseM, baseN, baseK);
+            OPS_ERR_IF(ret != 0,
+                       OPS_REPORT_VECTOR_INNER_ERR("PromptFlashAttention", "bmm2 SetFixSplit failed, ret = %d!", ret),
+                       return false);
         }
         ret = bmm2.GetTiling(bmm2TilingData);
     } else {
         if ((isDNoTail) || (splitS2 == 0) || (splitD == 1)) {
-            bmm2.SetFixSplit(sOuterFactor, dSplitFactor);
+             ret = bmm2.SetFixSplit(sOuterFactor, dSplitFactor);
         } else {
-            bmm2.SetFixSplit(sOuterFactor, tilingData.promptAttentionBaseParams.get_alignedHeadSize());
+             ret = bmm2.SetFixSplit(sOuterFactor, tilingData.promptAttentionBaseParams.get_alignedHeadSize());
         }
+        OPS_ERR_IF(ret != 0,
+                   OPS_REPORT_VECTOR_INNER_ERR("PromptFlashAttention", "bmm2 SetFixSplit failed, ret = %d!", ret),
+                   return false);
         ret = bmm2.GetTiling(bmm2TilingData);
     }
     OPS_ERR_IF(ret != 0,
@@ -1048,7 +1060,7 @@ bool PromptFlashAttentionTiling::PromptFlashAttentionCheckBmm2(PromptFlashAttent
     return true;
 }
 
-ge::graphStatus PromptFlashAttentionTiling::PromptFlashAttentionSetTensorSize(
+void PromptFlashAttentionTiling::PromptFlashAttentionSetTensorSize(
     PromptFlashAttentionTilingData& tilingData,
     PromptAttentionSingleCoreTensorSize& tensorSize,
     uint32_t sOuterFactor, uint32_t sInnerFactor) {
@@ -1118,7 +1130,6 @@ ge::graphStatus PromptFlashAttentionTiling::PromptFlashAttentionSetTensorSize(
     } else {
         tensorSize.set_selectSpaceUbSize(0);
     }
-    return ge::GRAPH_SUCCESS;
 }
 
 int64_t PromptFlashAttentionTiling::PromptFlashAttentionSetMsdUbSize(PromptFlashAttentionTilingData& tilingData, PromptAttentionSingleCoreTensorSize& tensorSize, int32_t sInnerFactorTmp) const
@@ -1211,6 +1222,9 @@ bool PromptFlashAttentionTiling::PromptFlashAttentionCheckArgsLegal(PromptFlashA
         l1SizeRemain, l0CSize, sOuterFactor, sInnerFactor)) &&
         (PromptFlashAttentionCheckBmm2(tilingData, tilingData.bmm2TilingDataRect,
         l1SizeRemain, l0CSize, sOuterFactor, sInnerFactor, dSplitFactor));
+    OPS_ERR_IF(res == false,
+               OPS_REPORT_VECTOR_INNER_ERR(contextKeyParamsPtr->opName, "PromptFlashAttentionCheckBmm1 or PromptFlashAttentionCheckBmm2 failed."),
+               return false);
 
     queueBufferSize = tilingData.promptAttentionTensorSizeRect.get_attenMaskUbSize();
 
@@ -1901,6 +1915,7 @@ ge::graphStatus PromptFlashAttentionTiling::CheckPostQuantParams(const ContextPa
     int64_t quantScale2ShapeSize = 0;
     int64_t quantOffset2ShapeSize = 0;
     uint32_t quantD = 0;
+    uint32_t queryD = h / n;
 
     if (outputType == ge::DT_INT8) {
         // Basic verification: quantScale2 must be inputted and not an empty tensor
@@ -1912,6 +1927,11 @@ ge::graphStatus PromptFlashAttentionTiling::CheckPostQuantParams(const ContextPa
         OPS_ERR_IF(quantScale2ShapeSize == 0,
                 OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "quant_scale2 is empty tensor when output type is int8."),
                 return ge::GRAPH_FAILED);
+
+        // altert unsupported situation(post quant per-tensor + BF16 + BSH + D unalign)
+        if ((contextKeyParams.inputDataType == ge::DT_BF16) && (quantScale2ShapeSize == 1) && (inputLayout == InputLayout::BSH) && (queryD % BYTE_BLOCK != 0)) {
+            OPS_LOG_W(contextKeyParams.opName, "post quant per-tensor doesn't support D unaligned(%u), when qkv is bf16 and layout is BSH.", queryD);
+        }
 
         // Cross characteristic verification: The After Quant per-channel does not currently support left padding, ring attention, and D non 32B alignment
         if (quantScale2ShapeSize != 1) {
@@ -2094,10 +2114,10 @@ ge::graphStatus PromptFlashAttentionTiling::GetAndCheckEmptyQueryShape(ContextPa
             s = (queryShape->GetStorageShape().GetDim(1));
             h = (queryShape->GetStorageShape().GetDim(2)); // dim num: 2
         } else { // BSND
-            b = (queryShape->GetStorageShape().GetDim(0));
-            s = (queryShape->GetStorageShape().GetDim(1));
-            n = (queryShape->GetStorageShape().GetDim(2)); // dim num: 2
-            d = (queryShape->GetStorageShape().GetDim(3)); // dim num: 3
+            b = queryShape->GetStorageShape().GetDim(0);
+            s = queryShape->GetStorageShape().GetDim(1);
+            n = queryShape->GetStorageShape().GetDim(2); // dim num: 2
+            d = queryShape->GetStorageShape().GetDim(3); // dim num: 3
         }
     } else {
         return ge::GRAPH_FAILED;
@@ -3904,7 +3924,7 @@ ge::graphStatus TilingPromptFlashAttention(gert::TilingContext* context) {
         .actualSeqenceLengthQ = nullptr,
         .actualSeqenceLengthKV = nullptr,
         .antiquantScale = nullptr,
-        .antiquantOffset = nullptr,
+        .antiquantOffset = nullptr, // Initialize pfa context
         .queryPaddingSize = nullptr,
         .kvPaddingSize = nullptr,
         .blockTable = nullptr,
@@ -3912,7 +3932,7 @@ ge::graphStatus TilingPromptFlashAttention(gert::TilingContext* context) {
         .valueSharedPrefix = nullptr,
         .actualSharedPrefixLen = nullptr,
         .KeyAntiquantScale = nullptr,
-        .valueAntiquantScale = nullptr,
+        .valueAntiquantScale = nullptr, // Initialize pfa context
         .KeyAntiquantOffset = nullptr,
         .valueAntiquantOffset = nullptr,
         .inputDataType = ge::DataType::DT_FLOAT16,
@@ -3920,7 +3940,7 @@ ge::graphStatus TilingPromptFlashAttention(gert::TilingContext* context) {
         .vDataType = ge::DataType::DT_FLOAT16,
         .pseShiftDataType = ge::DataType::DT_FLOAT16,
         .maskDataType = ge::DataType::DT_FLOAT16,
-        .blockTableType = ge::DataType::DT_FLOAT16,
+        .blockTableType = ge::DataType::DT_FLOAT16, // Initialize pfa context
         .outputDataType = ge::DataType::DT_FLOAT16,
         .opName = nullptr,
         .queryInputShape = nullptr,
@@ -3928,7 +3948,7 @@ ge::graphStatus TilingPromptFlashAttention(gert::TilingContext* context) {
         .valueInputShape = nullptr,
         .pseShiftShape = nullptr,
         .attentionMaskShape = nullptr,
-        .deqScale1Shape = nullptr,
+        .deqScale1Shape = nullptr, // Initialize pfa context
         .scale1Shape = nullptr,
         .deqScale2Shape = nullptr,
         .scale2Shape = nullptr,
@@ -3936,7 +3956,7 @@ ge::graphStatus TilingPromptFlashAttention(gert::TilingContext* context) {
         .antiquantScaleShape = nullptr,
         .antiquantOffsetShape = nullptr,
         .blockTableShape = nullptr,
-        .outputShape = nullptr,
+        .outputShape = nullptr, // Initialize pfa context
         .lseoutputShape = nullptr,
         .KeyAntiquantScaleShape = nullptr,
         .valueAntiquantScaleShape = nullptr,
@@ -3944,7 +3964,7 @@ ge::graphStatus TilingPromptFlashAttention(gert::TilingContext* context) {
         .valueAntiquantOffsetShape = nullptr,
         .KeyAntiquantScaleType = ge::DataType::DT_FLOAT16,
         .valueAntiquantScaleType = ge::DataType::DT_FLOAT16,
-        .KeyAntiquantOffsetType = ge::DataType::DT_FLOAT16,
+        .KeyAntiquantOffsetType = ge::DataType::DT_FLOAT16, // Initialize pfa context
         .valueAntiquantOffsetType = ge::DataType::DT_FLOAT16,
         .innerPrecisePtr = nullptr,
         .headsNumber = nullptr,
@@ -3952,7 +3972,7 @@ ge::graphStatus TilingPromptFlashAttention(gert::TilingContext* context) {
         .preToken = nullptr,
         .nextToken = nullptr,
         .scaleValue = nullptr,
-        .blockSize = nullptr,
+        .blockSize = nullptr, // Initialize pfa context
         .layout = nullptr,
         .numKeyValueHeads = nullptr,
         .workspaceSize = nullptr,
@@ -3960,7 +3980,7 @@ ge::graphStatus TilingPromptFlashAttention(gert::TilingContext* context) {
         .deqScaleType = ge::DataType::DT_FLOAT16,
         .deqScale2Type = ge::DataType::DT_FLOAT16,
         .quantScale2Type = ge::DataType::DT_FLOAT16,
-        .quantOffset2Type = ge::DataType::DT_FLOAT16,
+        .quantOffset2Type = ge::DataType::DT_FLOAT16, // Initialize pfa context
         .isKvContinuous = 0,
         .kTensorList = {nullptr},
         .vTensorList = {nullptr},
@@ -3968,7 +3988,7 @@ ge::graphStatus TilingPromptFlashAttention(gert::TilingContext* context) {
         .fromFused = 0,
         .emptyTensor = 0,
         .isBSNDOut = 0,
-        .softmaxLseFlag = nullptr,
+        .softmaxLseFlag = nullptr, // Initialize pfa context
         .isSoftMaxLseEnable = false,
         .fromTilingSink = 0,
         .hasKeyAntiquantScale = 0,
@@ -3976,7 +3996,7 @@ ge::graphStatus TilingPromptFlashAttention(gert::TilingContext* context) {
         .isMsd = 0,
         .keyAntiquantMode = nullptr,
         .valueAntiquantMode = nullptr,
-        .hasKeyAntiquantOffset = 0
+        .hasKeyAntiquantOffset = 0 // Initialize pfa context
     };
     auto ret = ConvertContextToPFAParams(context, contextParamsForPFATiling);
     uint64_t tilingKey = 7;  // 7: default tiling key

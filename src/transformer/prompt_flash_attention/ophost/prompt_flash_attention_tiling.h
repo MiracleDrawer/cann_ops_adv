@@ -192,8 +192,8 @@ protected:
     ge::graphStatus ConvertContextToPFAParams(gert::TilingContext* context, ContextParamsForPFATiling& contextKeyParams);
     ge::graphStatus TilingGetTilingKeyAttentionAscendC(uint64_t& tilingKey, ContextParamsForPFATiling& contextKeyParams,
                                                        bool useNewTiling, PromptFlashAttentionTilingData& tilingData);
-    ge::graphStatus PromptFlashAttentionSplitNS(ContextParamsForPFATiling& contextKeyParams, PromptFlashAttentionTilingData& tilingData, uint32_t curCoreNum, std::vector<int64_t>& actualSeqLengths);
-    ge::graphStatus PromptFlashAttentionSplitNSNew(ContextParamsForPFATiling& contextKeyParams, PromptFlashAttentionTilingData& tilingData, uint32_t curCoreNum, std::vector<int64_t>& actualSeqLengths,
+    void PromptFlashAttentionSplitNS(ContextParamsForPFATiling& contextKeyParams, PromptFlashAttentionTilingData& tilingData, uint32_t curCoreNum, std::vector<int64_t>& actualSeqLengths);
+    void PromptFlashAttentionSplitNSNew(ContextParamsForPFATiling& contextKeyParams, PromptFlashAttentionTilingData& tilingData, uint32_t curCoreNum, std::vector<int64_t>& actualSeqLengths,
                                                     std::vector<int64_t>& actualSeqLengthsKV, int64_t actualSharedPrefixLen, bool useBalanceTiling);
     void GetPreNextTokensLeftUp(PromptFlashAttentionTilingData& tilingData, uint32_t actualSeqLength, uint32_t actualSeqLengthKV, int64_t& preTokensLeftUp, int64_t& nextTokensLeftUp);
     bool EnableSplitSeqOneN(PromptFlashAttentionTilingData& tilingData, const ContextParamsForPFATiling& contextKeyParams, uint32_t hDivN);
@@ -211,7 +211,7 @@ protected:
                                        int64_t l1SizeRemain, int64_t l0CSize,
                                        uint32_t sOuterFactor, uint32_t sInnerFactor,
                                        uint32_t dSplitFactor, bool allGM = false, bool autoBaseMNK = false);
-    ge::graphStatus PromptFlashAttentionSetTensorSize(PromptFlashAttentionTilingData& tilingData,
+    void PromptFlashAttentionSetTensorSize(PromptFlashAttentionTilingData& tilingData,
                         PromptAttentionSingleCoreTensorSize& tensorSize, uint32_t sOuterFactor, uint32_t sInnerFactor);
     bool PromptFlashAttentionCheckArgsLegal(PromptFlashAttentionTilingData& tilingData, int64_t ubSize, int64_t l1Size,
                                             int64_t l0CSize, uint32_t typeByteSize, uint32_t& sOuterFactor,
