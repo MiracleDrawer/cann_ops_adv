@@ -72,7 +72,7 @@ Atlas A2 训练系列产品
   - 算子执行接口对外屏蔽了算子内部实现逻辑以及不同代际NPU的差异，且开发者无需编译算子，实现了算子的精简调用。
   - 若开发者不使用算子执行接口的调用算子，也可以定义基于Ascend IR的算子描述文件，通过ATC工具编译获得算子om文件，然后加载模型文件执行算子，详细调用方法可参见《应用开发指南》的[单算子调用 > 单算子模型执行](https://hiascend.com/document/redirect/CannCommunityCppOpcall)章节。
 
-### aclnnFlashAttentionGradGetWorkspaceSize
+### aclnnFlashAttentionScoreGradGetWorkspaceSize
 
 - **参数说明：**
 
