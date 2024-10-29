@@ -122,7 +122,7 @@ uint64_t FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::GetTilingKey() const
     } else {
         dtypeValue = DtypeEnum::FLOAT16_PRECISION;
     }
-    // auto unpackValue = fBaseParams.layoutType == INPUT_FORMAT_TND ? OptionEnum::ENABLE : OptionEnum::DISABLE;
+
     auto attenMaskCfg = fBaseParams.attenMaskOptional == EMPTY_TENSOR ? OptionEnum::DISABLE : OptionEnum::ENABLE;
     LayoutEnum inputLayout = LayoutEnum::BSND;
     if (fBaseParams.layoutType == INPUT_FORMAT_BN2GS2D) {        // 0
@@ -1228,8 +1228,7 @@ ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::GetWorkspaceSiz
 ge::graphStatus FlashAttentionScoreGradTilingS1s2Bn2gs1s2SameAb::PostTiling()
 {
     SaveToTilingData();
-    // auto blockdim = CalcTschBlockDim(tilingData.s1s2BNGS1S2SplitCoreParams.get_blockOuter(), fBaseParams.aicNum,
-    //                                  fBaseParams.coreNum);
+
     auto blockdim = CalcTschBlockDim(fBaseParams.coreNum, fBaseParams.aicNum,
                                      fBaseParams.coreNum);
     OPS_ERR_IF(blockdim == 0,

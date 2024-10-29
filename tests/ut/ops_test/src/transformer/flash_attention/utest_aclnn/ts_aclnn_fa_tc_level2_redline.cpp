@@ -65,6 +65,7 @@ const auto Tc_Level2_Redline_Cases = ::testing::Values(
                              ge::DataType::DT_BOOL,                      /* AttentionMaskDtype */
                              PrefixShapeType::NONE)                      /* PrefixShapeType */
                 )
+
 );
 
 INSTANTIATE_TEST_SUITE_P(Fa, Ts_Aclnn_Fa_WithParam_Ascend910B2, Tc_Level2_Redline_Cases);
