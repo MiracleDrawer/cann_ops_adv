@@ -254,7 +254,7 @@
       - 当伪量化参数 和 KV分离量化参数同时传入时，以KV分离量化参数为准。
       - keyAntiquantScale与valueAntiquantScale非空场景，要求query的s小于等于16。
       - keyAntiquantScale与valueAntiquantScale非空场景，要求query的dtype为BFLOAT16,key、value的dtype为INT8，输出的dtype为BFLOAT16。
-      - keyAntiquantScale与valueAntiquantScale非空场景，不支持tensolist、左padding、page attention、prefix特性。
+      - keyAntiquantScale与valueAntiquantScale非空场景，不支持tensorlist、左padding、page attention、prefix特性。
 
 - **当Q_S等于1时**：
   -   query，key，value输入，功能使用限制如下：
