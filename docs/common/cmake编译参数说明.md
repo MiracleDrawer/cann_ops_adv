@@ -31,7 +31,7 @@
   # 编译Atlas A2 训练系列产品类型
   -DASCEND_COMPUTE_UNIT="<soc_version>"
 
-  # 编译Atlas A2 训练系列产品和Atlas 推理系列产品（Ascend 310P处理器）类型
+  # 编译Atlas A2 训练系列产品和Atlas 推理系列产品类型
   -DASCEND_COMPUTE_UNIT="<soc_version1>;<soc_version2>"
   ```
 

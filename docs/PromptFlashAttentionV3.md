@@ -2,16 +2,16 @@
 
 # PromptFlashAttentionV3
 
-## 支持的芯片型号
+## 支持的产品型号
 
-- Atlas A2 训练系列产品
-- Atlas 推理系列产品（Ascend 310P处理器）中的加速卡
+- Atlas A2 训练系列产品/Atlas 800I A2 推理产品
+- Atlas 推理系列加速卡产品
 
-  产品形态详细说明请参见[昇腾产品形态说明](https://www.hiascend.com/document/redirect/CannCommunityProductForm)。
+产品形态详细说明请参见[昇腾产品形态说明](https://www.hiascend.com/document/redirect/CannCommunityProductForm)。
 
 ## 功能描述
 
-- 算子功能：全量推理场景的FlashAttention算子，相较于[PromptFlashAttentionV2](PromptFlashAttentionV2.md)接口，**此接口新增**了innerPrecise参数，用于支持高精度或者高性能模式选择。
+-   算子功能：全量推理场景的FlashAttention算子，相较于[PromptFlashAttentionV2](PromptFlashAttentionV2.md)接口，**此接口新增**了innerPrecise参数，用于支持高精度或者高性能模式选择。
 
 -   计算公式：
 
@@ -42,54 +42,55 @@
 * `aclnnStatus aclnnPromptFlashAttentionV3(void *workspace, uint64_t workspaceSize, aclOpExecutor *executor, aclrtStream stream)`
 
 **说明：**
+
 - 算子执行接口对外屏蔽了算子内部实现逻辑以及不同代际NPU的差异，且开发者无需编译算子，实现了算子的精简调用。
 - 若开发者不使用算子执行接口的调用算子，也可以定义基于Ascend IR的算子描述文件，通过ATC工具编译获得算子om文件，然后加载模型文件执行算子，详细调用方法可参见《应用开发指南》的[单算子调用 > 单算子模型执行](https://hiascend.com/document/redirect/CannCommunityCppOpcall)章节。
 
 
-## aclnnPromptFlashAttentionV3GetWorkspaceSize
+### aclnnPromptFlashAttentionV3GetWorkspaceSize
 
 - **参数说明：**
 
-  - query（aclTensor\*，计算输入）：Device侧的aclTensor，公式中的输入Q，数据类型支持FLOAT16、BFLOAT16、INT8，数据类型与key的数据类型需满足数据类型推导规则，即保持与key、value的数据类型一致。不支持[[非连续的Tensor](common/非连续的Tensor.md)](common/[非连续的Tensor](common/非连续的Tensor.md).md)，[数据格式](common/数据格式.md)支持ND，**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持FLOAT16**。
+  - query（aclTensor\*，计算输入）：Device侧的aclTensor，公式中的输入Q，数据类型支持FLOAT16、BFLOAT16、INT8，数据类型与key的数据类型需满足数据类型推导规则，即保持与key、value的数据类型一致。不支持[非连续的Tensor](common/非连续的Tensor.md)，[数据格式](common/数据格式.md)支持ND，**Atlas推理系列加速卡产品仅支持FLOAT16**。
 
-  - key（aclTensor\*，计算输入）：Device侧的aclTensor，公式中的输入K，数据类型支持FLOAT16、BFLOAT16、INT8，数据类型与query的数据类型需满足数据类型推导规则，即保持与query、value的数据类型一致。不支持[[非连续的Tensor](common/非连续的Tensor.md)](common/[非连续的Tensor](common/非连续的Tensor.md).md)，[数据格式](common/数据格式.md)支持ND，**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持FLOAT16**。
+  - key（aclTensor\*，计算输入）：Device侧的aclTensor，公式中的输入K，数据类型支持FLOAT16、BFLOAT16、INT8，数据类型与query的数据类型需满足数据类型推导规则，即保持与query、value的数据类型一致。不支持[非连续的Tensor](common/非连续的Tensor.md)，[数据格式](common/数据格式.md)支持ND，**Atlas推理系列加速卡产品仅支持FLOAT16**。
 
-  - value（aclTensor\*，计算输入）：Device侧的aclTensor，公式中的输入V，数据类型支持FLOAT16、BFLOAT16、INT8，数据类型与query的数据类型需满足数据类型推导规则，即保持与query、key的数据类型一致。不支持[非连续的Tensor](common/非连续的Tensor.md)，[数据格式](common/数据格式.md)支持ND，**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持FLOAT16**。
+  - value（aclTensor\*，计算输入）：Device侧的aclTensor，公式中的输入V，数据类型支持FLOAT16、BFLOAT16、INT8，数据类型与query的数据类型需满足数据类型推导规则，即保持与query、key的数据类型一致。不支持[非连续的Tensor](common/非连续的Tensor.md)，[数据格式](common/数据格式.md)支持ND，**Atlas推理系列加速卡产品仅支持FLOAT16**。
 
-  - pseShift（aclTensor\*，计算输入）：Device侧的aclTensor，可选参数，数据类型支持FLOAT16、BFLOAT16，且在pseShift为FLOAT16类型时，要求此时的query为FLOAT16或INT8类型，而在pseShift为BFLOAT16类型时，要求此时的query为BFLOAT16类型。在query、key、value为FLOAT16且pseShift存在的情况下，默认走高精度模式。不支持[[非连续的Tensor](common/非连续的Tensor.md)](common/[非连续的Tensor](common/非连续的Tensor.md).md)，[数据格式](common/数据格式.md)支持ND。输入shape类型需为（B,N,Q_S,KV_S）或（1,N,Q_S,KV_S），其中Q_S为query的shape中的S，KV_S为key和value的shape中的S。对于pseShift的KV_S为非32对齐的场景，建议padding到32字节来提高性能，多余部分的填充值不做要求。如不使用该功能时可传入nullptr。综合约束请见[约束与限制](#1)，**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持nullptr**。
+  - pseShift（aclTensor\*，计算输入）：Device侧的aclTensor，可选参数，数据类型支持FLOAT16、BFLOAT16，且在pseShift为FLOAT16类型时，要求此时的query为FLOAT16或INT8类型，而在pseShift为BFLOAT16类型时，要求此时的query为BFLOAT16类型。在query、key、value为FLOAT16且pseShift存在的情况下，默认走高精度模式。不支持[非连续的Tensor](common/非连续的Tensor.md)，[数据格式](common/数据格式.md)支持ND。输入shape类型需为（B,N,Q_S,KV_S）或（1,N,Q_S,KV_S），其中Q_S为query的shape中的S，KV_S为key和value的shape中的S。对于pseShift的KV_S为非32对齐的场景，建议padding到32字节来提高性能，多余部分的填充值不做要求。如不使用该功能时可传入nullptr。综合约束请见[约束与限制](#1)，**Atlas推理系列加速卡产品仅支持nullptr**。
 
-  - attenMask（aclTensor\*，计算输入）：Device侧的aclTensor，代表下三角全为0上三角全为负无穷的倒三角mask矩阵，不支持[[非连续的Tensor](common/非连续的Tensor.md)](common/[非连续的Tensor](common/非连续的Tensor.md).md)，数据类型支持BOOL、INT8和UINT8。[数据格式](common/数据格式.md)支持ND。如果不使用该功能可传入nullptr。通常建议shape输入Q_S,KV_S;B,Q_S,KV_S;1,Q_S,KV_S;B,1,Q_S,KV_S;1,1,Q_S,KV_S，其中Q_S为query的shape中的S，KV_S为key和value的shape中的S，对于attenMask的KV_S为非32对齐的场景，建议padding到32对齐来提高性能，多余部分填充成1。综合约束请见[约束与限制](#1)，**Atlas推理系列产品（Ascend310P处理器）中的加速卡数据类型仅支持BOOL**。
+  - attenMask（aclTensor\*，计算输入）：Device侧的aclTensor，代表下三角全为0上三角全为负无穷的倒三角mask矩阵，不支持[非连续的Tensor](common/非连续的Tensor.md)，数据类型支持BOOL、INT8和UINT8。[数据格式](common/数据格式.md)支持ND。如果不使用该功能可传入nullptr。通常建议shape输入Q_S,KV_S;B,Q_S,KV_S;1,Q_S,KV_S;B,1,Q_S,KV_S;1,1,Q_S,KV_S，其中Q_S为query的shape中的S，KV_S为key和value的shape中的S，对于attenMask的KV_S为非32对齐的场景，建议padding到32对齐来提高性能，多余部分填充成1。综合约束请见[约束与限制](#1)，**Atlas推理系列加速卡产品数据类型仅支持BOOL**。
 
-  - actualSeqLengths（aclIntArray\*，计算输入）：Host侧的aclIntArray，代表不同Batch中query的有效Sequence Length，数据类型支持INT64。如果不指定seqlen可以传入nullptr，表示和query的shape的s长度相同。限制：该入参中每个batch的有效Sequence Length应该不大于query中对应batch的Sequence Length。seqlen的传入长度为1时，每个Batch使用相同seqlen；传入长度大于等于Batch时取seqlen的前Batch个数。其他长度不支持。**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持nullptr**。
+  - actualSeqLengths（aclIntArray\*，计算输入）：Host侧的aclIntArray，代表不同Batch中query的有效Sequence Length，数据类型支持INT64。如果不指定seqlen可以传入nullptr，表示和query的shape的s长度相同。限制：该入参中每个batch的有效Sequence Length应该不大于query中对应batch的Sequence Length。seqlen的传入长度为1时，每个Batch使用相同seqlen；传入长度大于等于Batch时取seqlen的前Batch个数。其他长度不支持。**Atlas推理系列加速卡产品仅支持nullptr**。
 
-  - actualSeqLengthsKv（aclIntArray\*，计算输入）：Host侧的aclIntArray，可传入nullptr，代表不同batch中key/value的有效Sequence Length。数据类型支持INT64。限制：该入参中每个batch的有效Sequence Length应该不大于key/value中对应batch的Sequence Length。seqlenKv的传入长度为1时，每个Batch使用相同seqlenKv；传入长度大于等于Batch时取seqlenKv的前Batch个数。其他长度不支持。**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持nullptr**。
+  - actualSeqLengthsKv（aclIntArray\*，计算输入）：Host侧的aclIntArray，可传入nullptr，代表不同batch中key/value的有效Sequence Length。数据类型支持INT64。限制：该入参中每个batch的有效Sequence Length应该不大于key/value中对应batch的Sequence Length。seqlenKv的传入长度为1时，每个Batch使用相同seqlenKv；传入长度大于等于Batch时取seqlenKv的前Batch个数。其他长度不支持。**Atlas推理系列加速卡产品仅支持nullptr**。
 
-  - deqScale1（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持UINT64、FLOAT32。[数据格式](common/数据格式.md)支持ND（参考），表示BMM1后面的反量化因子，支持per-tensor。 如不使用该功能时可传入nullptr，**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持nullptr**。
+  - deqScale1（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持UINT64、FLOAT32。[数据格式](common/数据格式.md)支持ND（参考），表示BMM1后面的反量化因子，支持per-tensor。 如不使用该功能时可传入nullptr，**Atlas推理系列加速卡产品仅支持nullptr**。
 
-  - quantScale1（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持FLOAT32。[数据格式](common/数据格式.md)支持ND（参考），表示BMM2前面的量化因子，支持per-tensor。 如不使用该功能时可传入nullptr，**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持nullptr**。
+  - quantScale1（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持FLOAT32。[数据格式](common/数据格式.md)支持ND（参考），表示BMM2前面的量化因子，支持per-tensor。 如不使用该功能时可传入nullptr，**Atlas推理系列加速卡产品仅支持nullptr**。
 
-  - deqScale2（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持UINT64、FLOAT32。[数据格式](common/数据格式.md)支持ND（参考），表示BMM2后面的反量化因子，支持per-tensor。 如不使用该功能时可传入nullptr，**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持nullptr**。
+  - deqScale2（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持UINT64、FLOAT32。[数据格式](common/数据格式.md)支持ND（参考），表示BMM2后面的反量化因子，支持per-tensor。 如不使用该功能时可传入nullptr，**Atlas推理系列加速卡产品仅支持nullptr**。
 
-  - quantScale2（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持FLOAT32和BFLOAT16。[数据格式](common/数据格式.md)支持ND（参考），表示输出的量化因子，支持per-tensor，per-channel。 如不使用该功能时可传入nullptr，**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持nullptr**。
+  - quantScale2（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持FLOAT32和BFLOAT16。[数据格式](common/数据格式.md)支持ND（参考），表示输出的量化因子，支持per-tensor，per-channel。 如不使用该功能时可传入nullptr，**Atlas推理系列加速卡产品仅支持nullptr**。
 
-  - quantOffset2（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持FLOAT32和BFLOAT16。[数据格式](common/数据格式.md)支持ND（参考），表示输出的量化偏移，支持per-tensor，per-channel。 如不使用该功能时可传入nullptr，**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持nullptr**。
+  - quantOffset2（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持FLOAT32和BFLOAT16。[数据格式](common/数据格式.md)支持ND（参考），表示输出的量化偏移，支持per-tensor，per-channel。 如不使用该功能时可传入nullptr，**Atlas推理系列加速卡产品仅支持nullptr**。
 
   - numHeads（int64\_t，计算输入）：Host侧的int，代表query的head个数，数据类型支持INT64。
 
   - scaleValue（double，计算输入）：Host侧的double，公式中d开根号的倒数，代表缩放系数，作为计算流中Muls的scalar值，数据类型支持DOUBLE。数据类型与query的数据类型需满足数据类型推导规则。用户不特意指定时可传入默认值1.0。
 
-  - preTokens（int64\_t，计算输入）：Host侧的int，用于稀疏计算，表示attention需要和前几个Token计算关联，数据类型支持INT64。用户不特意指定时可传入默认值2147483647，**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持默认值2147483647**。
+  - preTokens（int64\_t，计算输入）：Host侧的int，用于稀疏计算，表示attention需要和前几个Token计算关联，数据类型支持INT64。用户不特意指定时可传入默认值2147483647，**Atlas推理系列加速卡产品仅支持默认值2147483647**。
 
-  - nextTokens（int64\_t，计算输入）：Host侧的int，用于稀疏计算，表示attention需要和后几个Token计算关联。数据类型支持INT64。用户不特意指定时可传入默认值0，**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持默认值0和2147483647**。
+  - nextTokens（int64\_t，计算输入）：Host侧的int，用于稀疏计算，表示attention需要和后几个Token计算关联。数据类型支持INT64。用户不特意指定时可传入默认值0，**Atlas推理系列加速卡产品仅支持默认值0和2147483647**。
 
   - inputLayout（char\*，计算输入）：Host侧的字符指针CHAR\*，用于标识输入query、key、value的数据排布格式，当前支持BSH、BSND、BNSD、BNSD_BSND(输入为BNSD时，输出格式为BSND)。用户不特意指定时可传入默认值"BSH”。
     
      **说明：**
      query、key、value数据排布格式支持从多种维度解读，其中B（Batch）表示输入样本批量大小、S（Seq-Length）表示输入样本序列长度、H（Head-Size）表示隐藏层的大小、N（Head-Num）表示多头数、D（Head-Dim）表示隐藏层最小的单元尺寸，且满足D=H/N。
 
-  - numKeyValueHeads（int64\_t，计算输入）：Host侧的int，代表key、value中head个数，用于支持GQA（Grouped-Query Attention，分组查询注意力）场景，数据类型支持INT64。用户不特意指定时可传入默认值0，表示key/value和query的head个数相等。限制：需要满足numHeads整除numKeyValueHeads，numHeads与numKeyValueHeads的比值不能大于64，且在BSND、BNSD、BNSD_BSND场景下，需要与shape中的key/value的N轴shape值相同，否则报错，**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持默认值0**。
+  - numKeyValueHeads（int64\_t，计算输入）：Host侧的int，代表key、value中head个数，用于支持GQA（Grouped-Query Attention，分组查询注意力）场景，数据类型支持INT64。用户不特意指定时可传入默认值0，表示key/value和query的head个数相等。限制：需要满足numHeads整除numKeyValueHeads，numHeads与numKeyValueHeads的比值不能大于64，且在BSND、BNSD、BNSD_BSND场景下，需要与shape中的key/value的N轴shape值相同，否则报错，**Atlas推理系列加速卡产品仅支持默认值0**。
 
-  - sparseMode（int64\_t，计算输入）：Host侧的int，表示sparse的模式。数据类型支持INT64，**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持默认值0**。
+  - sparseMode（int64\_t，计算输入）：Host侧的int，表示sparse的模式。数据类型支持INT64，**Atlas推理系列加速卡产品仅支持默认值0**。
     -  sparseMode为0时，代表defaultMask模式，如果attenmask未传入则不做mask操作，忽略preTokens和nextTokens（内部赋值为INT\_MAX）；如果传入，则需要传入完整的attenmask矩阵（S1 \* S2），表示preTokens和nextTokens之间的部分需要计算。
     -  sparseMode为1时，代表allMask，必须传入完整的attenmask矩阵（S1 \* S2）。
     -  sparseMode为2时，代表leftUpCausal模式的mask，需要传入优化后的attenmask矩阵（2048\*2048）。
@@ -111,7 +112,7 @@
       当前0、1为保留配置值，当计算过程中“参与计算的mask部分”存在某整行全为1的情况时，精度可能会有损失。此时可以尝试将该参数配置为2或3来使能行无效功能以提升精度，但是该配置会导致性能下降。
     如果算子可判断出存在无效行场景，会自动使能无效行计算，例如sparse_mode为3，Sq > Skv场景。
     
-  - attentionOut（aclTensor\*，计算输出）：Device侧的aclTensor，公式中的输出，数据类型支持FLOAT16、BFLOAT16、INT8。[数据格式](common/数据格式.md)支持ND。限制：当inputLayout为BNSD_BSND时，输入query的shape是BNSD，输出shape为BSND；其余情况该入参的shape需要与入参query的shape保持一致，**Atlas推理系列产品（Ascend310P处理器）中的加速卡仅支持FLOAT16**。
+  - attentionOut（aclTensor\*，计算输出）：Device侧的aclTensor，公式中的输出，数据类型支持FLOAT16、BFLOAT16、INT8。[数据格式](common/数据格式.md)支持ND。限制：当inputLayout为BNSD_BSND时，输入query的shape是BNSD，输出shape为BSND；其余情况该入参的shape需要与入参query的shape保持一致，**Atlas推理系列加速卡产品仅支持FLOAT16**。
 
   - workspaceSize（uint64\_t\*，出参）：返回用户需要在Device侧申请的workspace大小。
 
@@ -121,12 +122,13 @@
 
   返回aclnnStatus状态码，具体参见[aclnn返回码](common/aclnn返回码.md)。
 
-  说明：
+  ```
   第一段接口完成入参校验，若出现以下错误码，则对应原因为：
   -  返回161001（ACLNN_ERR_PARAM_NULLPTR）：如果传入参数是必选输入，输出或者必选属性，且是空指针，则返回161001。
   -  返回161002（ACLNN_ERR_PARAM_INVALID）：query、key、value、pseShift、attenMask、attentionOut的数据类型和数据格式不在支持的范围内。
+  ```
 
-## aclnnPromptFlashAttentionV3
+### aclnnPromptFlashAttentionV3
 
 -   **参数说明：**
     -   workspace（void\*，入参）：在Device侧申请的workspace内存起址。
@@ -152,7 +154,7 @@
               -   (3)B=20,Q_N=1,Q_S=2097152,D = 256,KV_N=1,KV_S=2097152;
               -   (4)B=1,Q_N=10,Q_S=2097152,D = 512,KV_N=1,KV_S=2097152。
         -   支持D轴小于等于512。inputLayout为BSH或者BSND时，要求N*D小于65535。
-    -   Atlas推理系列产品（Ascend310P处理器）中的加速卡： 
+    -   Atlas推理系列加速卡产品： 
         -   支持B轴小于等于128；
         -   支持N轴小于等于256；   
         -   支持S轴小于等于65535(64k), Q_S或KV_S非128对齐，Q_S和KV_S不等长的场景不支持配置atten_mask；
@@ -216,7 +218,7 @@ REG_OP(PromptFlashAttention)
 
 - aclnn单算子调用方式
 
-  示例代码如下（以Atlas A2 训练系列处理器为例），仅供参考，具体编译和执行过程请参考[编译与运行样例](common/编译与运行样例.md)。
+  示例代码如下（以Atlas A2 训练系列产品/Atlas 800I A2 推理产品为例），仅供参考，具体编译和执行过程请参考[编译与运行样例](common/编译与运行样例.md)。
 
 ```c++
 

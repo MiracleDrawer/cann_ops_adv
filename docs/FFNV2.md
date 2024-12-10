@@ -4,8 +4,8 @@
 
 ## 支持的产品型号
 
-- Atlas A2 训练系列产品
-- Atlas 推理系列产品（Ascend 310P处理器）中的加速卡
+- Atlas A2 训练系列产品/Atlas 800I A2 推理产品
+- Atlas 推理系列加速卡产品
 
 产品形态详细说明请参见[昇腾产品形态说明](https://www.hiascend.com/document/redirect/CannCommunityProductForm)。
 
@@ -131,7 +131,7 @@ y = FFN(x, weight1, weight2, tokens, bias1, bias2, activateType)  # 具体参数
 
 ## 约束与限制
 
-- 含BFLOAT16数据类型的场景仅支持Atlas A2 训练系列产品。
+- 含BFLOAT16数据类型的场景仅支持Atlas A2 训练系列产品/Atlas 800I A2 推理产品。
 - 有专家时，专家数据的总数需要与x的M保持一致。
 - 激活层为geglu/swiglu/reglu时，仅支持无专家分组时的FLOAT16高性能场景（FLOAT16场景指类型为aclTensor的必选参数数据类型都为FLOAT16的场景），且N1=2\*K2。
 - 激活层为gelu/fastgelu/relu/silu时，支持有专家或无专家分组的FLOAT16高精度及高性能场景、BFLOAT16场景、量化场景及伪量化场景，且N1=K2。
@@ -152,7 +152,7 @@ y = FFN(x, weight1, weight2, tokens, bias1, bias2, activateType)  # 具体参数
 - 伪量化场景，per-in-group下，antiquantScale1和antiquantOffset1中的组数G要能被K1整除，antiquantScale2和antiquantOffset2中的组数G要能被K2整除。
 - innerPrecise参数在BFLOAT16非量化场景，只能配置为0；FLOAT16非量化场景，可以配置为0或者1；量化或者伪量化场景，0和1都可配置，但是配置后不生效。
 - tokensIndexFlag为true且有专家（expertTokens不为空）时，expertTokens中的数值必须满足：如果i和j都是expertTokens中有效的数组索引，且j大于i，那么expertTokens中第j个元素的数值大于或者等于expertTokens中第i个元素的数值。
-- Atlas 推理系列产品（Ascend 310P处理器）中的加速卡仅支持无专家场景非量化高性能模式，x和y仅支持2维，输入输出数据类型均为FLOAT16，激活层仅支持gelu/fastgelu/relu/silu。
+- Atlas 推理系列加速卡产品仅支持无专家场景非量化高性能模式，x和y仅支持2维，输入输出数据类型均为FLOAT16，激活层仅支持gelu/fastgelu/relu/silu。
 
 ## 算子原型
 

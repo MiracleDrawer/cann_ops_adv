@@ -18,7 +18,7 @@
 
   PromptFlashAttention算子包含B、N2(key和value的N)、G(query_N/kv_N)、S1(query的S)、S2(key和value的S)共5个轴，切分顺序是先核内再核间，核内切分依据基本块大小选择切分轴，核间切分是把核内切分后剩余的轴合并后依据AI Core核数再进行切分。
 
- 
+
 - **根据特殊场景及特定优化进行模板特化**
 
   每一个融合算子有一个基础模板，并辅以多个特化模板：
@@ -125,7 +125,7 @@ def Vec():
 
 - C侧总耗时 > V侧总耗时
 
-  该场景流水特征下，Vector计算节点少，计算速度快，在Atlas A2 训练系列产品 C:V=1:2的情况下，Cube的搬运时长足以掩盖Vector的计算时长，因此只要关注Cube的MTE2耗时即可，最终达成MTE2 bound。在Cube双发机制下，提前发射两块Cube计算，Cube1、Cube2计算可以衔接，使得Cube利用率最高，达成Cube bound。
+  该场景流水特征下，Vector计算节点少，计算速度快，在Atlas A2训练系列产品/Atlas 800I A2推理产品 C:V=1:2的情况下，Cube的搬运时长足以掩盖Vector的计算时长，因此只要关注Cube的MTE2耗时即可，最终达成MTE2 bound。在Cube双发机制下，提前发射两块Cube计算，Cube1、Cube2计算可以衔接，使得Cube利用率最高，达成Cube bound。
 
   ![设计图3](../fig/设计图3.png)
 

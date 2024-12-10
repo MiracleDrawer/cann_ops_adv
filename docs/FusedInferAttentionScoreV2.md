@@ -2,16 +2,16 @@
 
 # FusedInferAttentionScoreV2
 
-## 支持的芯片型号
+## 支持的产品型号
 
-- Atlas A2 训练系列产品
+Atlas A2 训练系列产品/Atlas 800I A2推理产品
 
-  产品形态详细说明请参见[昇腾产品形态说明](https://www.hiascend.com/document/redirect/CannCommunityProductForm)。
+产品形态详细说明请参见[昇腾产品形态说明](https://www.hiascend.com/document/redirect/CannCommunityProductForm)。
 
 ## 功能描述
 
--   **算子功能**：适配增量&全量推理场景的FlashAttention算子，既可以支持全量计算场景（PromptFlashAttention），也可支持增量计算场景（IncreFlashAttention）。当Query矩阵的S为1，进入IncreFlashAttention分支，其余场景进入PromptFlashAttention分支。
--   **计算公式**：详细内容可参考[PromptFlashAttentionV3](PromptFlashAttentionV3.md)及[IncreFlashAttentionV4](IncreFlashAttentionV4.md)。
+-   算子功能：适配增量&全量推理场景的FlashAttention算子，既可以支持全量计算场景（PromptFlashAttention），也可支持增量计算场景（IncreFlashAttention）。当Query矩阵的S为1，进入IncreFlashAttention分支，其余场景进入PromptFlashAttention分支。
+-   计算公式：详细内容可参考[PromptFlashAttentionV3](PromptFlashAttentionV3.md)及[IncreFlashAttentionV4](IncreFlashAttentionV4.md)。
 
 ## 实现原理
 该算子是全量计算场景（PromptFlashAttention）和增量计算场景（IncreFlashAttention）的融合算子，详细实现原理可参考[PromptFlashAttentionV3](PromptFlashAttentionV3.md)及[IncreFlashAttentionV4](IncreFlashAttentionV4.md)。
@@ -28,7 +28,7 @@
 - 算子执行接口对外屏蔽了算子内部实现逻辑以及不同代际NPU的差异，且开发者无需编译算子，实现了算子的精简调用。
 - 若开发者不使用算子执行接口的调用算子，也可以定义基于Ascend IR的算子描述文件，通过ATC工具编译获得算子om文件，然后加载模型文件执行算子，详细调用方法可参见《应用开发指南》的[单算子调用 > 单算子模型执行](https://hiascend.com/document/redirect/CannCommunityCppOpcall)章节。
 
-## aclnnFusedInferAttentionScoreV2GetWorkspaceSize
+### aclnnFusedInferAttentionScoreV2GetWorkspaceSize
 
 -   **参数说明：**
 
@@ -146,16 +146,16 @@
     - executor（aclOpExecutor\*\*，计算输出）：返回op执行器，包含了算子计算流程。
 
 
--   **返回值：**
+- **返回值：**
 
-    返回aclnnStatus状态码，具体参见[aclnn返回码](common/aclnn返回码.md)。
+  返回aclnnStatus状态码，具体参见[aclnn返回码](common/aclnn返回码.md)。
 
-    说明：
-    第一段接口完成入参校验，若出现以下错误码，则对应原因为：
-    
-    -  返回161001（ACLNN\_ERR\_PARAM\_NULLPTR）：传入的query、key、value、attentionOut是空指针。
+  ```
+  第一段接口完成入参校验，若出现以下错误码，则对应原因为：
+  -  返回161001（ACLNN_ERR_PARAM_NULLPTR）：传入的query、key、value、attentionOut是空指针。
+  ```
 
-## aclnnFusedInferAttentionScoreV2
+### aclnnFusedInferAttentionScoreV2
 
 -   **参数说明：**
     -   workspace（void\*，入参）：在Device侧申请的workspace内存起址。

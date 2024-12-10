@@ -6,7 +6,7 @@
 
 增量推理相对于全量推理，主要有如下差异：
 
-1. 输入数据特点是query 的S轴固定为1；
+1. 输入数据特点是query 的S轴固定为1。
 2. Key和Value是经过kv cache后，将之前推理过的state信息叠加在一起，每个Batch对应的S轴的实际长度可能不一样，输入的数据时经过padding后的固定长度数据。
 
 ## 实现原理
@@ -40,9 +40,8 @@
 
 1. C+V模板：IFA 基础模板，支持绝大多数输入场景，计算时同时使能VectorCore 和 CubeCore，matmul计算放在CubeCore执行;
 2. All-Vector模板：对C+V模板的补充，主流程与C+V模板基本一致，matmul计算由vector实现， 降低Cube启动和CV通信开销，对于部分输入类型有更好的性能表现；支持场景：
-
-- Atlas 推理系列产品（Ascend 310P处理器）中的加速卡：全部使用该模板；
-- Atlas A2 训练系列产品：非PA，非GQA，且Q、KV 、Output类型全部为FP16 。
+    - Atlas 推理系列加速卡产品：全部使用该模板。
+    - Atlas A2 训练系列产品/Atlas 800I A2 推理产品：非PA，非GQA，且Q、KV 、Output类型全部为FP16 。
 
 ### 计算过程
 
@@ -50,9 +49,9 @@
 
 由于硬件buffer大小是有限的，而计算的数据量又是巨大的，无法一次计算完，那么就需要进行tiling切分，shape不同会导致算子的切分轴不同，而算子的切分轴，会影响模板的功能及性能。简单的elewise类算子，往往会将所有的轴fuse成一根轴进行切分，逻辑简单，因此模板也比较单一。而融合算子融合了elewise、broadcast、reduce及matmul等多类场景，功能复杂，为达到较高的性能要求，往往需要根据切分轴进行模板拆分，模板拆分时为了达到性能最优，需要考虑如下几个点：
 
-a. 将核心的数量用满，防止部分核闲置 ；
+a. 将核心的数量用满，防止部分核闲置。
 
-b. 每一个核心被分配的计算量相对均匀，避免出现某些核计算的数据量过大，其余核在围观的情况；
+b. 每一个核心被分配的计算量相对均匀，避免出现某些核计算的数据量过大，其余核在围观的情况。
 
 c. AIC和AIV之间处理的数据量要符合其对应的算力，避免AIC或AIV出现长时间的空闲。 
 
@@ -60,7 +59,7 @@ IFA算子包含B、N2(key和value的N)、G(query_N/kv_N)、S1(query的S)、S2(ke
 
 - 核间：数据外切是为了最大限度的利用多个Core并行工作，通常先按照BN2分核，即将BN2 个 SD块分配到多个核上，每个核计算一定数量的SD块，当BN2小于阈值时（0.4 * 总核数），需再对S2轴进行外切（SplitKV份），  总块数为 BN2 * SplitKv，每个核分配一定数量的子块，当所有子块计算完成后，再进行规约，即FlashDecode流程。
 
-- 核内：由于单core缓存有限，需根据设定的缓存大小，对S2轴或KV子块的S2轴 进行切分，此即flashAttention过程。
+- 核内：由于单core缓存有限，需根据设定的缓存大小，对S2轴或KV子块的S2轴 进行切分，此即FlashAttention过程。
 
 #### 主流程
 
@@ -127,23 +126,23 @@ void combine() {
 
 #### AntiQuant
 
-IFA  AntiQuant 场景矩阵计算公式 为：
+IFA  AntiQuant场景矩阵计算公式为：
 $$
 C = A * (B + offset)\times scale
 $$
-A矩阵为FP16/BF16类型， B矩阵为int8类型。
+其中，A矩阵为FP16/BF16类型， B矩阵为int8类型。
 
 经典的反量化方案，对整个B矩阵进行反量化操作，需要对矩阵B搬入vector处理，矩阵B的数据量较大，严重影响计算性能。
 
 IFA场景下，A矩阵较小，可以通过变换A矩阵来适配B矩阵，基本流程：
 
-1. 矩阵A进入Vector展开成多行，每行An均用int8 格式存储；
-2. 将这些An 打包成新的矩阵 AA 计算 CC = AA * B （按 int8 * int8 = int32来计算）；
+1. 矩阵A进入Vector展开成多行，每行An均用int8格式存储。
+2. 将这些An打包成新的矩阵AA计算CC = AA * B （按 int8 * int8 = int32来计算）。
 3. 对matmul 结果CC进行Reduce操作得到C。
 
 #### PageAttention
 
-Kv block内存不连续，Matmul 针对这种场景提供了回调函数进行B矩阵的拷贝（GM->L1),  IFA 中实现相应的拷贝函数，回调函数在Cube中执行，参数通过GM传递，Vector设置相应的参数后到GM后（确保DCCI）再通知Matmul工作。 
+Kv block内存不连续，Matmul 针对这种场景提供了回调函数进行B矩阵的拷贝（GM->L1)，IFA 中实现相应的拷贝函数，回调函数在Cube中执行，参数通过GM传递，Vector设置相应的参数后到GM后（确保DCCI）再通知Matmul工作。 
 
 #### GQA
 
@@ -187,21 +186,21 @@ IFA算子对UB分配进行了简化， 初始化时，将UB按照固定大小进
 
 #### WorkSpace分配
 
-workspace用于保存算子计算过程中不适合常驻UB的中间数据，IFA算子workspace分配情况如下
+workspace用于保存算子计算过程中不适合常驻UB的中间数据，IFA算子workspace分配情况如下：
 
-|                      |                                                            |                                          |
+| 中间数据             | 分配情况                                                   | 备注                                     |
 | -------------------- | ---------------------------------------------------------- | ---------------------------------------- |
-| mm1ResGm             | msdIterNum * G * SinnerSize * sizeof(float) * corenum      | 保存Cube MM1 计算输出                    |
+| mm1ResGm             | msdIterNum * G * SinnerSize * sizeof(float) * corenum      | 保存Cube MM1计算输出                     |
 | vec1ResGm            | msdIterNum * G * SinnerSize * sizeof (fp16/bf16) * coreNum | 保存Vec1计算过程结果                     |
-| mm2ResGm             | msdIterNum * G * D * sizeof(float) * corenum               | 保存Cube MM2 计算输出                    |
+| mm2ResGm             | msdIterNum * G * D * sizeof(float) * corenum               | 保存Cube MM2计算输出                     |
 | vec2ResGm            | msdIterNum * G * D * sizeof(float) * corenum               | 保存Vec2计算过程结果                     |
 | queryPreProcessResGm | msdIterNum * G * D * sizeof(int8) * corenum                | antiquant 场景，保存Query预处理结果      |
 | accumOutGm           | B * KvN * G * splitKv * D *  sizeof（float）               | FLASHDecode场景，保存子块的Attention结果 |
 | logSumExpGm          | B * KvN * G * splitKv * 8 *  sizeof（float）               | FLASHDecode场景，保存子块LSE结果         |
-| bmm1CallBackDataGm   | 64B                                                        | PageAttention场景mm1 计算CV通信附加参数  |
-| bmm2CallBackDataGm   | 64B                                                        | PageAttention场景mm2 计算CV通信附加参数  |
+| bmm1CallBackDataGm   | 64B                                                        | PageAttention场景mm1计算CV通信附加参数   |
+| bmm2CallBackDataGm   | 64B                                                        | PageAttention场景mm2计算CV通信附加参数   |
 
-- SinnerSize：Kv块内切大小；
+- SinnerSize：Kv块内切大小。
 
 - msdIterNum ：默认为 1， Antiquant 场景A矩阵扩展行数 ，高精度模式时为3， 高性能模式为2。
 
@@ -212,9 +211,9 @@ workspace用于保存算子计算过程中不适合常驻UB的中间数据，IFA
 
 ### 分核设计
 
-​        Tiling操作的目的是为了找到一种更高效的NPU执行方式，原始的数据量一般是非常大的，没有办法通过一次指令调用就完成所有计算，因此需要将数据量分到多个核上并行计算，且每个核上也需要考虑如何循环计算性能最优，不同的输入可能有不同的最优执行方式，所以需要通过tiling策略决定怎么将数据分配到各个核上进行计算。
+ Tiling操作的目的是为了找到一种更高效的NPU执行方式，原始的数据量一般是非常大的，没有办法通过一次指令调用就完成所有计算，因此需要将数据量分到多个核上并行计算，且每个核上也需要考虑如何循环计算性能最优，不同的输入可能有不同的最优执行方式，所以需要通过tiling策略决定怎么将数据分配到各个核上进行计算。
 
-如前所述，总块数为 BN2 或 BN2*SplitKv
+如前所述，总块数为BN2或BN2*SplitKv：
 
 - 输入：核数 + 块数 +  块负载（通常为每个分块的S轴实际长度）；
 
@@ -223,7 +222,7 @@ workspace用于保存算子计算过程中不适合常驻UB的中间数据，IFA
 - 输出： blockid数组，每个元素对应一个核的起始blockid，最后附加一个元素等于总块数，前后元素差值为该核处理的块数。
 
 
-### TilingKey 规划
+### TilingKey规划
 
 TilingKey为uint64 类型，通常每个模板参数对应TilingKey中的一个十进制位，部分BOOL类型的模板参数采用组合方式在一个十进制位中表示。
 
