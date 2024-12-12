@@ -60,15 +60,15 @@
 
   - actualSeqLengthsKv（aclIntArray\*，计算输入）：Host侧的aclIntArray，可传入nullptr，代表不同batch中key/value的有效Sequence Length，数据类型支持INT64。限制：该入参中每个batch的有效Sequence Length应该不大于key/value中对应batch的Sequence Length。seqlenKv的传入长度为1时，每个Batch使用相同seqlenKv；传入长度大于等于Batch时取seqlenKv的前Batch个数。其他长度不支持。**Atlas推理系列加速卡产品仅支持nullptr**。
 
-  - deqScale1（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持UINT64、FLOAT32，[数据格式](common/数据格式.md)支持ND（参考），表示BMM1后面的反量化因子，支持per-tensor。 如不使用该功能时可传入nullptr，**Atlas推理系列加速卡产品仅支持nullptr**。
+  - deqScale1（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持UINT64、FLOAT32，[数据格式](common/数据格式.md)支持ND，表示BMM1后面的反量化因子，支持per-tensor。 如不使用该功能时可传入nullptr，**Atlas推理系列加速卡产品仅支持nullptr**。
 
-  - quantScale1（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持FLOAT32，[数据格式](common/数据格式.md)支持ND（参考），表示BMM2前面的量化因子，支持per-tensor。 如不使用该功能时可传入nullptr，**Atlas推理系列加速卡产品仅支持nullptr**。
+  - quantScale1（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持FLOAT32，[数据格式](common/数据格式.md)支持ND，表示BMM2前面的量化因子，支持per-tensor。 如不使用该功能时可传入nullptr，**Atlas推理系列加速卡产品仅支持nullptr**。
 
-  - deqScale2（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持UINT64、FLOAT32，[数据格式](common/数据格式.md)支持ND（参考），表示BMM2后面的反量化因子，支持per-tensor。 如不使用该功能时可传入nullptr，**Atlas推理系列加速卡产品仅支持nullptr**。
+  - deqScale2（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持UINT64、FLOAT32，[数据格式](common/数据格式.md)支持ND，表示BMM2后面的反量化因子，支持per-tensor。 如不使用该功能时可传入nullptr，**Atlas推理系列加速卡产品仅支持nullptr**。
 
-  - quantScale2（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持FLOAT32，[数据格式](common/数据格式.md)支持ND（参考），表示输出的量化因子，支持per-tensor，per-channel。 如不使用该功能时可传入nullptr，**Atlas推理系列加速卡产品仅支持nullptr**。
+  - quantScale2（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持FLOAT32，[数据格式](common/数据格式.md)支持ND，表示输出的量化因子，支持per-tensor，per-channel。 如不使用该功能时可传入nullptr，**Atlas推理系列加速卡产品仅支持nullptr**。
 
-  - quantOffset2（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持FLOAT32，[数据格式](common/数据格式.md)支持ND（参考），表示输出的量化偏移，支持per-tensor，per-channel。 如不使用该功能时可传入nullptr，**Atlas推理系列加速卡产品仅支持nullptr**。
+  - quantOffset2（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持FLOAT32，[数据格式](common/数据格式.md)支持ND，表示输出的量化偏移，支持per-tensor，per-channel。 如不使用该功能时可传入nullptr，**Atlas推理系列加速卡产品仅支持nullptr**。
 
   - numHeads（int64\_t，计算输入）：Host侧的int，代表query的head个数，数据类型支持INT64。
 

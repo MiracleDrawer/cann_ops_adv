@@ -53,25 +53,25 @@ Atlas A2 训练系列产品/Atlas 800I A2推理产品
     
     - actualSeqLengthsKv（aclIntArray\*，计算输入）：Host侧的aclIntArray，可传入nullptr，代表不同Batch中key/value的有效Sequence Length。数据类型支持：INT64。如果不指定seqlen可以传入nullptr，表示和key/value的shape的s长度相同。限制：该入参中每个batch的有效Sequence Length应该不大于key/value中对应batch的Sequence Length。seqlenKv的传入长度为1时，每个Batch使用相同seqlenKv；传入长度大于等于Batch时取seqlenKv的前Batch个数。其他长度不支持。
     
-    - deqScale1（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：UINT64。[数据格式](common/数据格式.md)支持ND（参考），表示BMM1后面的反量化因子，支持per-tensor。 如不使用该功能时可传入nullptr，综合约束请见[约束与限制](#1)。
+    - deqScale1（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：UINT64。[数据格式](common/数据格式.md)支持ND，表示BMM1后面的反量化因子，支持per-tensor。 如不使用该功能时可传入nullptr，综合约束请见[约束与限制](#1)。
     
-    - quantScale1（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：FLOAT32。[数据格式](common/数据格式.md)支持ND（参考），表示BMM2前面的量化因子，支持per-tensor。 如不使用该功能时可传入nullptr，综合约束请见[约束与限制](#1)。
+    - quantScale1（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：FLOAT32。[数据格式](common/数据格式.md)支持ND，表示BMM2前面的量化因子，支持per-tensor。 如不使用该功能时可传入nullptr，综合约束请见[约束与限制](#1)。
     
-    - deqScale2（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：UINT64。[数据格式](common/数据格式.md)支持ND（参考），表示BMM2后面的反量化因子，支持per-tensor。 如不使用该功能时可传入nullptr，综合约束请见[约束与限制](#1)。
+    - deqScale2（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：UINT64。[数据格式](common/数据格式.md)支持ND，表示BMM2后面的反量化因子，支持per-tensor。 如不使用该功能时可传入nullptr，综合约束请见[约束与限制](#1)。
     
-    - quantScale2（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：FLOAT32、BFLOAT16。[数据格式](common/数据格式.md)支持ND（参考），表示输出的量化因子，支持per-tensor，per-channel。 如不使用该功能时可传入nullptr，综合约束请见[约束与限制](#1)。
+    - quantScale2（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：FLOAT32、BFLOAT16。[数据格式](common/数据格式.md)支持ND，表示输出的量化因子，支持per-tensor，per-channel。 如不使用该功能时可传入nullptr，综合约束请见[约束与限制](#1)。
     
-    - quantOffset2（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：FLOAT32、BFLOAT16。[数据格式](common/数据格式.md)支持ND（参考），表示输出的量化偏移，支持per-tensor，per-channel。 如不使用该功能时可传入nullptr，综合约束请见[约束与限制](#1)。
+    - quantOffset2（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：FLOAT32、BFLOAT16。[数据格式](common/数据格式.md)支持ND，表示输出的量化偏移，支持per-tensor，per-channel。 如不使用该功能时可传入nullptr，综合约束请见[约束与限制](#1)。
     
-    - antiquantScale（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：FLOAT16、BFLOAT16、FLOAT32。[数据格式](common/数据格式.md)支持ND（参考），表示伪量化因子，支持per-tensor，per-channel，per-token。Q_S大于等于2时只支持FLOAT16，综合约束请见[约束与限制](#1)。
+    - antiquantScale（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：FLOAT16、BFLOAT16、FLOAT32。[数据格式](common/数据格式.md)支持ND，表示伪量化因子，支持per-tensor，per-channel，per-token。Q_S大于等于2时只支持FLOAT16，综合约束请见[约束与限制](#1)。
     
-    - antiquantOffset（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：FLOAT16、BFLOAT16、FLOAT32。[数据格式](common/数据格式.md)支持ND（参考），表示伪量化偏移，支持per-tensor，per-channel，per-token。Q_S大于等于2时只支持FLOAT16，综合约束请见[约束与限制](#1)。
+    - antiquantOffset（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：FLOAT16、BFLOAT16、FLOAT32。[数据格式](common/数据格式.md)支持ND，表示伪量化偏移，支持per-tensor，per-channel，per-token。Q_S大于等于2时只支持FLOAT16，综合约束请见[约束与限制](#1)。
 
-    - blockTable（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：INT32。[数据格式](common/数据格式.md)支持ND（参考）。表示PageAttention中KV存储使用的block映射表，如不使用该功能可传入nullptr。
+    - blockTable（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：INT32。[数据格式](common/数据格式.md)支持ND。表示PageAttention中KV存储使用的block映射表，如不使用该功能可传入nullptr。
     
-    - queryPaddingSize（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：INT64。[数据格式](common/数据格式.md)支持ND（参考）。表示Query中每个batch的数据是否右对齐，且右对齐的个数是多少。仅支持Q_S大于1，其余场景该参数无效。用户不特意指定时可传入默认值nullptr。
+    - queryPaddingSize（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：INT64。[数据格式](common/数据格式.md)支持ND。表示Query中每个batch的数据是否右对齐，且右对齐的个数是多少。仅支持Q_S大于1，其余场景该参数无效。用户不特意指定时可传入默认值nullptr。
     
-    - kvPaddingSize（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：INT64。[数据格式](common/数据格式.md)支持ND（参考）。表示key/value中每个batch的数据是否右对齐，且右对齐的个数是多少。用户不特意指定时可传入默认值nullptr。
+    - kvPaddingSize（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：INT64。[数据格式](common/数据格式.md)支持ND。表示key/value中每个batch的数据是否右对齐，且右对齐的个数是多少。用户不特意指定时可传入默认值nullptr。
     
     - numHeads（int64\_t，计算输入）：Host侧的int，代表query的head个数，数据类型支持INT64，在BNSD场景下，需要与shape中的query的N轴shape值相同，否则执行异常。
     

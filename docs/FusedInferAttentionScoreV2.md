@@ -52,33 +52,33 @@ Atlas A2 训练系列产品/Atlas 800I A2推理产品
     
     - actualSeqLengthsKvOptional（aclIntArray\*，计算输入）：Host侧的aclIntArray，可传入nullptr，代表不同Batch中key/value的有效Sequence Length。数据类型支持：INT64。如果不指定seqlen可以传入nullptr，表示和key/value的shape的s长度相同。限制：该入参中每个batch的有效Sequence Length应该不大于key/value中对应batch的Sequence Length。seqlenKv的传入长度为1时，每个Batch使用相同seqlenKv；传入长度大于等于Batch时取seqlenKv的前Batch个数。其他长度不支持。
     
-    - deqScale1Optional（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：UINT64。[数据格式](common/数据格式.md)支持ND（参考），表示BMM1后面的反量化因子，支持per-tensor。 如不使用该功能时可传入nullptr，综合约束请见[约束与限制](#1)。
+    - deqScale1Optional（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：UINT64。[数据格式](common/数据格式.md)支持ND，表示BMM1后面的反量化因子，支持per-tensor。 如不使用该功能时可传入nullptr，综合约束请见[约束与限制](#1)。
     
-    - quantScale1Optional（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：FLOAT32。[数据格式](common/数据格式.md)支持ND（参考），表示BMM2前面的量化因子，支持per-tensor。 如不使用该功能时可传入nullptr，综合约束请见[约束与限制](#1)。
+    - quantScale1Optional（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：FLOAT32。[数据格式](common/数据格式.md)支持ND，表示BMM2前面的量化因子，支持per-tensor。 如不使用该功能时可传入nullptr，综合约束请见[约束与限制](#1)。
     
-    - deqScale2Optional（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：UINT64。[数据格式](common/数据格式.md)支持ND（参考），表示BMM2后面的反量化因子，支持per-tensor。 如不使用该功能时可传入nullptr，综合约束请见[约束与限制](#1)。
+    - deqScale2Optional（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：UINT64。[数据格式](common/数据格式.md)支持ND，表示BMM2后面的反量化因子，支持per-tensor。 如不使用该功能时可传入nullptr，综合约束请见[约束与限制](#1)。
     
-    - quantScale2Optional（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：FLOAT32、BFLOAT16。[数据格式](common/数据格式.md)支持ND（参考），表示输出的量化因子，支持per-tensor，per-channel。 如不使用该功能时可传入nullptr，综合约束请见[约束与限制](#1)。
+    - quantScale2Optional（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：FLOAT32、BFLOAT16。[数据格式](common/数据格式.md)支持ND，表示输出的量化因子，支持per-tensor，per-channel。 如不使用该功能时可传入nullptr，综合约束请见[约束与限制](#1)。
     
-    - quantOffset2Optional（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：FLOAT32、BFLOAT16。[数据格式](common/数据格式.md)支持ND（参考），表示输出的量化偏移，支持per-tensor，per-channel。 如不使用该功能时可传入nullptr，综合约束请见[约束与限制](#1)。
+    - quantOffset2Optional（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：FLOAT32、BFLOAT16。[数据格式](common/数据格式.md)支持ND，表示输出的量化偏移，支持per-tensor，per-channel。 如不使用该功能时可传入nullptr，综合约束请见[约束与限制](#1)。
     
-    - antiquantScaleOptional（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：FLOAT16、BFLOAT16、FLOAT32。[数据格式](common/数据格式.md)支持ND（参考），表示伪量化因子，支持per-tensor，per-channel，per-token。Q_S大于等于2时只支持FLOAT16，如不使用该功能时可传入nullptr。综合约束请见[约束与限制](#1)。
+    - antiquantScaleOptional（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：FLOAT16、BFLOAT16、FLOAT32。[数据格式](common/数据格式.md)支持ND，表示伪量化因子，支持per-tensor，per-channel，per-token。Q_S大于等于2时只支持FLOAT16，如不使用该功能时可传入nullptr。综合约束请见[约束与限制](#1)。
     
-    - antiquantOffsetOptional（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：FLOAT16、BFLOAT16、FLOAT32。[数据格式](common/数据格式.md)支持ND（参考），表示伪量化偏移，支持per-tensor，per-channel，per-token。Q_S大于等于2时只支持FLOAT16，如不使用该功能时可传入nullptr。综合约束请见[约束与限制](#1)。
+    - antiquantOffsetOptional（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：FLOAT16、BFLOAT16、FLOAT32。[数据格式](common/数据格式.md)支持ND，表示伪量化偏移，支持per-tensor，per-channel，per-token。Q_S大于等于2时只支持FLOAT16，如不使用该功能时可传入nullptr。综合约束请见[约束与限制](#1)。
     
-    - blockTableOptional（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：INT32。[数据格式](common/数据格式.md)支持ND（参考）。表示PageAttention中KV存储使用的block映射表，如不使用该功能可传入nullptr。
+    - blockTableOptional（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：INT32。[数据格式](common/数据格式.md)支持ND。表示PageAttention中KV存储使用的block映射表，如不使用该功能可传入nullptr。
     
-    - queryPaddingSizeOptional（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：INT64。[数据格式](common/数据格式.md)支持ND（参考）。表示Query中每个batch的数据是否右对齐，且右对齐的个数是多少。仅支持Q_S大于1，其余场景该参数无效。用户不特意指定时可传入默认值nullptr。
+    - queryPaddingSizeOptional（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：INT64。[数据格式](common/数据格式.md)支持ND。表示Query中每个batch的数据是否右对齐，且右对齐的个数是多少。仅支持Q_S大于1，其余场景该参数无效。用户不特意指定时可传入默认值nullptr。
 
-    - kvPaddingSizeOptional（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：INT64。[数据格式](common/数据格式.md)支持ND（参考）。表示key/value中每个batch的数据是否右对齐，且右对齐的个数是多少。用户不特意指定时可传入默认值nullptr。
+    - kvPaddingSizeOptional（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：INT64。[数据格式](common/数据格式.md)支持ND。表示key/value中每个batch的数据是否右对齐，且右对齐的个数是多少。用户不特意指定时可传入默认值nullptr。
     
-    - keyAntiquantScaleOptional（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：FLOAT16、BFLOAT16、FLOAT32。[数据格式](common/数据格式.md)支持ND（参考），kv伪量化参数分离时表示key的反量化因子，支持per-tensor，per-channel，per-token。Q_S大于等于2时仅支持per-token模式，如不使用该功能时可传入nullptr。综合约束请见[约束与限制](#1)。
+    - keyAntiquantScaleOptional（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：FLOAT16、BFLOAT16、FLOAT32。[数据格式](common/数据格式.md)支持ND，kv伪量化参数分离时表示key的反量化因子，支持per-tensor，per-channel，per-token。Q_S大于等于2时仅支持per-token模式，如不使用该功能时可传入nullptr。综合约束请见[约束与限制](#1)。
     
-    - keyAntiquantOffsetOptional（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：FLOAT16、BFLOAT16、FLOAT32。[数据格式](common/数据格式.md)支持ND（参考），kv伪量化参数分离时表示key的反量化偏移，支持per-tensor，per-channel，per-token。Q_S大于等于2时仅支持per-token模式，如不使用该功能时可传入nullptr。综合约束请见[约束与限制](#1)。
+    - keyAntiquantOffsetOptional（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：FLOAT16、BFLOAT16、FLOAT32。[数据格式](common/数据格式.md)支持ND，kv伪量化参数分离时表示key的反量化偏移，支持per-tensor，per-channel，per-token。Q_S大于等于2时仅支持per-token模式，如不使用该功能时可传入nullptr。综合约束请见[约束与限制](#1)。
     
-    - valueAntiquantScaleOptional（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：FLOAT16、BFLOAT16、FLOAT32。[数据格式](common/数据格式.md)支持ND（参考），kv伪量化参数分离时表示value的反量化因子，支持per-tensor，per-channel，per-token。Q_S大于等于2时仅支持per-token模式，如不使用该功能时可传入nullptr。综合约束请见[约束与限制](#1)。
+    - valueAntiquantScaleOptional（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：FLOAT16、BFLOAT16、FLOAT32。[数据格式](common/数据格式.md)支持ND，kv伪量化参数分离时表示value的反量化因子，支持per-tensor，per-channel，per-token。Q_S大于等于2时仅支持per-token模式，如不使用该功能时可传入nullptr。综合约束请见[约束与限制](#1)。
     
-    - valueAntiquantOffsetOptional（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：FLOAT16、BFLOAT16、FLOAT32。[数据格式](common/数据格式.md)支持ND（参考），kv伪量化参数分离时表示value的反量化偏移，支持per-tensor，per-channel，per-token。Q_S大于等于2时仅支持per-token模式，如不使用该功能时可传入nullptr。综合约束请见[约束与限制](#1)。
+    - valueAntiquantOffsetOptional（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：FLOAT16、BFLOAT16、FLOAT32。[数据格式](common/数据格式.md)支持ND，kv伪量化参数分离时表示value的反量化偏移，支持per-tensor，per-channel，per-token。Q_S大于等于2时仅支持per-token模式，如不使用该功能时可传入nullptr。综合约束请见[约束与限制](#1)。
     
     - keySharedPrefixOptional（aclTensor\*，计算输入）：Device侧的aclTensor，attention结构中Key的系统前缀部分的参数，数据类型支持FLOAT16、BFLOAT16、INT8，不支持[非连续的Tensor](common/非连续的Tensor.md)，[数据格式](common/数据格式.md)支持ND。如不使用该功能时可传入nullptr。综合约束请见[约束与限制](#1)。
     
