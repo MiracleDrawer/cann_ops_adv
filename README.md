@@ -18,6 +18,12 @@ cann-ops-adv，是基于昇腾硬件的融合算子库（adv表示advanced）。
 - 优化数据流：融合算子可以优化数据流，减少数据在不同算子之间的传输，从而提高数据处理效率。
 - 简化代码实现：融合算子可以简化代码实现，减少代码量，提高代码可读性和可维护性。
 
+## 版本配套说明
+
+- 本源码仓会适配CANN软件版本创建相应的标签并发行，关于CANN软件版本与本源码仓中标签的配套关系可参见"[开放项目与CANN版本配套表](https://gitee.com/ascend/cann-community/blob/master/README.md#cannversionmap)"。**需要注意，为确保您的源码定制开发顺利进行，请选择配套的CANN版本与Gitee标签源码，使用master分支可能存在版本不匹配的风险。**
+
+- 本源码仓支持的固件驱动版本与配套CANN软件支持的固件驱动版本相同，开发者可通过“[昇腾社区-固件与驱动](https://www.hiascend.com/hardware/firmware-drivers/community?product=2&model=28)”页面根据产品型号与CANN软件版本获取配套的固件与驱动。
+
 
 ## 目录结构说明
 
@@ -87,7 +93,6 @@ cann-ops-adv，是基于昇腾硬件的融合算子库（adv表示advanced）。
 | PromptFlashAttentionV2     | 相较于PromptFlashAttention新增量化特性、sparse特性、指定key/value的有效Sequence Length特性。 | [PromptFlashAttentionV2](./docs/PromptFlashAttentionV2.md)   |
 | PromptFlashAttentionV3     | 相较于PromptFlashAttentionV2新增支持指定精度模式特性。       | [PromptFlashAttentionV3](./docs/PromptFlashAttentionV3.md)   |
 
-以上算子当前仅支持Atlas A2 训练系列产品。
 ## 环境准备<a name="1"></a>
 
 cann-ops-adv支持由源码编译，进行源码编译前，请根据如下步骤完成相关环境准备。
@@ -95,12 +100,13 @@ cann-ops-adv支持由源码编译，进行源码编译前，请根据如下步�
 1. **获取CANN开发套件包**
 
    请参见"[开放项目与CANN版本配套表](https://gitee.com/ascend/cann-community/blob/master/README.md#cannversionmap)"获取对应的CANN开发套件包`Ascend-cann-toolkit_<cann_version>_linux-<arch>.run`和算子二进制包`Ascend-cann-kernels-<soc_version>_<cann_version>_linux.run`（二进制包，算子运行时依赖）。
-   - **为确保您的源码定制开发顺利进行，请选择配套的CANN版本与Gitee分支源码，使用master分支可能存在版本不匹配的风险。**
+
+   - 为确保您的源码定制开发顺利进行，请选择配套的CANN版本与Gitee分支源码，使用master分支可能存在版本不匹配的风险。
    - 支持的安装方式及操作系统请参见配套版本的[用户手册](https://hiascend.com/document/redirect/CannCommunityInstSoftware)。
 
 2. **安装依赖**
 
-   **以下所列仅为cann-ops-adv源码编译用到的依赖，python、gcc、cmake以及CANN开发套件包其他依赖的安装方法请参见配套版本的[用户手册](https://hiascend.com/document/redirect/CannCommunityInstDepend)，选择安装场景后，参见“安装CANN > 安装依赖”章节进行相关依赖的安装。**
+   以下所列仅为cann-ops-adv源码编译用到的依赖，其中python、gcc的安装方法请参见配套版本的[用户手册](https://hiascend.com/document/redirect/CannCommunityInstDepend)，选择安装场景后，参见“安装CANN > 安装依赖”章节进行相关依赖的安装。
 
    - python >= 3.7.0
 
