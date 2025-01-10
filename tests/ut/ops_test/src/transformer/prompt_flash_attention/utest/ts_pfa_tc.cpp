@@ -119,6 +119,22 @@ TEST_F(Ts_Pfa_Ascend910B2, prompt_flash_attention_BNSD_attenMask_sparse_mode4_ca
     ge::FORMAT_ND); ASSERT_EQ(cs.Run(), cs.mOpInfo.mExp.mSuccess);
 }
 
+TEST_F(Ts_Pfa_Ascend910B2, prompt_flash_attention_BNSD_attenMask_sparse_mode4_case2)
+{
+    PfaCase cs;
+    cs.mParam.b = 1;
+    cs.mParam.n = 8;
+    cs.mParam.s = 8193;
+    cs.mParam.d = 128;
+    cs.mParam.layout = "BNSD";
+    cs.mParam.numHeads = 8;
+    cs.mParam.scaleValue = 1.0f;
+    cs.mOpInfo.mExp.mSuccess = true;
+    ASSERT_TRUE(cs.Init());
+    cs.query = Tensor("query", {cs.mParam.b, cs.mParam.n, cs.mParam.s, cs.mParam.d}, "BNSD", cs.mParam.qDataType,
+    ge::FORMAT_ND); ASSERT_EQ(cs.Run(), cs.mOpInfo.mExp.mSuccess);
+}
+
 TEST_F(Ts_Pfa_Ascend910B2, prompt_flash_attention_tiling_bf16)
 {
     PfaCase cs;
@@ -255,7 +271,7 @@ TEST_F(Ts_Pfa_Ascend910B2, case_invalid_quant_1)
     PfaCase cs;
     cs.mParam.b = 1;
     cs.mParam.n = 40;
-    cs.mParam.s = 1000;
+    cs.mParam.s = 1;
     cs.mParam.d = 128;
     cs.mParam.layout = "BNSD";
     cs.mParam.qDataType = ge::DT_INT8;
@@ -263,7 +279,6 @@ TEST_F(Ts_Pfa_Ascend910B2, case_invalid_quant_1)
     cs.mParam.outDataType = ge::DT_INT8;
     cs.mParam.attenMaskType = AttenMaskShapeType::B_N_1_S;
     cs.mParam.quantType = QuantShapeType::ALL_1;
-    cs.mParam.actualSeqLength = {1000};
     cs.mParam.numHeads = 40;
     cs.mOpInfo.mExp.mSuccess = true;
     ASSERT_TRUE(cs.Init());
@@ -318,8 +333,9 @@ TEST_F(Ts_Pfa_Ascend910B2, case_atten_mask_2)
     cs.mParam.layout = "BNSD";
     cs.mParam.attenMaskType = AttenMaskShapeType::B_N_1_S;
     cs.mParam.numHeads = 40;
+    cs.mOpInfo.mExp.mSuccess = false;
     ASSERT_TRUE(cs.Init());
-    ASSERT_TRUE(cs.Run());
+    ASSERT_EQ(cs.Run(), cs.mOpInfo.mExp.mSuccess);
 }
 
 TEST_F(Ts_Pfa_Ascend910B2, case_BN_greater_than_core_number)
@@ -333,24 +349,25 @@ TEST_F(Ts_Pfa_Ascend910B2, case_BN_greater_than_core_number)
     cs.mParam.attenMaskType = AttenMaskShapeType::B_N_1_S;
     cs.mParam.numHeads = 49;
     cs.mParam.kvNumHeads = 1;
+    cs.mOpInfo.mExp.mSuccess = false;
     ASSERT_TRUE(cs.Init());
-    ASSERT_TRUE(cs.Run());
+    ASSERT_EQ(cs.Run(), cs.mOpInfo.mExp.mSuccess);
 }
 TEST_F(Ts_Pfa_Ascend910B2, case_quant_1)
 {
     PfaCase cs;
     cs.mParam.b = 1;
     cs.mParam.n = 40;
-    cs.mParam.s = 1000;
+    cs.mParam.s = 1;
     cs.mParam.d = 128;
     cs.mParam.layout = "BNSD";
     cs.mParam.outDataType = ge::DT_INT8;
     cs.mParam.attenMaskType = AttenMaskShapeType::B_N_1_S;
     cs.mParam.quantType = QuantShapeType::POST_1;
-    cs.mParam.actualSeqLength = {1000};
     cs.mParam.numHeads = 40;
+    cs.mOpInfo.mExp.mSuccess = true;
     ASSERT_TRUE(cs.Init());
-    ASSERT_TRUE(cs.Run());
+    ASSERT_EQ(cs.Run(), cs.mOpInfo.mExp.mSuccess);
 }
 TEST_F(Ts_Pfa_Ascend910B2, case_kvAntiQuant_1)
 {
@@ -603,7 +620,7 @@ TEST_F(Ts_Pfa_Ascend910B2, case_kvAntiquant_bf16_quant_scale2_type_3)
     cs.mParam.quantType = QuantShapeType::POST_1;
     cs.mOpInfo.mExp.mSuccess = false;
     ASSERT_TRUE(cs.Init());
-     ASSERT_EQ(cs.Run(), cs.mOpInfo.mExp.mSuccess);
+    ASSERT_EQ(cs.Run(), cs.mOpInfo.mExp.mSuccess);
 }
 TEST_F(Ts_Pfa_Ascend910B2, case_kvAntiquant_workspace_opt_unflashSplitB_largeS)
 {
@@ -676,8 +693,144 @@ TEST_F(Ts_Pfa_Ascend910B2, case_attenmask_fp16)
     cs.mParam.attenMaskType = AttenMaskShapeType::B_N_1_S;
     cs.mParam.pseShiftType = PseShiftShapeType::B_1_N_S;
     cs.mParam.qDataType = ge::DT_BF16;
-    cs.pseShift = Tensor("pseShift", {cs.mParam.b, cs.mParam.n, 1, cs.mParam.s}, "B_1_N_S", cs.mParam.qDataType,
-    ge::FORMAT_ND); ASSERT_TRUE(cs.Init()); ASSERT_TRUE(cs.Run());
+    cs.mOpInfo.mExp.mSuccess = false;
+    cs.pseShift = Tensor("pseShift", {cs.mParam.b, cs.mParam.n, 1, cs.mParam.s}, "B_1_N_S", cs.mParam.qDataType, ge::FORMAT_ND);
+    ASSERT_TRUE(cs.Init());
+    ASSERT_EQ(cs.Run(), cs.mOpInfo.mExp.mSuccess);
+}
+
+TEST_F(Ts_Pfa_Ascend910B2, case_pfa_1)
+{
+    PfaCase cs;
+    cs.mParam.b = 1;
+    cs.mParam.n = 4;
+    cs.mParam.s = 8192;
+    cs.mParam.d = 256;
+    cs.mParam.layout = "BNSD";
+    cs.mParam.numHeads = 4;
+    cs.mParam.actualSeqLength = {1};
+    cs.mParam.pseShiftType = PseShiftShapeType::B_1_N_S;
+    cs.mParam.qDataType = ge::DT_BF16;
+    cs.pseShift = Tensor("pseShift", {cs.mParam.b, cs.mParam.n, 1, cs.mParam.s}, "B_1_N_S", cs.mParam.qDataType, ge::FORMAT_ND);
+    ASSERT_TRUE(cs.Init());
+    cs.mOpInfo.mExp.mSuccess = false;
+    ASSERT_EQ(cs.Run(), cs.mOpInfo.mExp.mSuccess);
+}
+
+TEST_F(Ts_Pfa_Ascend310P3, case_pfa_2)
+{
+    PfaCase cs;
+    cs.mParam.b = 1;
+    cs.mParam.n = 20;
+    cs.mParam.s = 4096;
+    cs.mParam.d = 16;
+    cs.mParam.layout = "BSND";
+    cs.mParam.numHeads = 20;
+    cs.mParam.kvNumHeads = 2;
+    cs.mParam.scaleValue = 1.0f;
+    cs.mParam.actualSeqLength = {1};
+    ASSERT_TRUE(cs.Init());
+    ASSERT_TRUE(cs.Run());
+}
+
+TEST_F(Ts_Pfa_Ascend310P3, case_pfa_3)
+{
+    PfaCase cs;
+    cs.mParam.b = 1;
+    cs.mParam.n = 20;
+    cs.mParam.s = 4096;
+    cs.mParam.d = 16;
+    cs.mParam.layout = "SH";
+    cs.mParam.numHeads = 20;
+    cs.mParam.kvNumHeads = 2;
+    cs.mParam.scaleValue = 1.0f;
+    cs.mParam.actualSeqLength = {1};
+    ASSERT_TRUE(cs.Init());
+    cs.query = Tensor("query", {4096, 320}, "SH", cs.mParam.qDataType, ge::FORMAT_ND);
+    cs.key = Tensor("key", {4096, 32}, "SH", cs.mParam.kvDataType, ge::FORMAT_ND);
+    cs.value = Tensor("value", {4096, 32}, "SH", cs.mParam.kvDataType, ge::FORMAT_ND);
+    cs.attentionOut = Tensor("attentionOut", {4096, 320}, "SH", cs.mParam.outDataType, ge::FORMAT_ND);
+    cs.mOpInfo.mExp.mSuccess = false;
+    ASSERT_EQ(cs.Run(), cs.mOpInfo.mExp.mSuccess);
+}
+
+TEST_F(Ts_Pfa_Ascend310P3, case_pfa_4)
+{
+    PfaCase cs;
+    cs.mParam.b = 1;
+    cs.mParam.n = 20;
+    cs.mParam.s = 4096;
+    cs.mParam.d = 16;
+    cs.mParam.layout = "NSD";
+    cs.mParam.numHeads = 20;
+    cs.mParam.kvNumHeads = 2;
+    cs.mParam.scaleValue = 1.0f;
+    cs.mParam.actualSeqLength = {1};
+    ASSERT_TRUE(cs.Init());
+    cs.query = Tensor("query", {20, 4096, 16}, "NSD", cs.mParam.qDataType, ge::FORMAT_ND);
+    cs.key = Tensor("key", {2, 4096, 16}, "NSD", cs.mParam.kvDataType, ge::FORMAT_ND);
+    cs.value = Tensor("value", {2, 4096, 16}, "NSD", cs.mParam.kvDataType, ge::FORMAT_ND);
+    cs.attentionOut = Tensor("attentionOut", {20, 4096, 16}, "NSD", cs.mParam.outDataType, ge::FORMAT_ND);
+    cs.mOpInfo.mExp.mSuccess = true;
+    ASSERT_EQ(cs.Run(), cs.mOpInfo.mExp.mSuccess);
+}
+
+TEST_F(Ts_Pfa_Ascend910B2, case_pfa_5)
+{
+    PfaCase cs;
+    cs.mParam.b = 1;
+    cs.mParam.n = 20;
+    cs.mParam.s = 4096;
+    cs.mParam.d = 16;
+    cs.mParam.layout = "BSND";
+    cs.mParam.numHeads = 20;
+    cs.mParam.kvNumHeads = 2;
+    cs.mParam.scaleValue = 1.0f;
+    cs.mParam.actualSeqLength = {1};
+    ASSERT_TRUE(cs.Init());
+    ASSERT_TRUE(cs.Run());
+}
+
+TEST_F(Ts_Pfa_Ascend910B2, case_pfa_6)
+{
+    PfaCase cs;
+    cs.mParam.b = 1;
+    cs.mParam.n = 20;
+    cs.mParam.s = 4096;
+    cs.mParam.d = 16;
+    cs.mParam.layout = "SH";
+    cs.mParam.numHeads = 20;
+    cs.mParam.kvNumHeads = 2;
+    cs.mParam.scaleValue = 1.0f;
+    cs.mParam.actualSeqLength = {1};
+    ASSERT_TRUE(cs.Init());
+    cs.query = Tensor("query", {4096, 320}, "SH", cs.mParam.qDataType, ge::FORMAT_ND);
+    cs.key = Tensor("key", {4096, 32}, "SH", cs.mParam.kvDataType, ge::FORMAT_ND);
+    cs.value = Tensor("value", {4096, 32}, "SH", cs.mParam.kvDataType, ge::FORMAT_ND);
+    cs.attentionOut = Tensor("attentionOut", {4096, 320}, "SH", cs.mParam.outDataType, ge::FORMAT_ND);
+    cs.mOpInfo.mExp.mSuccess = false;
+    ASSERT_EQ(cs.Run(), cs.mOpInfo.mExp.mSuccess);
+}
+
+TEST_F(Ts_Pfa_Ascend910B2, case_pfa_7)
+{
+    PfaCase cs;
+    cs.mParam.b = 1;
+    cs.mParam.n = 20;
+    cs.mParam.s = 4096;
+    cs.mParam.d = 16;
+    cs.mParam.layout = "NSD";
+    cs.mParam.numHeads = 20;
+    cs.mParam.kvNumHeads = 2;
+    cs.mParam.scaleValue = 1.0f;
+    cs.mParam.actualSeqLength = {1};
+    ASSERT_TRUE(cs.Init());
+    cs.query = Tensor("query", {20, 4096, 16}, "NSD", cs.mParam.qDataType, ge::FORMAT_ND);
+    cs.key = Tensor("key", {2, 4096, 16}, "NSD", cs.mParam.kvDataType, ge::FORMAT_ND);
+    cs.value = Tensor("value", {2, 4096, 16}, "NSD", cs.mParam.kvDataType, ge::FORMAT_ND);
+    cs.attentionOut = Tensor("attentionOut", {20, 4096, 16}, "NSD", cs.mParam.outDataType, ge::FORMAT_ND);
+    cs.mOpInfo.mExp.mSuccess = true;
+    ASSERT_EQ(cs.Run(), cs.mOpInfo.mExp.mSuccess);
 }
 
 TEST_F(Ts_Pfa_Ascend310P3, prompt_flash_attention_tiling_8)

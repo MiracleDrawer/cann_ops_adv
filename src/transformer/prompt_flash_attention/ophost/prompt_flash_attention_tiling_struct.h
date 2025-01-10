@@ -31,6 +31,15 @@ enum class TilingMod {
     CVSAME = 0,
     CVDIFF,
 };
+
+enum class SplitCoreMode {
+    SPLIT_NBS_VECTOR = 0,
+    SPLIT_NBS_CUBE,
+    SPLIT_ONEN_VECTOR,
+    SPLIT_ONEN_CUBE,
+    BALANCE_VECTOR,
+    BALANCE_CUBE,
+};
 } // namespace optiling
 
 #endif // PROMPT_FLASH_ATTENTION_TILING_STRUCT_H

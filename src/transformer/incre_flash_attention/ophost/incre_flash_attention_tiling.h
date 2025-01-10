@@ -29,7 +29,11 @@
 
 const uint32_t MAX_CORE_NUM = 50;
 const uint32_t MAX_SIZE_BATCH = 256U;
-
+#ifdef ASCENDC_OP_TEST
+#define IFA_EXTERN_C extern "C"
+#else
+#define IFA_EXTERN_C
+#endif
 namespace optiling {
 
 BEGIN_TILING_DATA_DEF(IncreFlashAttentionInitOutputParams)
@@ -194,6 +198,7 @@ struct IncreFlashAttentionContext {
     std::vector<gert::StorageShape *> vCache;
     uint64_t tilingKey;
     uint32_t blockDim;
+    const bool *tilingSinkFlag;
 };
 
 enum class TilingInOutMode : uint32_t {
@@ -244,11 +249,13 @@ constexpr uint32_t DIM_PER_TOKEN_KvSplit = 2;
 constexpr uint32_t DIM_PER_TOKEN = 3;
 constexpr uint32_t PER_CHANNEL_MODE = 0;
 constexpr uint32_t PER_TOKEN_MODE = 1;
+constexpr uint32_t PER_CHANNEL_TOKEN_MODE = 2;
 constexpr uint32_t DEQUANT_PER_CHANNEL_MODE = 0; // 下面的0~4代表用户输入的数值，与上面的PER_CHANNEL_MODE、PER_TOKEN_MODE含义不同
 constexpr uint32_t DEQUANT_PER_TOKEN_MODE = 1;
 constexpr uint32_t DEQUANT_PER_TENSOR_HEAD_MODE = 2;
 constexpr uint32_t DEQUANT_PER_TOKEN_HEAD_MODE = 3;
 constexpr uint32_t DEQUANT_PER_TOKEN_PA_MODE = 4;
+constexpr uint32_t DEQUANT_PER_TOKEN_HEAD_PA_MODE = 5;
 constexpr uint32_t DIM_PER_CHANNEL_BNSD = 4;
 constexpr uint32_t DIM_PER_CHANNEL_BSND = 3;
 constexpr uint32_t DIM_PER_CHANNEL_BSH = 2;
@@ -302,9 +309,10 @@ private:
     ge::graphStatus CheckBaseInputsNull();
     ge::graphStatus InputAttrsPreProcess();
     ge::graphStatus QKVPreProcess();
+    ge::graphStatus ProcessPageAttentionFlag();
     ge::graphStatus KvShapePostProcess();
-    ge::graphStatus CheckKVHeadNum(gert::StorageShape *inputShape);
-    ge::graphStatus CheckKVShape();
+    ge::graphStatus CheckKVHeadNum(const gert::StorageShape *inputShape);
+    ge::graphStatus CheckKVShape(const size_t &size, const gert::StorageShape *keyTensorInList, const gert::StorageShape *valueTensorInList);
     ge::graphStatus CheckQKOutShape();
     ge::graphStatus CheckKeyShapeTensor(const gert::Shape &aShape);
     ge::graphStatus ZeroTensorProcess();
@@ -330,6 +338,12 @@ private:
                                         const gert::Tensor *antiquantOffsetTensor,
                                         const gert::CompileTimeTensorDesc *antiquantScaleDesc,
                                         const gert::CompileTimeTensorDesc *antiquantOffsetDesc);
+    ge::graphStatus CheckAntiQuantParamKeyType(const gert::Tensor *antiquantOffsetTensor,
+                                               const gert::CompileTimeTensorDesc *antiquantScaleDesc,
+                                               const gert::CompileTimeTensorDesc *antiquantOffsetDesc);
+    ge::graphStatus CheckAntiQuantParamValueType(const gert::Tensor *antiquantOffsetTensor,
+                                                 const gert::CompileTimeTensorDesc *antiquantScaleDesc,
+                                                 const gert::CompileTimeTensorDesc *antiquantOffsetDesc);
     ge::graphStatus CheckSupportKVLeftPadding();
     ge::graphStatus CheckInputFormatAndLimits();
     ge::graphStatus CheckInputParameterFormat();
@@ -507,6 +521,7 @@ private:
     uint32_t l2CacheOffFlag_ = 0;
     // softmaxLse
     bool softmaxLseFlag_ = false;
+    bool tilingSinkFlag_ = false;
 
     bool sysPrefixFlag_ = false;
     bool isSysPrefixTiling_ = false;
@@ -529,7 +544,7 @@ ge::graphStatus TilingPrepareForIncreFlashAttention(gert::TilingParseContext *co
 ge::graphStatus TilingIncreFlashAttentionAdapter(gert::TilingContext *context, IncreFlashAttentionContext &ifaContext,
                                                  IncreFlashAttentionTilingDataV2 &ifaTilingData);
 
-ge::graphStatus TilingIncreFlashAttention(gert::TilingContext *context);
+IFA_EXTERN_C ge::graphStatus TilingIncreFlashAttention(gert::TilingContext *context);
 
 } // namespace optiling
 #endif // AIR_CXX_RUNTIME_V2_OP_IMPL_INCREFLASHATTENTIONSCORE_H_

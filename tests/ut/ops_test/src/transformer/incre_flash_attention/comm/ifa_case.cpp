@@ -64,6 +64,22 @@ bool RunIncreFlashAttention(void *func, uint64_t tilingKey, int64_t blockDim, st
     return true;
 }
 
+extern "C" ge::graphStatus TilingIncreFlashAttentionStub(gert::TilingContext *context)
+{
+    auto *ifaCase = static_cast<IfaCase *>(Case::GetCurrentCase());
+    if (ifaCase != nullptr) {
+        IfaCase::DoTilingParam p;
+        p.ctx = context;
+        p.ret = ge::GRAPH_SUCCESS;
+        p.actualSeqLengthsTensor = const_cast<gert::Tensor *>(context->GetOptionalInputTensor(5)); // 5:act_seq_len idx
+        if (!ifaCase->DoOpTiling(p)) {
+            return p.ret;
+        }
+        return ifaCase->ifaTilingFunc(context);
+    }
+    return ge::GRAPH_FAILED;
+}
+
 bool IfaCase::InitParam()
 {
     h = mParam.n * mParam.d;
@@ -179,6 +195,19 @@ bool IfaCase::InitOpInfo()
     rst = rst && mCtx.SetKernelRunCbf(RunIncreFlashAttention);
     rst = rst && mCtx.SetKernelMainFunc(ifaKernelFunc);
     rst = rst && mOpInfo.SetContext(&mCtx);
+
+    auto *platform = Platform::GetGlobalPlatform();
+    if (platform == nullptr) {
+        LOG_ERR("Global Platform is null");
+        return false;
+    }
+
+    ifaTilingFunc = (gert::OpImplRegisterV2::TilingKernelFunc)platform->LoadOpTilingSoSym("TilingIncreFlashAttention");
+    if (ifaTilingFunc == nullptr) {
+        LOG_ERR("Can't get origin tiling func, ifa(%p)", ifaTilingFunc);
+        return false;
+    }
+    IMPL_OP(IncreFlashAttention).Tiling(TilingIncreFlashAttentionStub);
     return rst;
 }
 
@@ -220,4 +249,15 @@ IfaCase::Param::Param(int64_t pB, int64_t pN, int64_t pS, int64_t pD, std::strin
     : b(pB), n(pN), s(pS), d(pD), layout(pLayout), numHeads(pNumHeads), kvNumHeads(pKvNumHeads),
       scaleValue(pScaleValue), blockSize(pBlockSize), innerPrecise(pInnerPrecise), actualSeqLength(pActualSeqLength)
 {
+}
+
+
+bool IfaCase::DoOpTiling(DoTilingParam& tilingParam) {
+  if (tilingParam.ctx == nullptr) {
+    return false;
+  }
+  if (tilingParam.actualSeqLengthsTensor != nullptr && mParam.actualSeqLength.size() != 0) {
+    tilingParam.actualSeqLengthsTensor->SetData(gert::TensorData{mParam.actualSeqLength.data()});
+  }
+  return true;
 }

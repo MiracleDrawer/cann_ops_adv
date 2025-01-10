@@ -182,6 +182,9 @@ extern "C" __global__ __aicore__ void incre_flash_attention_FIAS(
     } else if (TILING_KEY_IS(10000000000100000)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, half, half, false, true,
                                    LAYOUT::BNSD);
+    } else if (TILING_KEY_IS(10000000000300000)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, half, half, true, true,
+                                   LAYOUT::BNSD);
     } else if (TILING_KEY_IS(10000000000000001)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, half, half, false, false,
                                    LAYOUT::BSH);
@@ -199,18 +202,21 @@ extern "C" __global__ __aicore__ void incre_flash_attention_FIAS(
     } else if (TILING_KEY_IS(10000000000100001)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, half, half, false, true,
                                    LAYOUT::BSH);
+    } else if (TILING_KEY_IS(10000000000300001)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, half, half, true, true,
+                                   LAYOUT::BSH);
     } else if (TILING_KEY_IS(20000000000000000)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, half, half, false, false,
-                                   LAYOUT::BNSD, false, true);
+                                   LAYOUT::BNSD, 0, true);
     } else if (TILING_KEY_IS(20000000000100000)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, half, half, false, true,
-                                   LAYOUT::BNSD, false, true);
+                                   LAYOUT::BNSD, 0, true);
     } else if (TILING_KEY_IS(20000000000000001)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, half, half, false, false,
-                                   LAYOUT::BSH, false, true);
+                                   LAYOUT::BSH, 0, true);
     } else if (TILING_KEY_IS(20000000000100001)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, half, half, false, true,
-                                   LAYOUT::BSH, false, true);
+                                   LAYOUT::BSH, 0, true);
 #else
     } else if (TILING_KEY_IS(11000000000200000)) {
         INVOKE_IFA_ALL_VEC_OP_IMPL(IncreFlashAttentionAttenAllVecNew, half, half, half, half, true, false,
@@ -247,6 +253,9 @@ extern "C" __global__ __aicore__ void incre_flash_attention_FIAS(
     } else if (TILING_KEY_IS(10000000000100300)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false, true,
                                    LAYOUT::BNSD);
+    } else if (TILING_KEY_IS(10000000000300300)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, true, true,
+                                   LAYOUT::BNSD);
     } else if (TILING_KEY_IS(10000000000000301)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false, false,
                                    LAYOUT::BSH);
@@ -264,64 +273,125 @@ extern "C" __global__ __aicore__ void incre_flash_attention_FIAS(
     } else if (TILING_KEY_IS(10000000000100301)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false, true,
                                    LAYOUT::BSH);
+    } else if (TILING_KEY_IS(10000000000300301)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, true, true,
+                                   LAYOUT::BSH);
     } else if (TILING_KEY_IS(10000000000400300)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false, false,
-                                   LAYOUT::BNSD, true);
+                                   LAYOUT::BNSD, 1);
     } else if (TILING_KEY_IS(12000000000400300)) {
         KERNEL_TASK_TYPE(12000000000400300, KERNEL_TYPE_MIX_AIC_1_1);
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false, false,
-                                   LAYOUT::BNSD, true);
+                                   LAYOUT::BNSD, 1);
     } else if (TILING_KEY_IS(10000000000600300)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, true, false,
-                                   LAYOUT::BNSD, true);
+                                   LAYOUT::BNSD, 1);
     } else if (TILING_KEY_IS(12000000000600300)) {
         KERNEL_TASK_TYPE(12000000000600300, KERNEL_TYPE_MIX_AIC_1_1);
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, true, false,
-                                   LAYOUT::BNSD, true);
+                                   LAYOUT::BNSD, 1);
     } else if (TILING_KEY_IS(10000000000500300)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false, true,
-                                   LAYOUT::BNSD, true);
+                                   LAYOUT::BNSD, 1);
+    } else if (TILING_KEY_IS(10000000000700300)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, true, true,
+                                   LAYOUT::BNSD, 1);
     } else if (TILING_KEY_IS(10000000000400301)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false, false,
-                                   LAYOUT::BSH, true);
+                                   LAYOUT::BSH, 1);
     } else if (TILING_KEY_IS(12000000000400301)) {
         KERNEL_TASK_TYPE(12000000000400301, KERNEL_TYPE_MIX_AIC_1_1);
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false, false,
-                                   LAYOUT::BSH, true);
+                                   LAYOUT::BSH, 1);
     } else if (TILING_KEY_IS(10000000000600301)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, true, false,
-                                   LAYOUT::BSH, true);
+                                   LAYOUT::BSH, 1);
     } else if (TILING_KEY_IS(12000000000600301)) {
         KERNEL_TASK_TYPE(12000000000600301, KERNEL_TYPE_MIX_AIC_1_1);
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, true, false,
-                                   LAYOUT::BSH, true);
+                                   LAYOUT::BSH, 1);
     } else if (TILING_KEY_IS(10000000000500301)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false, true,
-                                   LAYOUT::BSH, true);
+                                   LAYOUT::BSH, 1);
+    } else if (TILING_KEY_IS(10000000000700301)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, true, true,
+                                   LAYOUT::BSH, 1);
+    } else if (TILING_KEY_IS(10000000002000300)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false, false,
+                                   LAYOUT::BNSD, 2);
+    } else if (TILING_KEY_IS(12000000002000300)) {
+        KERNEL_TASK_TYPE(12000000002000300, KERNEL_TYPE_MIX_AIC_1_1);
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false, false,
+                                   LAYOUT::BNSD, 2);
+    } else if (TILING_KEY_IS(10000000002200300)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, true, false,
+                                   LAYOUT::BNSD, 2);
+    } else if (TILING_KEY_IS(12000000002200300)) {
+        KERNEL_TASK_TYPE(12000000002200300, KERNEL_TYPE_MIX_AIC_1_1);
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, true, false,
+                                   LAYOUT::BNSD, 2);
+    } else if (TILING_KEY_IS(10000000002100300)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false, true,
+                                   LAYOUT::BNSD, 2);
+    } else if (TILING_KEY_IS(10000000002300300)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, true, true,
+                                   LAYOUT::BNSD, 2);
+    } else if (TILING_KEY_IS(10000000002000301)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false, false,
+                                   LAYOUT::BSH, 2);
+    } else if (TILING_KEY_IS(12000000002000301)) {
+        KERNEL_TASK_TYPE(12000000002000301, KERNEL_TYPE_MIX_AIC_1_1);
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false, false,
+                                   LAYOUT::BSH, 2);
+    } else if (TILING_KEY_IS(10000000002200301)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, true, false,
+                                   LAYOUT::BSH, 2);
+    } else if (TILING_KEY_IS(12000000002200301)) {
+        KERNEL_TASK_TYPE(12000000002200301, KERNEL_TYPE_MIX_AIC_1_1);
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, true, false,
+                                   LAYOUT::BSH, 2);
+    } else if (TILING_KEY_IS(10000000002100301)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false, true,
+                                   LAYOUT::BSH, 2);
+    } else if (TILING_KEY_IS(10000000002300301)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, true, true,
+                                   LAYOUT::BSH, 2);
     } else if (TILING_KEY_IS(20000000000000300)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false,
-                                          false, LAYOUT::BNSD, false, true);
+                                          false, LAYOUT::BNSD, 0, true);
     } else if (TILING_KEY_IS(20000000000100300)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false, true,
-                                          LAYOUT::BNSD, false, true);
+                                          LAYOUT::BNSD, 0, true);
     } else if (TILING_KEY_IS(20000000000000301)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false,
-                                          false, LAYOUT::BSH, false, true);
+                                          false, LAYOUT::BSH, 0, true);
     } else if (TILING_KEY_IS(20000000000100301)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false, true,
-                                          LAYOUT::BSH, false, true);
+                                          LAYOUT::BSH, 0, true);
     } else if (TILING_KEY_IS(20000000000400300)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false,
-                                          false, LAYOUT::BNSD, true, true);
+                                          false, LAYOUT::BNSD, 1, true);
     } else if (TILING_KEY_IS(20000000000500300)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false, true,
-                                          LAYOUT::BNSD, true, true);
+                                          LAYOUT::BNSD, 1, true);
     } else if (TILING_KEY_IS(20000000000400301)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false,
-                                          false, LAYOUT::BSH, true, true);
+                                          false, LAYOUT::BSH, 1, true);
     } else if (TILING_KEY_IS(20000000000500301)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false, true,
-                                          LAYOUT::BSH, true, true);
+                                          LAYOUT::BSH, 1, true);
+    } else if (TILING_KEY_IS(20000000002000300)) {
+        INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false,
+                                          false, LAYOUT::BNSD, 2, true);
+    } else if (TILING_KEY_IS(20000000002100300)) {
+        INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false, true,
+                                          LAYOUT::BNSD, 2, true);
+    } else if (TILING_KEY_IS(20000000002000301)) {
+        INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false,
+                                          false, LAYOUT::BSH, 2, true);
+    } else if (TILING_KEY_IS(20000000002100301)) {
+        INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, half, half, false, true,
+                                          LAYOUT::BSH, 2, true);
     }
 #else
     if (TILING_KEY_IS(11000000000000300)) { // kvDeq
@@ -376,48 +446,80 @@ extern "C" __global__ __aicore__ void incre_flash_attention_FIAS(
                                    LAYOUT::BSH);
     } else if (TILING_KEY_IS(10000000000400400)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int4b_t, half, half, false, false,
-                                   LAYOUT::BNSD, true);
+                                   LAYOUT::BNSD, 1);
     } else if (TILING_KEY_IS(12000000000400400)) {
         KERNEL_TASK_TYPE(12000000000400400, KERNEL_TYPE_MIX_AIC_1_1);
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int4b_t, half, half, false, false,
-                                   LAYOUT::BNSD, true);
+                                   LAYOUT::BNSD, 1);
     } else if (TILING_KEY_IS(10000000000500400)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int4b_t, half, half, false, true,
-                                   LAYOUT::BNSD, true);
+                                   LAYOUT::BNSD, 1);
     } else if (TILING_KEY_IS(10000000000400401)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int4b_t, half, half, false, false,
-                                   LAYOUT::BSH, true);
+                                   LAYOUT::BSH, 1);
     } else if (TILING_KEY_IS(12000000000400401)) {
         KERNEL_TASK_TYPE(12000000000400401, KERNEL_TYPE_MIX_AIC_1_1);
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int4b_t, half, half, false, false,
-                                   LAYOUT::BSH, true);
+                                   LAYOUT::BSH, 1);
     } else if (TILING_KEY_IS(10000000000500401)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int4b_t, half, half, false, true,
-                                   LAYOUT::BSH, true);
+                                   LAYOUT::BSH, 1);
+    } else if (TILING_KEY_IS(10000000002000400)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int4b_t, half, half, false, false,
+                                   LAYOUT::BNSD, 2);
+    } else if (TILING_KEY_IS(12000000002000400)) {
+        KERNEL_TASK_TYPE(12000000002000400, KERNEL_TYPE_MIX_AIC_1_1);
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int4b_t, half, half, false, false,
+                                   LAYOUT::BNSD, 2);
+    } else if (TILING_KEY_IS(10000000002100400)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int4b_t, half, half, false, true,
+                                   LAYOUT::BNSD, 2);
+    } else if (TILING_KEY_IS(10000000002000401)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int4b_t, half, half, false, false,
+                                   LAYOUT::BSH, 2);
+    } else if (TILING_KEY_IS(12000000002000401)) {
+        KERNEL_TASK_TYPE(12000000002000401, KERNEL_TYPE_MIX_AIC_1_1);
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int4b_t, half, half, false, false,
+                                   LAYOUT::BSH, 2);
+    } else if (TILING_KEY_IS(10000000002100401)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int4b_t, half, half, false, true,
+                                   LAYOUT::BSH, 2);
     } else if (TILING_KEY_IS(20000000000000400)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int4b_t, half, half, false,
-                                          false, LAYOUT::BNSD, false, true);
+                                          false, LAYOUT::BNSD, 0, true);
     } else if (TILING_KEY_IS(20000000000100400)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int4b_t, half, half, false,
-                                          true, LAYOUT::BNSD, false, true);
+                                          true, LAYOUT::BNSD, 0, true);
     } else if (TILING_KEY_IS(20000000000000401)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int4b_t, half, half, false,
-                                          false, LAYOUT::BSH, false, true);
+                                          false, LAYOUT::BSH, 0, true);
     } else if (TILING_KEY_IS(20000000000100401)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int4b_t, half, half, false,
-                                          true, LAYOUT::BSH, false, true);
+                                          true, LAYOUT::BSH, 0, true);
     } else if (TILING_KEY_IS(20000000000400400)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int4b_t, half, half, false,
-                                          false, LAYOUT::BNSD, true, true);
+                                          false, LAYOUT::BNSD, 1, true);
     } else if (TILING_KEY_IS(20000000000500400)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int4b_t, half, half, false,
-                                          true, LAYOUT::BNSD, true, true);
+                                          true, LAYOUT::BNSD, 1, true);
     } else if (TILING_KEY_IS(20000000000400401)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int4b_t, half, half, false,
-                                          false, LAYOUT::BSH, true, true);
+                                          false, LAYOUT::BSH, 1, true);
     } else if (TILING_KEY_IS(20000000000500401)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int4b_t, half, half, false,
-                                          true, LAYOUT::BSH, true, true);
+                                          true, LAYOUT::BSH, 1, true);
+    } else if (TILING_KEY_IS(20000000002000400)) {
+        INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int4b_t, half, half, false,
+                                          false, LAYOUT::BNSD, 2, true);
+    } else if (TILING_KEY_IS(20000000002100400)) {
+        INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int4b_t, half, half, false,
+                                          true, LAYOUT::BNSD, 2, true);
+    } else if (TILING_KEY_IS(20000000002000401)) {
+        INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int4b_t, half, half, false,
+                                          false, LAYOUT::BSH, 2, true);
+    } else if (TILING_KEY_IS(20000000002100401)) {
+        INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int4b_t, half, half, false,
+                                          true, LAYOUT::BSH, 2, true);
     }
 #endif
 #endif
@@ -442,6 +544,9 @@ extern "C" __global__ __aicore__ void incre_flash_attention_FIAS(
     } else if (TILING_KEY_IS(10000000000103000)) { // A16W16 fp16, out int8, FD
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, int8_t, half, false, true,
                                    LAYOUT::BNSD);
+    } else if (TILING_KEY_IS(10000000000303000)) { // A16W16 fp16, out int8, FD
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, int8_t, half, true, true,
+                                   LAYOUT::BNSD);
     } else if (TILING_KEY_IS(10000000000003001)) { // A16W16 fp16, out int8
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, int8_t, half, false, false,
                                    LAYOUT::BSH);
@@ -459,18 +564,21 @@ extern "C" __global__ __aicore__ void incre_flash_attention_FIAS(
     } else if (TILING_KEY_IS(10000000000103001)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, int8_t, half, false, true,
                                    LAYOUT::BSH);
+    } else if (TILING_KEY_IS(10000000000303001)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, int8_t, half, true, true,
+                                   LAYOUT::BSH);
     } else if (TILING_KEY_IS(20000000000003000)) { // A16W16 fp16, out int8
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, int8_t, half, false,
-                                          false, LAYOUT::BNSD, false, true);
+                                          false, LAYOUT::BNSD, 0, true);
     } else if (TILING_KEY_IS(20000000000103000)) { // A16W16 fp16, out int8, FD
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, int8_t, half, false,
-                                          true, LAYOUT::BNSD, false, true);
+                                          true, LAYOUT::BNSD, 0, true);
     } else if (TILING_KEY_IS(20000000000003001)) { // A16W16 fp16, out int8
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, int8_t, half, false,
-                                          false, LAYOUT::BSH, false, true);
+                                          false, LAYOUT::BSH, 0, true);
     } else if (TILING_KEY_IS(20000000000103001)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, half, int8_t, half, false,
-                                          true, LAYOUT::BSH, false, true);
+                                          true, LAYOUT::BSH, 0, true);
     }
 #endif
 
@@ -492,6 +600,9 @@ extern "C" __global__ __aicore__ void incre_flash_attention_FIAS(
     } else if (TILING_KEY_IS(10000000000103300)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, false, true,
                                    LAYOUT::BNSD);
+    } else if (TILING_KEY_IS(10000000000303300)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, true, true,
+                                   LAYOUT::BNSD);
     } else if (TILING_KEY_IS(10000000000003301)) { // A16W8 out int8
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, false, false,
                                    LAYOUT::BSH);
@@ -509,64 +620,73 @@ extern "C" __global__ __aicore__ void incre_flash_attention_FIAS(
     } else if (TILING_KEY_IS(10000000000103301)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, false, true,
                                    LAYOUT::BSH);
+    } else if (TILING_KEY_IS(10000000000303301)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, true, true,
+                                   LAYOUT::BSH);
     } else if (TILING_KEY_IS(10000000000403300)) { // A16W8 fp16, pertoken, out int8
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, false, false,
-                                   LAYOUT::BNSD, true);
+                                   LAYOUT::BNSD, 1);
     } else if (TILING_KEY_IS(12000000000403300)) {
         KERNEL_TASK_TYPE(12000000000403300, KERNEL_TYPE_MIX_AIC_1_1);
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, false, false,
-                                   LAYOUT::BNSD, true);
+                                   LAYOUT::BNSD, 1);
     } else if (TILING_KEY_IS(10000000000603300)) { // A16W8 fp16, pertoken, out int8
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, true, false,
-                                   LAYOUT::BNSD, true);
+                                   LAYOUT::BNSD, 1);
     } else if (TILING_KEY_IS(12000000000603300)) {
         KERNEL_TASK_TYPE(12000000000603300, KERNEL_TYPE_MIX_AIC_1_1);
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, true, false,
-                                   LAYOUT::BNSD, true);
+                                   LAYOUT::BNSD, 1);
     } else if (TILING_KEY_IS(10000000000503300)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, false, true,
-                                   LAYOUT::BNSD, true);
+                                   LAYOUT::BNSD, 1);
+    } else if (TILING_KEY_IS(10000000000703300)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, true, true,
+                                   LAYOUT::BNSD, 1);
     } else if (TILING_KEY_IS(10000000000403301)) { // A16W8 out int8
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, false, false,
-                                   LAYOUT::BSH, true);
+                                   LAYOUT::BSH, 1);
     } else if (TILING_KEY_IS(12000000000403301)) {
         KERNEL_TASK_TYPE(12000000000403301, KERNEL_TYPE_MIX_AIC_1_1);
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, false, false,
-                                   LAYOUT::BSH, true);
+                                   LAYOUT::BSH, 1);
     } else if (TILING_KEY_IS(10000000000603301)) { // A16W8 out int8
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, true, false,
-                                   LAYOUT::BSH, true);
+                                   LAYOUT::BSH, 1);
     } else if (TILING_KEY_IS(12000000000603301)) {
         KERNEL_TASK_TYPE(12000000000603301, KERNEL_TYPE_MIX_AIC_1_1);
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, true, false,
-                                   LAYOUT::BSH, true);
+                                   LAYOUT::BSH, 1);
     } else if (TILING_KEY_IS(10000000000503301)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, false, true,
-                                   LAYOUT::BSH, true);
+                                   LAYOUT::BSH, 1);
+    } else if (TILING_KEY_IS(10000000000703301)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, true, true,
+                                   LAYOUT::BSH, 1);
     } else if (TILING_KEY_IS(20000000000003300)) { // A16W8 fp16, out int
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, false,
-                                          false, LAYOUT::BNSD, false, true);
+                                          false, LAYOUT::BNSD, 0, true);
     } else if (TILING_KEY_IS(20000000000103300)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, false,
-                                          true, LAYOUT::BNSD, false, true);
+                                          true, LAYOUT::BNSD, 0, true);
     } else if (TILING_KEY_IS(20000000000003301)) { // A16W8 out int8
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, false,
-                                          false, LAYOUT::BSH, false, true);
+                                          false, LAYOUT::BSH, 0, true);
     } else if (TILING_KEY_IS(20000000000103301)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, false,
-                                          true, LAYOUT::BSH, false, true);
+                                          true, LAYOUT::BSH, 0, true);
     } else if (TILING_KEY_IS(20000000000403300)) { // A16W8 fp16, pertoken, out int8
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, false,
-                                          false, LAYOUT::BNSD, true, true);
+                                          false, LAYOUT::BNSD, 1, true);
     } else if (TILING_KEY_IS(20000000000503300)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, false,
-                                          true, LAYOUT::BNSD, true, true);
+                                          true, LAYOUT::BNSD, 1, true);
     } else if (TILING_KEY_IS(20000000000403301)) { // A16W8 out int8
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, false,
-                                          false, LAYOUT::BSH, true, true);
+                                          false, LAYOUT::BSH, 1, true);
     } else if (TILING_KEY_IS(20000000000503301)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, half, int8_t, int8_t, half, false,
-                                          true, LAYOUT::BSH, true, true);
+                                          true, LAYOUT::BSH, 1, true);
     }
 #endif
 
@@ -588,6 +708,9 @@ extern "C" __global__ __aicore__ void incre_flash_attention_FIAS(
     } else if (TILING_KEY_IS(10000000000122220)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, bfloat16_t,
                                    bfloat16_t, false, true, LAYOUT::BNSD);
+    } else if (TILING_KEY_IS(10000000000322220)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, bfloat16_t,
+                                   bfloat16_t, true, true, LAYOUT::BNSD);
     } else if (TILING_KEY_IS(10000000000022221)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, bfloat16_t,
                                    bfloat16_t, false, false, LAYOUT::BSH);
@@ -605,18 +728,21 @@ extern "C" __global__ __aicore__ void incre_flash_attention_FIAS(
     } else if (TILING_KEY_IS(10000000000122221)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, bfloat16_t,
                                    bfloat16_t, false, true, LAYOUT::BSH);
+    } else if (TILING_KEY_IS(10000000000322221)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, bfloat16_t,
+                                   bfloat16_t, true, true, LAYOUT::BSH);
     } else if (TILING_KEY_IS(20000000000022220)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, bfloat16_t,
-                                          bfloat16_t, false, false, LAYOUT::BNSD, false, true);
+                                          bfloat16_t, false, false, LAYOUT::BNSD, 0, true);
     } else if (TILING_KEY_IS(20000000000122220)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t,
-                                          bfloat16_t, bfloat16_t, false, true, LAYOUT::BNSD, false, true);
+                                          bfloat16_t, bfloat16_t, false, true, LAYOUT::BNSD, 0, true);
     } else if (TILING_KEY_IS(20000000000022221)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, bfloat16_t,
-                                          bfloat16_t, false, false, LAYOUT::BSH, false, true);
+                                          bfloat16_t, false, false, LAYOUT::BSH, 0, true);
     } else if (TILING_KEY_IS(20000000000122221)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, bfloat16_t,
-                                          bfloat16_t, false, true, LAYOUT::BSH, false, true);
+                                          bfloat16_t, false, true, LAYOUT::BSH, 0, true);
     }
 #endif
 
@@ -638,6 +764,9 @@ extern "C" __global__ __aicore__ void incre_flash_attention_FIAS(
     } else if (TILING_KEY_IS(10000000000122320)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t,
                                    false, true, LAYOUT::BNSD);
+    } else if (TILING_KEY_IS(10000000000322320)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t,
+                                   true, true, LAYOUT::BNSD);
     } else if (TILING_KEY_IS(10000000000022321)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t,
                                    false, false, LAYOUT::BSH);
@@ -655,64 +784,73 @@ extern "C" __global__ __aicore__ void incre_flash_attention_FIAS(
     } else if (TILING_KEY_IS(10000000000122321)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t,
                                    false, true, LAYOUT::BSH);
+    } else if (TILING_KEY_IS(10000000000322321)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t,
+                                   true, true, LAYOUT::BSH);
     } else if (TILING_KEY_IS(10000000000422320)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t,
-                                   false, false, LAYOUT::BNSD, true);
+                                   false, false, LAYOUT::BNSD, 1);
     } else if (TILING_KEY_IS(12000000000422320)) {
         KERNEL_TASK_TYPE(12000000000422320, KERNEL_TYPE_MIX_AIC_1_1);
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t,
-                                   false, false, LAYOUT::BNSD, true);
+                                   false, false, LAYOUT::BNSD, 1);
     } else if (TILING_KEY_IS(10000000000622320)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t,
-                                   true, false, LAYOUT::BNSD, true);
+                                   true, false, LAYOUT::BNSD, 1);
     } else if (TILING_KEY_IS(12000000000622320)) {
         KERNEL_TASK_TYPE(12000000000622320, KERNEL_TYPE_MIX_AIC_1_1);
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t,
-                                   true, false, LAYOUT::BNSD, true);
+                                   true, false, LAYOUT::BNSD, 1);
     } else if (TILING_KEY_IS(10000000000522320)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t,
-                                   false, true, LAYOUT::BNSD, true);
+                                   false, true, LAYOUT::BNSD, 1);
+    } else if (TILING_KEY_IS(10000000000722320)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t,
+                                   true, true, LAYOUT::BNSD, 1);
     } else if (TILING_KEY_IS(10000000000422321)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t,
-                                   false, false, LAYOUT::BSH, true);
+                                   false, false, LAYOUT::BSH, 1);
     } else if (TILING_KEY_IS(12000000000422321)) {
         KERNEL_TASK_TYPE(12000000000422321, KERNEL_TYPE_MIX_AIC_1_1);
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t,
-                                   false, false, LAYOUT::BSH, true);
+                                   false, false, LAYOUT::BSH, 1);
     } else if (TILING_KEY_IS(10000000000622321)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t,
-                                   true, false, LAYOUT::BSH, true);
+                                   true, false, LAYOUT::BSH, 1);
     } else if (TILING_KEY_IS(12000000000622321)) {
         KERNEL_TASK_TYPE(12000000000622321, KERNEL_TYPE_MIX_AIC_1_1);
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t,
-                                   true, false, LAYOUT::BSH, true);
+                                   true, false, LAYOUT::BSH, 1);
     } else if (TILING_KEY_IS(10000000000522321)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t,
-                                   false, true, LAYOUT::BSH, true);
+                                   false, true, LAYOUT::BSH, 1);
+    } else if (TILING_KEY_IS(10000000000722321)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t, bfloat16_t,
+                                   true, true, LAYOUT::BSH, 1);
     } else if (TILING_KEY_IS(20000000000022320)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t,
-                                          bfloat16_t, false, false, LAYOUT::BNSD, false, true);
+                                          bfloat16_t, false, false, LAYOUT::BNSD, 0, true);
     } else if (TILING_KEY_IS(20000000000122320)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t,
-                                          bfloat16_t, false, true, LAYOUT::BNSD, false, true);
+                                          bfloat16_t, false, true, LAYOUT::BNSD, 0, true);
     } else if (TILING_KEY_IS(20000000000022321)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t,
-                                          bfloat16_t, false, false, LAYOUT::BSH, false, true);
+                                          bfloat16_t, false, false, LAYOUT::BSH, 0, true);
     } else if (TILING_KEY_IS(20000000000122321)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t,
-                                          bfloat16_t, false, true, LAYOUT::BSH, false, true);
+                                          bfloat16_t, false, true, LAYOUT::BSH, 0, true);
     } else if (TILING_KEY_IS(20000000000422320)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t,
-                                          bfloat16_t, false, false, LAYOUT::BNSD, true, true);
+                                          bfloat16_t, false, false, LAYOUT::BNSD, 1, true);
     } else if (TILING_KEY_IS(20000000000522320)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t,
-                                          bfloat16_t, false, true, LAYOUT::BNSD, true, true);
+                                          bfloat16_t, false, true, LAYOUT::BNSD, 1, true);
     } else if (TILING_KEY_IS(20000000000422321)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t,
-                                          bfloat16_t, false, false, LAYOUT::BSH, true, true);
+                                          bfloat16_t, false, false, LAYOUT::BSH, 1, true);
     } else if (TILING_KEY_IS(20000000000522321)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, bfloat16_t,
-                                          bfloat16_t, false, true, LAYOUT::BSH, true, true);
+                                          bfloat16_t, false, true, LAYOUT::BSH, 1, true);
     }
 #endif
 
@@ -739,48 +877,80 @@ extern "C" __global__ __aicore__ void incre_flash_attention_FIAS(
                                    false, true, LAYOUT::BSH);
     } else if (TILING_KEY_IS(10000000000422420)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int4b_t, bfloat16_t, bfloat16_t,
-                                   false, false, LAYOUT::BNSD, true);
+                                   false, false, LAYOUT::BNSD, 1);
     } else if (TILING_KEY_IS(12000000000422420)) {
         KERNEL_TASK_TYPE(12000000000422420, KERNEL_TYPE_MIX_AIC_1_1);
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int4b_t, bfloat16_t, bfloat16_t,
-                                   false, false, LAYOUT::BNSD, true);
+                                   false, false, LAYOUT::BNSD, 1);
     } else if (TILING_KEY_IS(10000000000522420)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int4b_t, bfloat16_t, bfloat16_t,
-                                   false, true, LAYOUT::BNSD, true);
+                                   false, true, LAYOUT::BNSD, 1);
     } else if (TILING_KEY_IS(10000000000422421)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int4b_t, bfloat16_t, bfloat16_t,
-                                   false, false, LAYOUT::BSH, true);
+                                   false, false, LAYOUT::BSH, 1);
     } else if (TILING_KEY_IS(12000000000422421)) {
         KERNEL_TASK_TYPE(12000000000422421, KERNEL_TYPE_MIX_AIC_1_1);
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int4b_t, bfloat16_t, bfloat16_t,
-                                   false, false, LAYOUT::BSH, true);
+                                   false, false, LAYOUT::BSH, 1);
     } else if (TILING_KEY_IS(10000000000522421)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int4b_t, bfloat16_t, bfloat16_t,
-                                   false, true, LAYOUT::BSH, true);
+                                   false, true, LAYOUT::BSH, 1);
+    } else if (TILING_KEY_IS(10000000002022420)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int4b_t, bfloat16_t, bfloat16_t,
+                                   false, false, LAYOUT::BNSD, 2);
+    } else if (TILING_KEY_IS(12000000002022420)) {
+        KERNEL_TASK_TYPE(12000000002022420, KERNEL_TYPE_MIX_AIC_1_1);
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int4b_t, bfloat16_t, bfloat16_t,
+                                   false, false, LAYOUT::BNSD, 2);
+    } else if (TILING_KEY_IS(10000000002122420)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int4b_t, bfloat16_t, bfloat16_t,
+                                   false, true, LAYOUT::BNSD, 2);
+    } else if (TILING_KEY_IS(10000000002022421)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int4b_t, bfloat16_t, bfloat16_t,
+                                   false, false, LAYOUT::BSH, 2);
+    } else if (TILING_KEY_IS(12000000002022421)) {
+        KERNEL_TASK_TYPE(12000000002022421, KERNEL_TYPE_MIX_AIC_1_1);
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int4b_t, bfloat16_t, bfloat16_t,
+                                   false, false, LAYOUT::BSH, 2);
+    } else if (TILING_KEY_IS(10000000002122421)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int4b_t, bfloat16_t, bfloat16_t,
+                                   false, true, LAYOUT::BSH, 2);
     } else if (TILING_KEY_IS(20000000000022420)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int4b_t, bfloat16_t,
-                                          bfloat16_t, false, false, LAYOUT::BNSD, false, true);
+                                          bfloat16_t, false, false, LAYOUT::BNSD, 0, true);
     } else if (TILING_KEY_IS(20000000000122420)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int4b_t, bfloat16_t,
-                                          bfloat16_t, false, true, LAYOUT::BNSD, false, true);
+                                          bfloat16_t, false, true, LAYOUT::BNSD, 0, true);
     } else if (TILING_KEY_IS(20000000000022421)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int4b_t, bfloat16_t,
-                                          bfloat16_t, false, false, LAYOUT::BSH, false, true);
+                                          bfloat16_t, false, false, LAYOUT::BSH, 0, true);
     } else if (TILING_KEY_IS(20000000000122421)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int4b_t, bfloat16_t,
-                                          bfloat16_t, false, true, LAYOUT::BSH, false, true);
+                                          bfloat16_t, false, true, LAYOUT::BSH, 0, true);
     } else if (TILING_KEY_IS(20000000000422420)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int4b_t, bfloat16_t,
-                                          bfloat16_t, false, false, LAYOUT::BNSD, true, true);
+                                          bfloat16_t, false, false, LAYOUT::BNSD, 1, true);
     } else if (TILING_KEY_IS(20000000000522420)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int4b_t, bfloat16_t,
-                                          bfloat16_t, false, true, LAYOUT::BNSD, true, true);
+                                          bfloat16_t, false, true, LAYOUT::BNSD, 1, true);
     } else if (TILING_KEY_IS(20000000000422421)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int4b_t, bfloat16_t,
-                                          bfloat16_t, false, false, LAYOUT::BSH, true, true);
+                                          bfloat16_t, false, false, LAYOUT::BSH, 1, true);
     } else if (TILING_KEY_IS(20000000000522421)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int4b_t, bfloat16_t,
-                                          bfloat16_t, false, true, LAYOUT::BSH, true, true);
+                                          bfloat16_t, false, true, LAYOUT::BSH, 1, true);
+    } else if (TILING_KEY_IS(20000000002022420)) {
+        INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int4b_t, bfloat16_t,
+                                          bfloat16_t, false, false, LAYOUT::BNSD, 2, true);
+    } else if (TILING_KEY_IS(20000000002122420)) {
+        INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int4b_t, bfloat16_t,
+                                          bfloat16_t, false, true, LAYOUT::BNSD, 2, true);
+    } else if (TILING_KEY_IS(20000000002022421)) {
+        INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int4b_t, bfloat16_t,
+                                          bfloat16_t, false, false, LAYOUT::BSH, 2, true);
+    } else if (TILING_KEY_IS(20000000002122421)) {
+        INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int4b_t, bfloat16_t,
+                                          bfloat16_t, false, true, LAYOUT::BSH, 2, true);
     }
 
 #endif
@@ -803,6 +973,9 @@ extern "C" __global__ __aicore__ void incre_flash_attention_FIAS(
     } else if (TILING_KEY_IS(10000000000123220)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, int8_t, bfloat16_t,
                                    false, true, LAYOUT::BNSD);
+    } else if (TILING_KEY_IS(10000000000323220)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, int8_t, bfloat16_t,
+                                   true, true, LAYOUT::BNSD);
     } else if (TILING_KEY_IS(10000000000023221)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, int8_t, bfloat16_t,
                                    false, false, LAYOUT::BSH);
@@ -820,18 +993,21 @@ extern "C" __global__ __aicore__ void incre_flash_attention_FIAS(
     } else if (TILING_KEY_IS(10000000000123221)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, int8_t, bfloat16_t,
                                    false, true, LAYOUT::BSH);
+    } else if (TILING_KEY_IS(10000000000323221)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, int8_t, bfloat16_t,
+                                   true, true, LAYOUT::BSH);
     } else if (TILING_KEY_IS(20000000000023220)) { // A16W16 BF16 out int8
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, int8_t,
-                                          bfloat16_t, false, false, LAYOUT::BNSD, false, true);
+                                          bfloat16_t, false, false, LAYOUT::BNSD, 0, true);
     } else if (TILING_KEY_IS(20000000000123220)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, int8_t,
-                                          bfloat16_t, false, true, LAYOUT::BNSD, false, true);
+                                          bfloat16_t, false, true, LAYOUT::BNSD, 0, true);
     } else if (TILING_KEY_IS(20000000000023221)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, int8_t,
-                                          bfloat16_t, false, false, LAYOUT::BSH, false, true);
+                                          bfloat16_t, false, false, LAYOUT::BSH, 0, true);
     } else if (TILING_KEY_IS(20000000000123221)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, bfloat16_t, int8_t,
-                                          bfloat16_t, false, true, LAYOUT::BSH, false, true);
+                                          bfloat16_t, false, true, LAYOUT::BSH, 0, true);
     }
 #endif
 
@@ -853,6 +1029,9 @@ extern "C" __global__ __aicore__ void incre_flash_attention_FIAS(
     } else if (TILING_KEY_IS(10000000000123320)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t,
                                    false, true, LAYOUT::BNSD);
+    } else if (TILING_KEY_IS(10000000000323320)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t, true,
+                                   true, LAYOUT::BNSD);
     } else if (TILING_KEY_IS(10000000000023321)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t,
                                    false, false, LAYOUT::BSH);
@@ -870,64 +1049,73 @@ extern "C" __global__ __aicore__ void incre_flash_attention_FIAS(
     } else if (TILING_KEY_IS(10000000000123321)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t,
                                    false, true, LAYOUT::BSH);
+    } else if (TILING_KEY_IS(10000000000323321)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t, true,
+                                   true, LAYOUT::BSH);
     } else if (TILING_KEY_IS(10000000000423320)) { // A16W8 BF16 out int8 per token
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t,
-                                   false, false, LAYOUT::BNSD, true);
+                                   false, false, LAYOUT::BNSD, 1);
     } else if (TILING_KEY_IS(12000000000423320)) {
         KERNEL_TASK_TYPE(12000000000423320, KERNEL_TYPE_MIX_AIC_1_1);
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t,
-                                   false, false, LAYOUT::BNSD, true);
+                                   false, false, LAYOUT::BNSD, 1);
     } else if (TILING_KEY_IS(10000000000623320)) { // A16W8 BF16 out int8 per token
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t, true,
-                                   false, LAYOUT::BNSD, true);
+                                   false, LAYOUT::BNSD, 1);
     } else if (TILING_KEY_IS(12000000000623320)) {
         KERNEL_TASK_TYPE(12000000000623320, KERNEL_TYPE_MIX_AIC_1_1);
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t, true,
-                                   false, LAYOUT::BNSD, true);
+                                   false, LAYOUT::BNSD, 1);
     } else if (TILING_KEY_IS(10000000000523320)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t,
-                                   false, true, LAYOUT::BNSD, true);
+                                   false, true, LAYOUT::BNSD, 1);
+    } else if (TILING_KEY_IS(10000000000723320)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t, true,
+                                   true, LAYOUT::BNSD, 1);
     } else if (TILING_KEY_IS(10000000000423321)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t,
-                                   false, false, LAYOUT::BSH, true);
+                                   false, false, LAYOUT::BSH, 1);
     } else if (TILING_KEY_IS(12000000000423321)) {
         KERNEL_TASK_TYPE(12000000000423321, KERNEL_TYPE_MIX_AIC_1_1);
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t,
-                                   false, false, LAYOUT::BSH, true);
+                                   false, false, LAYOUT::BSH, 1);
     } else if (TILING_KEY_IS(10000000000623321)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t, true,
-                                   false, LAYOUT::BSH, true);
+                                   false, LAYOUT::BSH, 1);
     } else if (TILING_KEY_IS(12000000000623321)) {
         KERNEL_TASK_TYPE(12000000000623321, KERNEL_TYPE_MIX_AIC_1_1);
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t, true,
-                                   false, LAYOUT::BSH, true);
+                                   false, LAYOUT::BSH, 1);
     } else if (TILING_KEY_IS(10000000000523321)) {
         INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t,
-                                   false, true, LAYOUT::BSH, true);
+                                   false, true, LAYOUT::BSH, 1);
+    } else if (TILING_KEY_IS(10000000000723321)) {
+        INVOKE_IFA_GENERAL_OP_IMPL(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t, bfloat16_t, true,
+                                   true, LAYOUT::BSH, 1);
     } else if (TILING_KEY_IS(20000000000023320)) { // A16W8 BF16 out int8
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t,
-                                          bfloat16_t, false, false, LAYOUT::BNSD, false, true);
+                                          bfloat16_t, false, false, LAYOUT::BNSD, 0, true);
     } else if (TILING_KEY_IS(20000000000123320)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t,
-                                          bfloat16_t, false, true, LAYOUT::BNSD, false, true);
+                                          bfloat16_t, false, true, LAYOUT::BNSD, 0, true);
     } else if (TILING_KEY_IS(20000000000023321)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t,
-                                          bfloat16_t, false, false, LAYOUT::BSH, false, true);
+                                          bfloat16_t, false, false, LAYOUT::BSH, 0, true);
     } else if (TILING_KEY_IS(20000000000123321)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t,
-                                          bfloat16_t, false, true, LAYOUT::BSH, false, true);
+                                          bfloat16_t, false, true, LAYOUT::BSH, 0, true);
     } else if (TILING_KEY_IS(20000000000423320)) { // A16W8 BF16 out int8 per token
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t,
-                                          bfloat16_t, false, false, LAYOUT::BNSD, true, true);
+                                          bfloat16_t, false, false, LAYOUT::BNSD, 1, true);
     } else if (TILING_KEY_IS(20000000000523320)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t,
-                                          bfloat16_t, false, true, LAYOUT::BNSD, true, true);
+                                          bfloat16_t, false, true, LAYOUT::BNSD, 1, true);
     } else if (TILING_KEY_IS(20000000000423321)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t,
-                                          bfloat16_t, false, false, LAYOUT::BSH, true, true);
+                                          bfloat16_t, false, false, LAYOUT::BSH, 1, true);
     } else if (TILING_KEY_IS(20000000000523321)) {
         INVOKE_IFA_GENERAL_OP_IMPL_PREFIX(IncreFlashAttentionAttenSplitBbn2s2Us2, bfloat16_t, int8_t, int8_t,
-                                          bfloat16_t, false, true, LAYOUT::BSH, true, true);
+                                          bfloat16_t, false, true, LAYOUT::BSH, 1, true);
     }
 
 #endif

@@ -78,6 +78,13 @@ public:
               int64_t pPreTokens, int64_t pNextTokens);
     };
 
+    class DoTilingParam {
+        public:
+        gert::TilingContext* ctx = nullptr;
+        ge::graphStatus ret = ge::GRAPH_SUCCESS;
+        gert::Tensor* actualSeqLengthsTensor = nullptr;
+        gert::Tensor* actualSeqLengthsKVTensor = nullptr;
+    };
 
     int64_t h;
     Tensor query, key, value, pseShift, attenMask, actualSeqLengths, actualSeqLengthsKV, deqScale1, quantScale1,
@@ -85,12 +92,14 @@ public:
     OpInfo mOpInfo;
     Context mCtx;
     Param mParam;
+    gert::OpImplRegisterV2::TilingKernelFunc pfaTilingFunc = nullptr;
     PfaCase();
     PfaCase(const char *name, bool enable, const char *dbgInfo, OpInfo mOpInfo, Param param);
     bool Run() override;
     bool InitParam() override;
     bool InitOpInfo() override;
     bool InitCurrentCasePtr() override;
+    bool DoOpTiling(DoTilingParam& tilingParam);
 };
 
 } // namespace ops::adv::tests::pfa

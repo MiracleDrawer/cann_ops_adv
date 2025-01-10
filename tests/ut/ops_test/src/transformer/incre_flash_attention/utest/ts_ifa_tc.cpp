@@ -861,7 +861,7 @@ TEST_F(Ts_Ifa_Ascend910B2, case_masksize_maxcctualseq)
     cs.mParam.d = 128;
     cs.mParam.layout = "BNSD";
     cs.mParam.attenMaskType = AttenMaskShapeType::B_N_1_S;
-    cs.mParam.actualSeqLength = {1};
+    cs.mParam.actualSeqLength = {1024};
     cs.mParam.numHeads = 40;
     cs.mOpInfo.mExp.mSuccess = false;
     ASSERT_TRUE(cs.Init());
@@ -980,7 +980,7 @@ TEST_F(Ts_Ifa_Ascend910B2, case_pa_bsh)
     ASSERT_TRUE(cs.Init());
     cs.key = Tensor("key", {9, 4, 768}, "BSH", cs.mParam.qDataType, ge::FORMAT_ND);
     cs.value = Tensor("value", {9, 4, 768}, "BSH", cs.mParam.qDataType, ge::FORMAT_ND);
-    cs.mOpInfo.mExp.mSuccess = false;
+    cs.mOpInfo.mExp.mSuccess = true;
     ASSERT_EQ(cs.Run(), cs.mOpInfo.mExp.mSuccess);
 }
 
@@ -1000,7 +1000,7 @@ TEST_F(Ts_Ifa_Ascend910B2, case_pa_bnsd)
     ASSERT_TRUE(cs.Init());
     cs.key = Tensor("key", {4, 1, 1, 10}, "BNSD", cs.mParam.qDataType, ge::FORMAT_ND);
     cs.value = Tensor("value", {4, 1, 1, 10}, "BNSD", cs.mParam.qDataType, ge::FORMAT_ND);
-    cs.mOpInfo.mExp.mSuccess = false;
+    cs.mOpInfo.mExp.mSuccess = true;
     ASSERT_EQ(cs.Run(), cs.mOpInfo.mExp.mSuccess);
 }
 

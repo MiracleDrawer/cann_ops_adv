@@ -4,14 +4,14 @@
 
 ## 支持的产品型号
 
-Atlas A2 训练系列产品/Atlas 800I A2推理产品
+- Atlas A2 训练系列产品 / Atlas 800I A2推理产品
 
-产品形态详细说明请参见[昇腾产品形态说明](https://www.hiascend.com/document/redirect/CannCommunityProductForm)。
+  产品形态详细说明请参见[昇腾产品形态说明](https://www.hiascend.com/document/redirect/CannCommunityProductForm)。
 
 ## 功能描述
 
--   算子功能：适配增量&全量推理场景的FlashAttention算子，既可以支持全量计算场景（PromptFlashAttention），也可支持增量计算场景（IncreFlashAttention）。当Query矩阵的S为1，进入IncreFlashAttention分支，其余场景进入PromptFlashAttention分支。
--   计算公式：详细内容可参考[PromptFlashAttentionV3](PromptFlashAttentionV3.md)及[IncreFlashAttentionV4](IncreFlashAttentionV4.md)。
+-   **算子功能**：适配增量&全量推理场景的FlashAttention算子，既可以支持全量计算场景（PromptFlashAttention），也可支持增量计算场景（IncreFlashAttention）。当Query矩阵的S为1，进入IncreFlashAttention分支，其余场景进入PromptFlashAttention分支。
+-   **计算公式**：详细内容可参考[PromptFlashAttentionV3](PromptFlashAttentionV3.md)及[IncreFlashAttentionV4](IncreFlashAttentionV4.md)。
 
 ## 实现原理
 该算子是全量计算场景（PromptFlashAttention）和增量计算场景（IncreFlashAttention）的融合算子，详细实现原理可参考[PromptFlashAttentionV3](PromptFlashAttentionV3.md)及[IncreFlashAttentionV4](IncreFlashAttentionV4.md)。
@@ -29,7 +29,7 @@ Atlas A2 训练系列产品/Atlas 800I A2推理产品
   - 算子执行接口对外屏蔽了算子内部实现逻辑以及不同代际NPU的差异，且开发者无需编译算子，实现了算子的精简调用。
   - 若开发者不使用算子执行接口的调用算子，也可以定义基于Ascend IR的算子描述文件，通过ATC工具编译获得算子om文件，然后加载模型文件执行算子，详细调用方法可参见《应用开发指南》的[单算子调用 > 单算子模型执行](https://hiascend.com/document/redirect/CannCommunityCppOpcall)章节。
 
-### aclnnFusedInferAttentionScoreGetWorkspaceSize
+## aclnnFusedInferAttentionScoreGetWorkspaceSize
 
 -   **参数说明：**
 
@@ -53,11 +53,11 @@ Atlas A2 训练系列产品/Atlas 800I A2推理产品
     
     - actualSeqLengthsKv（aclIntArray\*，计算输入）：Host侧的aclIntArray，可传入nullptr，代表不同Batch中key/value的有效Sequence Length。数据类型支持：INT64。如果不指定seqlen可以传入nullptr，表示和key/value的shape的s长度相同。限制：该入参中每个batch的有效Sequence Length应该不大于key/value中对应batch的Sequence Length。seqlenKv的传入长度为1时，每个Batch使用相同seqlenKv；传入长度大于等于Batch时取seqlenKv的前Batch个数。其他长度不支持。
     
-    - deqScale1（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：UINT64。[数据格式](common/数据格式.md)支持ND，表示BMM1后面的反量化因子，支持per-tensor。 如不使用该功能时可传入nullptr，综合约束请见[约束与限制](#1)。
+    - deqScale1（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：UINT64, FLOAT32。[数据格式](common/数据格式.md)支持ND，表示BMM1后面的反量化因子，支持per-tensor。 如不使用该功能时可传入nullptr，综合约束请见[约束与限制](#1)。
     
     - quantScale1（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：FLOAT32。[数据格式](common/数据格式.md)支持ND，表示BMM2前面的量化因子，支持per-tensor。 如不使用该功能时可传入nullptr，综合约束请见[约束与限制](#1)。
     
-    - deqScale2（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：UINT64。[数据格式](common/数据格式.md)支持ND，表示BMM2后面的反量化因子，支持per-tensor。 如不使用该功能时可传入nullptr，综合约束请见[约束与限制](#1)。
+    - deqScale2（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：UINT64, FLOAT32。[数据格式](common/数据格式.md)支持ND，表示BMM2后面的反量化因子，支持per-tensor。 如不使用该功能时可传入nullptr，综合约束请见[约束与限制](#1)。
     
     - quantScale2（aclTensor\*，计算输入）：Device侧的aclTensor，数据类型支持：FLOAT32、BFLOAT16。[数据格式](common/数据格式.md)支持ND，表示输出的量化因子，支持per-tensor，per-channel。 如不使用该功能时可传入nullptr，综合约束请见[约束与限制](#1)。
     
@@ -122,16 +122,18 @@ Atlas A2 训练系列产品/Atlas 800I A2推理产品
     -   executor（aclOpExecutor\*\*，计算输出）：返回op执行器，包含了算子计算流程。
 
 
-- **返回值：**
+-   **返回值：**
 
-  返回aclnnStatus状态码，具体参见[aclnn返回码](common/aclnn返回码.md)。
+    返回aclnnStatus状态码，具体参见[aclnn返回码](common/aclnn返回码.md)。
 
-  ```
-  第一段接口完成入参校验，若出现以下错误码，则对应原因为：
-  -  返回161001（ACLNN\_ERR\_PARAM\_NULLPTR）：传入的query、key、value、attentionOut是空指针。
-  ```
+    ```
+    第一段接口完成入参校验，若出现以下错误码，则对应原因为：
+    -  返回161001（ACLNN_ERR_PARAM_NULLPTR）：传入的query、key、value、attentionOut是空指针。
+    -  返回161002（ACLNN_ERR_PARAM_INVALID）：query、key、value、pseShift、attenMask、attentionOut的数据类型和数据格式不在支持的范围内。
+    -  返回361001（ACLNN_ERR_RUNTIME_ERROR）：API内存调用npu runtime的接口异常。
+    ```
 
-### aclnnFusedInferAttentionScore
+## aclnnFusedInferAttentionScore
 
 -   **参数说明：**
     -   workspace（void\*，入参）：在Device侧申请的workspace内存起址。
@@ -147,7 +149,7 @@ Atlas A2 训练系列产品/Atlas 800I A2推理产品
 
 -   该接口与PyTorch配合使用时，需要保证CANN相关包与PyTorch相关包的版本匹配。
 -   入参为空的处理：算子内部需要判断参数query是否为空，如果是空则直接返回。参数query不为空Tensor，参数key、value为空tensor（即S2为0），则填充全零的对应shape的输出\(填充attention\_out\)。attention\_out为空Tensor时，AscendCLNN框架会处理。其余在上述参数说明中标注了"可传入nullptr"的入参为空指针时，不进行处理。
--   参数key、value中对应tensor的shape需要完全一致；非连续场景下 key、value的tensorlist中的batch只能为1，个数等于query的B，N和D需要相等。
+-   参数key、value中对应tensor的shape需要完全一致；非连续场景下 key、value的tensorlist中的batch只能为1，个数等于query的B，N和D需要相等。由于tensorlist限制, 非连续场景下B不能大于256。
 -   int8量化相关入参数量与输入、输出[数据格式](common/数据格式.md)的综合限制：
     - 输入为INT8，输出为INT8的场景：入参deqScale1、quantScale1、deqScale2、quantScale2需要同时存在，quantOffset2可选，不传时默认为0。
     - 输入为INT8，输出为FLOAT16的场景：入参deqScale1、quantScale1、deqScale2需要同时存在，若存在入参quantOffset2 或 quantScale2（即不为nullptr），则报错并返回。
@@ -186,9 +188,9 @@ Atlas A2 训练系列产品/Atlas 800I A2推理产品
         -   page attention场景下，必须传入actualSeqLengthsKv。
         -   page attention场景下，blockTable必须为二维，第一维长度需等于B，第二维长度不能小于maxBlockNumPerSeq（maxBlockNumPerSeq为不同batch中最大actualSeqLengthsKv对应的block数量）。
         -   page attention场景下，不支持query为int8。
-   -   page attention的使能场景下，以下场景输入KV_S需要大于等于maxBlockNumPerSeq * blockSize
-      - 传入attenMask时，如 mask shape为 (B, 1, Q_S, KV_S)
-      - 传入pseShift时，如 pseShift shape为(B, N, Q_S, KV_S)
+        -   page attention的使能场景下，以下场景输入KV_S需要大于等于maxBlockNumPerSeq * blockSize
+            - 传入attenMask时，如 mask shape为 (B, 1, Q_S, KV_S)
+            - 传入pseShift时，如 pseShift shape为(B, N, Q_S, KV_S)
    -   query左padding场景:
         -   query左padding场景query的搬运起点计算公式为：Q_S - queryPaddingSize - actualSeqLengths。query的搬运终点计算公式为：Q_S - queryPaddingSize。其中query的搬运起点不能小于0，终点不能大于Q_S，否则结果将不符合预期。
         -   query左padding场景kvPaddingSize小于0时将被置为0。
@@ -226,8 +228,8 @@ Atlas A2 训练系列产品/Atlas 800I A2推理产品
       -   page attention场景下，必须传入actualSeqLengthsKv。
       -   page attention场景下，blockTable必须为二维，第一维长度需等于B，第二维长度不能小于maxBlockNumPerSeq（maxBlockNumPerSeq为每个batch中最大actualSeqLengthsKv对应的block数量）。
       -   page attention的使能场景下，以下场景输入KV_S需要大于等于maxBlockNumPerSeq * blockSize
-        - 传入attenMask时，如 mask shape为 (B, 1, Q_S, KV_S)
-        - 传入pseShift时，如 pseShift shape为(B, N, Q_S, KV_S)
+          - 传入attenMask时，如 mask shape为 (B, 1, Q_S, KV_S)
+          - 传入pseShift时，如 pseShift shape为(B, N, Q_S, KV_S)
   -   kv左padding场景:
       -   kv左padding场景kvCache的搬运起点计算公式为：KV_S - kvPaddingSize - actualSeqLengths。kvCache的搬运终点计算公式为：KV_S - kvPaddingSize。其中kvCache的搬运起点或终点小于0时，返回数据结果为全0。
       -   kv左padding场景kvPaddingSize小于0时将被置为0。
@@ -247,9 +249,9 @@ REG_OP(FusedInferAttentionScore)
     .OPTIONAL_INPUT(atten_mask, TensorType({DT_FLOAT16, DT_BOOL, DT_UINT8, DT_INT8}))
     .OPTIONAL_INPUT(actual_seq_lengths, TensorType({DT_INT64}))
     .OPTIONAL_INPUT(actual_seq_lengths_kv, TensorType({DT_INT64}))
-    .OPTIONAL_INPUT(dequant_scale1, TensorType({DT_UINT64}))
+    .OPTIONAL_INPUT(dequant_scale1, TensorType({DT_UINT64, DT_FLOAT32}))
     .OPTIONAL_INPUT(quant_scale1, TensorType({DT_FLOAT32}))
-    .OPTIONAL_INPUT(dequant_scale2, TensorType({DT_UINT64}))
+    .OPTIONAL_INPUT(dequant_scale2, TensorType({DT_UINT64, DT_FLOAT32}))
     .OPTIONAL_INPUT(quant_scale2, TensorType({DT_FLOAT32, DT_BF16}))
     .OPTIONAL_INPUT(quant_offset2, TensorType({DT_FLOAT32, DT_BF16}))
     .OPTIONAL_INPUT(antiquant_scale, TensorType({DT_FLOAT16, DT_BF16, DT_FLOAT32}))
@@ -257,12 +259,19 @@ REG_OP(FusedInferAttentionScore)
     .OPTIONAL_INPUT(block_table, TensorType({DT_INT32}))
     .OPTIONAL_INPUT(query_padding_size, TensorType({DT_INT64}))
     .OPTIONAL_INPUT(kv_padding_size, TensorType({DT_INT64}))
+    .OPTIONAL_INPUT(key_antiquant_scale, TensorType({DT_FLOAT16, DT_BF16, DT_FLOAT32}))
+    .OPTIONAL_INPUT(key_antiquant_offset, TensorType({DT_FLOAT16, DT_BF16, DT_FLOAT32}))
+    .OPTIONAL_INPUT(value_antiquant_scale, TensorType({DT_FLOAT16, DT_BF16, DT_FLOAT32}))
+    .OPTIONAL_INPUT(value_antiquant_offset, TensorType({DT_FLOAT16, DT_BF16, DT_FLOAT32}))
+    .OPTIONAL_INPUT(key_shared_prefix, TensorType({DT_INT8, DT_FLOAT16,DT_BF16}))
+    .OPTIONAL_INPUT(value_shared_prefix, TensorType({DT_INT8, DT_FLOAT16,DT_BF16}))
+    .OPTIONAL_INPUT(actual_shared_prefix_len, TensorType({DT_INT64}))
     .OUTPUT(attention_out, TensorType({DT_FLOAT16, DT_INT8, DT_BF16}))
     .OUTPUT(softmax_lse, TensorType({DT_FLOAT32}))
     .REQUIRED_ATTR(num_heads, Int)
     .ATTR(scale, Float, 1.0)
     .ATTR(pre_tokens, Int, 2147483647)
-    .ATTR(next_tokens, Int, 0)
+    .ATTR(next_tokens, Int, 2147483647)
     .ATTR(input_layout, String, "BSH")
     .ATTR(num_key_value_heads, Int, 0)
     .ATTR(sparse_mode, Int, 0)
@@ -270,6 +279,8 @@ REG_OP(FusedInferAttentionScore)
     .ATTR(block_size, Int, 0)
     .ATTR(antiquant_mode, Int, 0)
     .ATTR(softmax_lse_flag, Bool, false)
+    .ATTR(key_antiquant_mode, Int, 0)
+    .ATTR(value_antiquant_mode, Int, 0)
     .OP_END_FACTORY_REG(FusedInferAttentionScore)
 ```
 参数解释请参见**算子执行接口**。

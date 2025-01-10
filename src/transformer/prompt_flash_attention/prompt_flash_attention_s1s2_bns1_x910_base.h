@@ -104,6 +104,8 @@ struct PFAType {
 constexpr static uint32_t NEGATIVE_MIN_VAULE_FP32 = 0xFF7FFFFF;
 constexpr static uint32_t NEGATIVE_MIN_VAULE_FP16 = 0xC77FE000;
 
+constexpr static uint32_t MM2_SINGLE_K_ALIGN_SIZE = 32;
+constexpr static uint32_t SINGLE_PROCESS_SINNER_BMMTAIL_LIMIT = 32;
 constexpr static uint32_t PFA_BUFFER_SIZE_BYTE_256B = 256;
 
 #define TEMPLATE_LAYOUT template<PFALayout layout = PFAT::layout>
@@ -146,6 +148,7 @@ struct PFAComputeParam {
     uint32_t pseShiftInnerTailAlign;
     uint32_t pseShiftInnerPrefixTailAlign;
     uint32_t mm1SingleCoreN;
+    uint32_t mm2SingleKAlign;
     int64_t tensorAOffset;
     int64_t tensorBOffset;
     int64_t attenMaskOffset;
@@ -197,6 +200,8 @@ public:
                                      __gm__ uint8_t* scale2, __gm__ uint8_t* offset2);
     __aicore__ inline void InitKvAntiquant(__gm__ uint8_t* antiq_scale, __gm__ uint8_t* antiq_offset);
     __aicore__ inline void InitMsd(__gm__ uint8_t* key_antiquant_scale, __gm__ uint8_t* key_antiquant_offset, __gm__ uint8_t* value_antiquant_scale, __gm__ uint8_t* value_antiquant_offset);
+    __aicore__ inline void InitScale2InQuant(__gm__ uint8_t* scale2, __gm__ uint8_t* offset2);
+    __aicore__ inline void InitOffset2InQuant(__gm__ uint8_t* scale2, __gm__ uint8_t* offset2);
 
     using FT = float;
     using T = typename PFAT::inputType;
@@ -209,8 +214,7 @@ public:
     using pseShiftType = typename PromptFlashAttentionTypeTraits<T,PFAT::calcMode>::pseShiftType;
     using pseShiftCastType = typename PromptFlashAttentionTypeTraits<T,PFAT::calcMode>::pseShiftCastType;
 
-    static constexpr bool MsdOn = (IsSameType<T, bfloat16_t>::value && IsSameType<KV_T, int8_t>::value) and PFAT::msdMode == MsdMode::MSD_ON;
-    using mmOutputType = typename AscendC::Conditional<MsdOn, int32_t, mmOutputTypeTmp>::type;
+    using mmOutputType = typename AscendC::Conditional<PFAT::msdMode == MsdMode::MSD_ON, int32_t, mmOutputTypeTmp>::type;
 
     template <class SRC_T>
     static __aicore__ void CopyND2NZ(const LocalTensor<SRC_T>& dst, const GlobalTensor<SRC_T>& src, const int row, const int col, const int height,
@@ -342,8 +346,7 @@ public:
                  baseRowOffsetInSingle -= blockRowOffsetInSingle;
             }
 
-            CopyND2NZ(dst[copyFinishRowCnt * colElementCnt], src[curOffset], baseRowOffsetInSingle, baseColOffsetInSingle, 
-                        copyRowCnt, useK, Kb, 1, 0, 1, true, useN);
+            CopyND2NZ(dst[copyFinishRowCnt * colElementCnt], src[curOffset], baseRowOffsetInSingle, baseColOffsetInSingle, copyRowCnt, useK, Kb, 1, 0, 1, true, useN);
 
             // Update loop variables
             copyFinishRowCnt += copyRowCnt;
@@ -456,7 +459,7 @@ public:
             } else {
                  baseRowOffsetInSingle -= blockRowOffsetInSingle;
             }
-            
+
             CopyND2NZ(dst[copyFinishRowCnt * colElementCnt], src[curOffset], baseRowOffsetInSingle,
                            baseColOffsetInSingle, copyRowCnt, useN, N, 1, 0, 1, true, useK);
 
@@ -466,7 +469,7 @@ public:
         }
     }
     // define matmul
-    using MM_IN_T = typename AscendC::Conditional<MsdOn, KV_T, T>::type;
+    using MM_IN_T = typename AscendC::Conditional<PFAT::msdMode == MsdMode::MSD_ON, KV_T, T>::type;
     using a1Type = MatmulType<TPosition::GM, CubeFormat::ND, MM_IN_T, false>;
     using b1Type = MatmulType<TPosition::GM, CubeFormat::ND, MM_IN_T, true, LayoutMode::NONE, PFAT::ibShare>;
     using bias1Type = MatmulType<TPosition::GM, CubeFormat::ND, mmBiasType>;
@@ -590,6 +593,7 @@ protected:
     // quant bf16 per-channel
     bool isQuant2PerChn = false;
     bool isQuant2BF16 = false;
+    bool isQuant2FP16 = false;
     bool isQuantOffset2Exist = false;
     uint32_t perChannelQuantUBSize = 0;
     float quant2ScaleValue = 0;
@@ -597,11 +601,14 @@ protected:
     GlobalTensor<bfloat16_t> quantScale2BF16Gm;
     GlobalTensor<bfloat16_t> quantOffset2BF16Gm;
 
+    GlobalTensor<half> quantScale2FP16Gm;
+    GlobalTensor<half> quantOffset2FP16Gm;
+
     GlobalTensor<float> quantScale2FP32Gm;
     GlobalTensor<float> quantOffset2FP32Gm;
 
-    TBuf<> quantScale2BF16Ub;
-    TBuf<> quantOffset2BF16Ub;
+    TBuf<> quantScale2Size16Ub;
+    TBuf<> quantOffset2Size16Ub;
     TBuf<> quantScale2FloatUb;
     TBuf<> quantOffset2FloatUb;
 
@@ -776,14 +783,14 @@ protected:
             pipe_barrier(PIPE_V);
         }
         
-        if (PFAT::msdMode == MsdMode::MSD_ON && 
-		    (this->tilingData->promptAttentionBaseParams.keyAntiquantMode == 0)) {
-            LocalTensor<float> qRowSumUb = msdQRowSumBuff[0].Get<float>(); // to be modified by perchannel
-            uint32_t gSize = this->tilingData->promptAttentionBaseParams.seqSize;
-            Muls(qRowSumUb, qRowSumUb, static_cast<float>(this->tilingData->promptAttentionBaseParams.scaleValue), gSize * FP32_ONE_BLOCK_SIZE_PFA);
-            pipe_barrier(PIPE_V);
-            Add(lseUb, lseUb, qRowSumUb, gSize * FP32_ONE_BLOCK_SIZE_PFA);
-            pipe_barrier(PIPE_V);
+        if constexpr (PFAT::msdMode == MsdMode::MSD_ON) {
+            if (this->tilingData->promptAttentionBaseParams.keyAntiquantMode == 0 and this->msdIsKOffsetExist) {
+                LocalTensor<float> &qRowSumUb = this->msdRowSumUb[this->headParams->gmPingpong];
+                Muls(qRowSumUb, qRowSumUb, static_cast<float>(this->tilingData->promptAttentionBaseParams.scaleValue), souterSize * FP32_ONE_BLOCK_SIZE_PFA);
+                pipe_barrier(PIPE_V);
+                Add(lseUb, lseUb, qRowSumUb, souterSize * FP32_ONE_BLOCK_SIZE_PFA);
+                pipe_barrier(PIPE_V);
+            }
         }
 
         if (likely(souterSize % 8 == 0)) {      // copyout element num is 32B aligned, can use DataCopy to acquire high performance
@@ -813,6 +820,8 @@ protected:
     }
 
     __aicore__ inline void PostQuant2PerChannelBF16(LocalTensor<computeType> &bmm2ResUb, LocalTensor<int8_t> &outputQuantRes);
+
+    __aicore__ inline void PostQuant2PerChannelFP16(LocalTensor<computeType> &bmm2ResUb, LocalTensor<int8_t> &outputQuantRes);
 
     __aicore__ inline void PostQuant2PerChannelFP32(LocalTensor<computeType> &bmm2ResUb, LocalTensor<int8_t> &outputQuantRes);
 
@@ -857,7 +866,9 @@ protected:
             if (isQuant2PerChn) {                                        // per-channel
                 if (isQuant2BF16) {                                      // scale2 and offset2 is bf16，now qkv is also bf16，bmm2 output is fp32，scale2 and offset2 need to cast to FP32.
                     PostQuant2PerChannelBF16(bmm2ResUb, outputQuantRes);
-                } else {                                                 // scale2 and offset2 is fp32. High performance requires casting to fp16，high-precision/bf16 directly do quant.
+                } else if(isQuant2FP16){
+                    PostQuant2PerChannelFP16(bmm2ResUb, outputQuantRes);
+                } else {                                                  // scale2 and offset2 is fp32. High performance requires casting to fp16，high-precision/bf16 directly do quant.
                     PostQuant2PerChannelFP32(bmm2ResUb, outputQuantRes);
                 }
             } else {    // Perform per-channel quantiation, high performance requires conversion to fp16, high precision or bf16 directly quantizes.
@@ -930,6 +941,8 @@ protected:
             if (isQuant2PerChn) {                                         // per-channel
                 if (isQuant2BF16) {                                       // scale2 and offset2 is bf16，now qkv is also bf16，bmm2 output is fp32，scale2 and offset2 need to cast to FP32. 
                     PostQuant2PerChannelBF16(bmm2ResUb, outputQuantRes);
+                } else if(isQuant2FP16){
+                    PostQuant2PerChannelFP16(bmm2ResUb, outputQuantRes);
                 } else {                                                  // scale2 and offset2 is fp32，High performance requires casting to fp16，high-precision/bf16 directly do quant.
                     PostQuant2PerChannelFP32(bmm2ResUb, outputQuantRes);
                 }
@@ -1357,28 +1370,59 @@ protected:
 template<typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X910Base<PFAT>::PostQuant2PerChannelBF16(LocalTensor<computeType> &bmm2ResUb, LocalTensor<int8_t> &outputQuantRes) {
     if constexpr (IsSameType<computeType, float>::value) {
-        LocalTensor<bfloat16_t> quantScale2Ub = quantScale2BF16Ub.Get<bfloat16_t>(perChannelQuantUBSize);
+
+        LocalTensor<bfloat16_t> quantScale2Ub = quantScale2Size16Ub.Get<bfloat16_t>(perChannelQuantUBSize);
         LocalTensor<bfloat16_t> quantOffset2Ub;
         DataCopy(quantScale2Ub, quantScale2BF16Gm[(uint64_t)this->preHeadParams->batchNOffset * perChannelQuantUBSize], perChannelQuantUBSize);
         if (isQuantOffset2Exist) {
-            quantOffset2Ub = quantOffset2BF16Ub.Get<bfloat16_t>(perChannelQuantUBSize);
+            quantOffset2Ub = quantOffset2Size16Ub.Get<bfloat16_t>(perChannelQuantUBSize);
             DataCopy(quantOffset2Ub, quantOffset2BF16Gm[(uint64_t)this->preHeadParams->batchNOffset * perChannelQuantUBSize], perChannelQuantUBSize);
         }
         auto quantParamCast = GetTPipePtr()->FetchEventID(HardEvent::MTE2_V);
         SetFlag<HardEvent::MTE2_V>(quantParamCast);
         WaitFlag<HardEvent::MTE2_V>(quantParamCast);
-
-        LocalTensor<float> quantScale2UbFloat = quantScale2FloatUb.Get<float>(perChannelQuantUBSize);
-        LocalTensor<float> quantOffset2UbFloat;
-        Cast(quantScale2UbFloat, quantScale2Ub, RoundMode::CAST_NONE, quantScale2Ub.GetSize());
+        LocalTensor<float> quantScale2UbFloatBF16 = quantScale2FloatUb.Get<float>(perChannelQuantUBSize);
+        LocalTensor<float> quantOffset2UbFloatBF16;
+        Cast(quantScale2UbFloatBF16, quantScale2Ub, RoundMode::CAST_NONE, quantScale2Ub.GetSize());
         if (isQuantOffset2Exist) {
-            quantOffset2UbFloat = quantOffset2FloatUb.Get<float>(perChannelQuantUBSize);
-            Cast(quantOffset2UbFloat, quantOffset2Ub, RoundMode::CAST_NONE, quantOffset2Ub.GetSize());
+            quantOffset2UbFloatBF16 = quantOffset2FloatUb.Get<float>(perChannelQuantUBSize);
+            Cast(quantOffset2UbFloatBF16, quantOffset2Ub, RoundMode::CAST_NONE, quantOffset2Ub.GetSize());
             pipe_barrier(PIPE_V);
-            AscendQuant(outputQuantRes, bmm2ResUb, quantScale2UbFloat, quantOffset2UbFloat);
+            AscendQuant(outputQuantRes, bmm2ResUb, quantScale2UbFloatBF16, quantOffset2UbFloatBF16);
         } else {
             pipe_barrier(PIPE_V);
-            AscendQuant(outputQuantRes, bmm2ResUb, quantScale2UbFloat, static_cast<float>(0));
+            AscendQuant(outputQuantRes, bmm2ResUb, quantScale2UbFloatBF16, static_cast<float>(0));
+        }
+    }
+}
+
+template<typename PFAT>
+__aicore__ inline void PromptFlashAttentionS1s2Bns1X910Base<PFAT>::PostQuant2PerChannelFP16(LocalTensor<computeType> &bmm2ResUb, LocalTensor<int8_t> &outputQuantRes) {
+    if constexpr (IsSameType<computeType, float>::value) {
+
+        LocalTensor<half> quantScale2Ub = quantScale2Size16Ub.Get<half>(perChannelQuantUBSize);
+        LocalTensor<half> quantOffset2Ub;
+        DataCopy(quantScale2Ub, quantScale2FP16Gm[(uint64_t)this->preHeadParams->batchNOffset * perChannelQuantUBSize], perChannelQuantUBSize);
+        if (isQuantOffset2Exist) {
+            quantOffset2Ub = quantOffset2Size16Ub.Get<half>(perChannelQuantUBSize);
+            DataCopy(quantOffset2Ub, quantOffset2FP16Gm[(uint64_t)this->preHeadParams->batchNOffset * perChannelQuantUBSize], perChannelQuantUBSize);
+        }
+
+        auto quantParamCast = GetTPipePtr()->FetchEventID(HardEvent::MTE2_V);
+        SetFlag<HardEvent::MTE2_V>(quantParamCast);
+        WaitFlag<HardEvent::MTE2_V>(quantParamCast);
+        LocalTensor<float> quantScale2UbFloatFP16 = quantScale2FloatUb.Get<float>(perChannelQuantUBSize);
+        LocalTensor<float> quantOffset2UbFloatFP16;
+       
+        Cast(quantScale2UbFloatFP16, quantScale2Ub, RoundMode::CAST_NONE, quantScale2Ub.GetSize());
+        if (isQuantOffset2Exist) {
+            quantOffset2UbFloatFP16 = quantOffset2FloatUb.Get<float>(perChannelQuantUBSize);
+            Cast(quantOffset2UbFloatFP16, quantOffset2Ub, RoundMode::CAST_NONE, quantOffset2Ub.GetSize());
+            pipe_barrier(PIPE_V);
+            AscendQuant(outputQuantRes, bmm2ResUb, quantScale2UbFloatFP16, quantOffset2UbFloatFP16);
+        } else {
+            pipe_barrier(PIPE_V);
+            AscendQuant(outputQuantRes, bmm2ResUb, quantScale2UbFloatFP16, static_cast<float>(0));
         }
     }
 }
@@ -1446,6 +1490,67 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910Base<PFAT>::QuantCompute(
 }
 
 template<typename PFAT>
+__aicore__ inline void PromptFlashAttentionS1s2Bns1X910Base<PFAT>::InitScale2InQuant(__gm__ uint8_t* scale2, __gm__ uint8_t* offset2){
+    if (scale2 != nullptr) {
+        if (isQuant2PerChn) {       // scale2 is tensor in per-channel mode
+            if (isQuant2BF16) {     // scale2 type is bf16
+                quantScale2BF16Gm.SetGlobalBuffer((__gm__ bfloat16_t*)(scale2));
+                PFA_InitBuffer(quantScale2Size16Ub, perChannelQuantUBSize * sizeof(bfloat16_t));
+                PFA_InitBuffer(quantScale2FloatUb, perChannelQuantUBSize * sizeof(float));
+            } else if(isQuant2FP16){
+                quantScale2FP16Gm.SetGlobalBuffer((__gm__ half*)(scale2));
+                PFA_InitBuffer(quantScale2Size16Ub, perChannelQuantUBSize * sizeof(half));
+                PFA_InitBuffer(quantScale2FloatUb, perChannelQuantUBSize * sizeof(float));
+            } else {                 // scale2 type is fp32
+                quantScale2FP32Gm.SetGlobalBuffer((__gm__ float*)(scale2));
+                PFA_InitBuffer(quantScale2FloatUb, perChannelQuantUBSize * sizeof(float));
+            }
+        } else {                    // scale2 is scalarin per-tensor mode
+            if (isQuant2BF16) {     // scale2 type is bf16
+                quantScale2BF16Gm.SetGlobalBuffer((__gm__ bfloat16_t*)(scale2));
+                quantScale2 = ToFloat(quantScale2BF16Gm.GetValue(0));
+            } else if(isQuant2FP16){
+                quantScale2FP16Gm.SetGlobalBuffer((__gm__ half*)(scale2));
+                quantScale2 = (float)(quantScale2FP16Gm.GetValue(0));
+            } else {                // scale2 type is fp32
+                quantScale2 = *(reinterpret_cast<__gm__ float*>(scale2));
+            }
+        }
+    }
+}
+
+template<typename PFAT>
+__aicore__ inline void PromptFlashAttentionS1s2Bns1X910Base<PFAT>::InitOffset2InQuant(__gm__ uint8_t* scale2, __gm__ uint8_t* offset2){
+    if (offset2 != nullptr) {
+        if (isQuant2PerChn) {       // offset2 is tensor in per-channel mode
+            if (isQuant2BF16) {     // offset2 type is bf16
+                quantOffset2BF16Gm.SetGlobalBuffer((__gm__ bfloat16_t*)(offset2));
+                PFA_InitBuffer(quantOffset2Size16Ub, perChannelQuantUBSize * sizeof(bfloat16_t));
+                PFA_InitBuffer(quantOffset2FloatUb, perChannelQuantUBSize * sizeof(float));
+            } else if(isQuant2FP16){
+                quantOffset2FP16Gm.SetGlobalBuffer((__gm__ half*)(offset2));
+                PFA_InitBuffer(quantOffset2Size16Ub, perChannelQuantUBSize * sizeof(half));
+                PFA_InitBuffer(quantOffset2FloatUb, perChannelQuantUBSize * sizeof(float));
+            } else {                // offset2 type is fp32
+                quantOffset2FP32Gm.SetGlobalBuffer((__gm__ float*)(offset2));
+                PFA_InitBuffer(quantOffset2FloatUb, perChannelQuantUBSize * sizeof(float));
+            }
+        } else {                    // offset2 is scalar in per-tensor mode
+            if (isQuant2BF16) {
+                quantOffset2BF16Gm.SetGlobalBuffer((__gm__ bfloat16_t*)(offset2));
+                quantOffset2 = ToFloat(quantOffset2BF16Gm.GetValue(0));
+            } else if(isQuant2FP16){
+                quantOffset2FP16Gm.SetGlobalBuffer((__gm__ half*)(offset2));
+                quantOffset2 = (float)(quantOffset2FP16Gm.GetValue(0));
+            } else {
+                quantOffset2 = *(reinterpret_cast<__gm__ float*>(offset2));
+            }
+        }
+    }
+}
+
+
+template<typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X910Base<PFAT>::InitQuant(__gm__ uint8_t* deq_scale1,
                                                              __gm__ uint8_t* scale1, __gm__ uint8_t* deq_scale2,
                                                              __gm__ uint8_t* scale2, __gm__ uint8_t* offset2) {
@@ -1466,50 +1571,16 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910Base<PFAT>::InitQuant(__g
             dequantScale2 = *(reinterpret_cast<__gm__ uint64_t*>(deq_scale2));
         }
     }
-    isQuant2PerChn = tilingData->promptAttentionBaseParams.isQuant2Perchannel == 0 ? false : true;
-    isQuant2BF16 = tilingData->promptAttentionBaseParams.isQuant2BF16 == 0 ? false : true;
+    
+    isQuant2PerChn = tilingData->promptAttentionBaseParams.isQuant2Perchannel;
+    isQuant2BF16 = tilingData->promptAttentionBaseParams.isQuant2BF16;
+    isQuant2FP16 = tilingData->promptAttentionBaseParams.isQuant2FP16;
     isQuantOffset2Exist = offset2 == nullptr ? false : true;
-
     // Whether the per-tensor supports scale2 and offset input BF16? The current modification has removed this feature and now has a rollback function.
     perChannelQuantUBSize = this->tilingData->promptAttentionBaseParams.headSize;
-    if (scale2 != nullptr) {
-        if (isQuant2PerChn) {       // scale2 is tensor in per-channel mode
-            if (isQuant2BF16) {     // scale2 type is bf16
-                quantScale2BF16Gm.SetGlobalBuffer((__gm__ bfloat16_t*)(scale2));
-                PFA_InitBuffer(quantScale2BF16Ub, perChannelQuantUBSize * sizeof(bfloat16_t));
-                PFA_InitBuffer(quantScale2FloatUb, perChannelQuantUBSize * sizeof(float));
-            } else {                 // scale2 type is fp32
-                quantScale2FP32Gm.SetGlobalBuffer((__gm__ float*)(scale2));
-                PFA_InitBuffer(quantScale2FloatUb, perChannelQuantUBSize * sizeof(float));
-            }
-        } else {                    // scale2 is scalarin per-tensor mode
-            if (isQuant2BF16) {     // scale2 type is bf16
-                quantScale2BF16Gm.SetGlobalBuffer((__gm__ bfloat16_t*)(scale2));
-                quantScale2 = ToFloat(quantScale2BF16Gm.GetValue(0));
-            } else {                // scale2 type is fp32
-                quantScale2 = *(reinterpret_cast<__gm__ float*>(scale2));
-            }
-        }
-    }
-
-    if (offset2 != nullptr) {
-        if (isQuant2PerChn) {       // offset2 is tensor in per-channel mode
-            if (isQuant2BF16) {     // offset2 type is bf16
-                quantOffset2BF16Gm.SetGlobalBuffer((__gm__ bfloat16_t*)(offset2));
-                PFA_InitBuffer(quantOffset2BF16Ub, perChannelQuantUBSize * sizeof(bfloat16_t));
-                PFA_InitBuffer(quantOffset2FloatUb, perChannelQuantUBSize * sizeof(float));
-            } else {                // offset2 type is fp32
-                quantOffset2FP32Gm.SetGlobalBuffer((__gm__ float*)(offset2));
-                PFA_InitBuffer(quantOffset2FloatUb, perChannelQuantUBSize * sizeof(float));
-            }
-        } else {                    // offset2 is scalar in per-tensor mode
-            if (isQuant2BF16) {
-                quantOffset2BF16Gm.SetGlobalBuffer((__gm__ bfloat16_t*)(offset2));
-                quantOffset2 = ToFloat(quantOffset2BF16Gm.GetValue(0));
-            } else {
-                quantOffset2 = *(reinterpret_cast<__gm__ float*>(offset2));
-            }
-        }
+    if constexpr (IsSameType<O, int8_t>::value){
+        InitScale2InQuant(scale2, offset2);
+        InitOffset2InQuant(scale2, offset2);
     }
 }
 
@@ -1582,7 +1653,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910Base<PFAT>::InitMsdBuffer
     msdSoftmaxScaleResRowSumUb[1] = msdSoftmaxRowSumScaleBuff[1].Get<FT>();
 
     // msd展开次数, 高精度3次, 高性能2次
-    msdIterNum = (PFAT::calcMode == Mode::HighPerformance)? 2 : 3;
+    msdIterNum = (PFAT::calcMode == Mode::HighPerformance || PFAT::msdMode == MsdMode::MSD_ON)? 2 : 3;
 }
 
 template<typename PFAT>
@@ -1602,11 +1673,13 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910Base<PFAT>::Init(__gm__ u
     value_ptr = value;
 
     // For small B*N perform skip core optimization
-    if (tilingData->promptAttentionSingleCoreParams.actualCoreNums <= (GetBlockNum() * GetTaskRation() / 2 + 1)) {
-        if (tmp_block_idx & 0x1) {
-            tmp_block_idx = (tmp_block_idx + GetBlockNum() * GetTaskRation()) / 2;
-        } else {
-            tmp_block_idx = tmp_block_idx / 2;
+    if constexpr (PFAT::MM_TYPE != MatMulType::MM_IBSHARE_NORM) {
+        if (tilingData->promptAttentionSingleCoreParams.actualCoreNums <= (GetBlockNum() * GetTaskRation() / 2 + 1)) {
+            if (tmp_block_idx & 0x1) {
+                tmp_block_idx = (tmp_block_idx + GetBlockNum() * GetTaskRation()) / 2;
+            } else {
+                tmp_block_idx = tmp_block_idx / 2;
+            }
         }
     }
 
@@ -1771,7 +1844,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910Base<PFAT>::Init(__gm__ u
         InitLseOutputSingleCore();
     }
 
-    if (PFAT::msdMode == MsdMode::MSD_ON) {
+    if constexpr (PFAT::msdMode == MsdMode::MSD_ON) {
         InitMsdBuffers(workspace);
     }
 }

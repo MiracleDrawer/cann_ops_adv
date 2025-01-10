@@ -224,7 +224,7 @@ ge::graphStatus IFATiling::CheckInputFormatAndLimits() {
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus IFATiling::CheckKVHeadNum(gert::StorageShape *inputShape)
+ge::graphStatus IFATiling::CheckKVHeadNum(const gert::StorageShape *inputShape)
 {
     uint32_t tmpNumHeads = 0;
     std::string layOutStr = context_->layOut;
@@ -244,58 +244,38 @@ ge::graphStatus IFATiling::CheckKVHeadNum(gert::StorageShape *inputShape)
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus IFATiling::CheckKVShape()
+ge::graphStatus IFATiling::CheckKVShape(const size_t &size, const gert::StorageShape *keyTensorInList, const gert::StorageShape *valueTensorInList)
 {
-    if (pageAttentionFlag_) {
-        return ge::GRAPH_SUCCESS; // page_attention don't check this place
-    }
-    auto batchOfQuery = context_->query.shape->GetStorageShape().GetDim(0);
-    auto batchOfKey = context_->key.shape->GetStorageShape().GetDim(0);
-    /* kv continuous */
-    if (batchOfQuery == batchOfKey) {
-        return ge::GRAPH_SUCCESS;
-    }
     /* kv not continuous */
-    for (int64_t size = 0; size < batchOfQuery; ++size) {
-        auto keyTensorInList = context_->kCache[size];
-        auto valueTensorInList = context_->vCache[size];
-        if ((keyTensorInList == nullptr) || (valueTensorInList == nullptr)) {
-            OPS_LOG_E("IncreFlashAttention",
-                      "kv tensor list length should be greater than or equal to q batch, "
-                      "kv tensor list index[%ld] is null, q batch: %ld",
-                      size, batchOfQuery);
-            return ge::GRAPH_FAILED;
-        }
-        std::string layOutStr = context_->layOut;
-        if (layOutStr == "BSH") {
-            OPS_ERR_IF((keyTensorInList->GetStorageShape().GetDimNum() != DIM_BSH) ||
-                           (valueTensorInList->GetStorageShape().GetDimNum() != DIM_BSH),
-                       OPS_LOG_E(context_->opName,
-                                 "IFA check input param failed, tensor in list dim num should be 3, k: %lu, v: %lu.",
-                                 keyTensorInList->GetStorageShape().GetDimNum(),
-                                 valueTensorInList->GetStorageShape().GetDimNum()),
-                       return ge::GRAPH_FAILED);
-        }
-        if ((layOutStr == "BNSD") || (layOutStr == "BSND")) {
-            OPS_ERR_IF((keyTensorInList->GetStorageShape().GetDimNum() != DIM_BNSD_OR_BNSD) ||
-                           (valueTensorInList->GetStorageShape().GetDimNum() != DIM_BNSD_OR_BNSD),
-                       OPS_LOG_E(context_->opName,
-                                 "IFA check input param failed, tensor in list dim num should be 4, k: %lu, v: %lu.",
-                                 keyTensorInList->GetStorageShape().GetDimNum(),
-                                 valueTensorInList->GetStorageShape().GetDimNum()),
-                       return ge::GRAPH_FAILED);
-        }
-        OPS_ERR_IF(
-            keyTensorInList->GetStorageShape().GetDim(0) != 1,
-            OPS_LOG_E(
-                context_->opName,
-                "IFA check input param failed, b of tensor in tensor list should be 1, now b is: %ld, list index: %ld",
-                keyTensorInList->GetStorageShape().GetDim(0), size),
-            return ge::GRAPH_FAILED);
-        if (CheckKVHeadNum(keyTensorInList) != ge::GRAPH_SUCCESS ||
-            CheckKVHeadNum(valueTensorInList) != ge::GRAPH_SUCCESS) {
-            return ge::GRAPH_FAILED;
-        }
+    std::string layOutStr = context_->layOut;
+    if (layOutStr == "BSH") {
+        OPS_ERR_IF((keyTensorInList->GetStorageShape().GetDimNum() != DIM_BSH) ||
+                        (valueTensorInList->GetStorageShape().GetDimNum() != DIM_BSH),
+                    OPS_LOG_E(context_->opName,
+                                "IFA check input param failed, tensor in list dim num should be 3, k: %lu, v: %lu.",
+                                keyTensorInList->GetStorageShape().GetDimNum(),
+                                valueTensorInList->GetStorageShape().GetDimNum()),
+                    return ge::GRAPH_FAILED);
+    }
+    if ((layOutStr == "BNSD") || (layOutStr == "BSND")) {
+        OPS_ERR_IF((keyTensorInList->GetStorageShape().GetDimNum() != DIM_BNSD_OR_BNSD) ||
+                        (valueTensorInList->GetStorageShape().GetDimNum() != DIM_BNSD_OR_BNSD),
+                    OPS_LOG_E(context_->opName,
+                                "IFA check input param failed, tensor in list dim num should be 4, k: %lu, v: %lu.",
+                                keyTensorInList->GetStorageShape().GetDimNum(),
+                                valueTensorInList->GetStorageShape().GetDimNum()),
+                    return ge::GRAPH_FAILED);
+    }
+    OPS_ERR_IF(
+        keyTensorInList->GetStorageShape().GetDim(0) != 1,
+        OPS_LOG_E(
+            context_->opName,
+            "IFA check input param failed, b of tensor in tensor list should be 1, now b is: %ld, list index: %ld",
+            keyTensorInList->GetStorageShape().GetDim(0), size),
+        return ge::GRAPH_FAILED);
+    if (CheckKVHeadNum(keyTensorInList) != ge::GRAPH_SUCCESS ||
+        CheckKVHeadNum(valueTensorInList) != ge::GRAPH_SUCCESS) {
+        return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -549,8 +529,8 @@ ge::graphStatus IFATiling::CheckAntiQuantParam(const gert::Tensor *antiquantScal
                                                const gert::CompileTimeTensorDesc *antiquantScaleDesc,
                                                const gert::CompileTimeTensorDesc *antiquantOffsetDesc)
 {
-    OPS_ERR_IF((antiquantMode_ != 0) && (antiquantMode_ != 1), // unseparated antiquant need this
-               OPS_LOG_E(context_->opName, "antiquantMode value:%u is invalid, it should be 0 or 1", antiquantMode_),
+    OPS_ERR_IF((antiquantMode_ != 0) && (antiquantMode_ != 1) && (antiquantMode_ != 2), // unseparated antiquant need this
+               OPS_LOG_E(context_->opName, "antiquantMode value:%u is invalid, it should be 0 or 1 or 2", antiquantMode_),
                return ge::GRAPH_FAILED);
     if (antiquantScaleTensor == nullptr) {
         OPS_LOG_E(context_->opName, "KV antiquant is enabled, but the input antiquant scale is NULL");

@@ -87,7 +87,12 @@ public:
               int64_t pKvNumHeads, float pScaleValue, int64_t pBlockSize, int64_t pInnerPrecise,
               std::vector<int64_t> pActualSeqLength);
     };
-
+    class DoTilingParam {
+    public:
+        gert::TilingContext *ctx = nullptr;
+        ge::graphStatus ret = ge::GRAPH_SUCCESS;
+        gert::Tensor *actualSeqLengthsTensor = nullptr;
+    };
 
     int64_t h;
     Tensor query, key, value, pseShift, attenMask, actualSeqLengths, deqScale1, quantScale1, deqScale2, quantScale2,
@@ -95,12 +100,14 @@ public:
     OpInfo mOpInfo;
     Context mCtx;
     Param mParam;
+    gert::OpImplRegisterV2::TilingKernelFunc ifaTilingFunc = nullptr;
     IfaCase();
     IfaCase(const char *name, bool enable, const char *dbgInfo, OpInfo incre, Param param);
     bool Run() override;
     bool InitParam() override;
     bool InitOpInfo() override;
     bool InitCurrentCasePtr() override;
+     bool DoOpTiling(DoTilingParam& tilingParam);
 };
 
 } // namespace ops::adv::tests::ifa

@@ -78,6 +78,7 @@ ge::graphStatus IFATiling::GetNpuInfo()
 
     aicNum_ = ascendcPlatform.GetCoreNumAic();
     aivNum_ = ascendcPlatform.GetCoreNumAiv();
+    
     if (ascendcPlatform.GetSocVersion() == platform_ascendc::SocVersion::ASCEND310P) {
         socVersion_ = IfaSocVersion::SOC_ASCEND_310P;
         coreNum_ = aicNum_; // use aic num in 310p
@@ -301,38 +302,50 @@ void IFATiling::UpdatePerfMode()
     }
 }
 
+ge::graphStatus IFATiling::ProcessPageAttentionFlag() {
+    maxBlockNumPerBatch_ = context_->blockTable.tensor->GetStorageShape().GetDim(1);
+    sMax_ = maxBlockNumPerBatch_ * blockSize_;
+    seqSize_ = sMax_;
+    uint32_t kDimNum = context_->key.shape->GetStorageShape().GetDimNum();
+    if (kDimNum == 3U) { // BSH
+        inputLayout_ = IfaLayout::BSH_BSND;
+    } else { // BNSD
+        inputLayout_ = IfaLayout::BNSD;
+    }
+    const std::string inputLayoutStr = context_->layOut;
+    OPS_ERR_IF((kDimNum == DIM_BNSD && inputLayoutStr != "BNSD"),
+               OPS_LOG_E(context_->opName, "when Page Attention scene, kvcache is BNBD, query layout must be BNSD"),
+               return ge::GRAPH_FAILED);
+    return ge::GRAPH_SUCCESS;
+}
+
 ge::graphStatus IFATiling::KvShapePostProcess()
 {
     if (pageAttentionFlag_) {
-        maxBlockNumPerBatch_ = context_->blockTable.tensor->GetStorageShape().GetDim(1);
-        sMax_ = maxBlockNumPerBatch_ * blockSize_;
-        seqSize_ = sMax_;
-        uint32_t kDimNum = context_->key.shape->GetStorageShape().GetDimNum();
-        if (kDimNum == 3U) { // BSH
-            inputLayout_ = IfaLayout::BSH_BSND;
-        } else { // BNSD
-            inputLayout_ = IfaLayout::BNSD;
-        }
-        const std::string inputLayoutStr = context_->layOut;
-        OPS_ERR_IF((kDimNum == DIM_BNSD && inputLayoutStr != "BNSD"),
-                   OPS_LOG_E(context_->opName, "when Page Attention scene, kvcache is BNBD, query layout must be BNSD"),
-                   return ge::GRAPH_FAILED);
-        return ge::GRAPH_SUCCESS;
+        return ProcessPageAttentionFlag();
     }
+
+    auto batchOfQuery = context_->query.shape->GetStorageShape().GetDim(0);
+    auto batchOfKey = context_->key.shape->GetStorageShape().GetDim(0);
 
     for (size_t i = 0; i < context_->kCache.size(); i++) {
         auto keyShape = context_->kCache[i];
         auto valueShape = context_->vCache[i];
 
-        OPS_ERR_IF((keyShape == nullptr || valueShape == nullptr),
-                   OPS_LOG_E(context_->opName, "tensor shape of list[%zu] is nullptr", i), return ge::GRAPH_FAILED);
+        if ((keyShape == nullptr) || (valueShape == nullptr)) {
+            OPS_LOG_E("context_->opName",
+                        "kv tensor list length should be greater than or equal to q batch, "
+                        "kv tensor list index[%ld] is null, q batch: %ld",
+                        i, batchOfQuery);
+            return ge::GRAPH_FAILED;
+        }
 
         if (!ShapeEqual(keyShape->GetStorageShape(), valueShape->GetStorageShape())) {
             OPS_LOG_E(context_->opName, "k v shape shoud be same ");
             return ge::GRAPH_FAILED;
         }
 
-        if (CheckKVShape() != ge::GRAPH_SUCCESS ||
+        if ((!(pageAttentionFlag_ || batchOfQuery == batchOfKey) && CheckKVShape(i, keyShape, valueShape) != ge::GRAPH_SUCCESS) ||
             CheckKeyShapeTensor(keyShape->GetStorageShape()) != ge::GRAPH_SUCCESS) {
             return ge::GRAPH_FAILED;
         }
@@ -628,17 +641,37 @@ ge::graphStatus IFATiling::ProcessDequant2()
 }
 
 ge::graphStatus IFATiling::CheckKVAntiQuantParamsShapeInPagedAttention(const gert::Shape &inputParaShape) {
-    OPS_ERR_IF((inputParaShape.GetDim(0) != totalBlockNum_),
+    if (antiquantPerHeadFlag_) { // per-token-head, [block_num, kv_head_num, block_size]
+        OPS_ERR_IF((inputParaShape.GetDim(0) != totalBlockNum_),
+                OPS_LOG_E(context_->opName,
+                            "The 1st dim of antiquant parameter should be %u instead of the current %ld",
+                            totalBlockNum_, inputParaShape.GetDim(0)),
+                return ge::GRAPH_FAILED);
+        OPS_ERR_IF(
+            (inputParaShape.GetDim(1) != numKvHeads_),
             OPS_LOG_E(context_->opName,
-                        "The 1st dim of antiquant parameter should be %u instead of the current %ld",
-                        totalBlockNum_, inputParaShape.GetDim(0)),
+                    "The 2nd dim of antiquant parameter should be %u instead of the current %ld",
+                    numKvHeads_, inputParaShape.GetDim(1)),
             return ge::GRAPH_FAILED);
-    OPS_ERR_IF(
-        (inputParaShape.GetDim(1) != blockSize_),
-        OPS_LOG_E(context_->opName,
-                "The 2nd dim of antiquant parameter should be %u instead of the current %ld",
-                blockSize_, inputParaShape.GetDim(1)),
-        return ge::GRAPH_FAILED);
+        OPS_ERR_IF(
+            (inputParaShape.GetDim(2) != blockSize_),
+            OPS_LOG_E(context_->opName,
+                    "The 3rd dim of antiquant parameter should be %u instead of the current %ld",
+                    blockSize_, inputParaShape.GetDim(2)),
+            return ge::GRAPH_FAILED);
+    } else { // per-token, [block_num, block_size]
+        OPS_ERR_IF((inputParaShape.GetDim(0) != totalBlockNum_),
+                OPS_LOG_E(context_->opName,
+                            "The 1st dim of antiquant parameter should be %u instead of the current %ld",
+                            totalBlockNum_, inputParaShape.GetDim(0)),
+                return ge::GRAPH_FAILED);
+        OPS_ERR_IF(
+            (inputParaShape.GetDim(1) != blockSize_),
+            OPS_LOG_E(context_->opName,
+                    "The 2nd dim of antiquant parameter should be %u instead of the current %ld",
+                    blockSize_, inputParaShape.GetDim(1)),
+            return ge::GRAPH_FAILED);
+    }
     return ge::GRAPH_SUCCESS;
 }
 
@@ -663,9 +696,10 @@ ge::graphStatus IFATiling::CheckKVAntiQuantMode() {
             (antiquantMode_ != DEQUANT_PER_TOKEN_MODE) &&
             (antiquantMode_ != DEQUANT_PER_TENSOR_HEAD_MODE) && 
             (antiquantMode_ != DEQUANT_PER_TOKEN_HEAD_MODE) && 
-            (antiquantMode_ != DEQUANT_PER_TOKEN_PA_MODE)) {
+            (antiquantMode_ != DEQUANT_PER_TOKEN_PA_MODE) && 
+            (antiquantMode_ != DEQUANT_PER_TOKEN_HEAD_PA_MODE)) {
         OPS_LOG_E(context_->opName,
-            "antiquantMode value:%u is invalid, it should be 0、1、2、3 or 4", antiquantMode_);
+            "antiquantMode value:%u is invalid, it should be 0、1、2、3、4 or 5", antiquantMode_);
         return ge::GRAPH_FAILED;
     }
     return ge::GRAPH_SUCCESS;
@@ -689,20 +723,17 @@ ge::graphStatus IFATiling::CheckKVAntiQuantPerToken(const gert::Shape &inputPara
                       seqSize_, inputParaShape.GetDim(PER_TOKEN_S)),
             return ge::GRAPH_FAILED);
     } else if (inputParaShape.GetDimNum() == DIM_PER_TOKEN_KvSplit && kvAntiParamSplitFlag_) {
-        if (!antiquantParamsInPagedAttentionFlag_) {
-            // 使用pa模式管理scale/offset时，scale/offset形状有变化，屏蔽原有校验
-            OPS_ERR_IF((inputParaShape.GetDim(PER_TOKEN_Split_B) != batchSize_),
-                    OPS_LOG_E(context_->opName,
-                                "The 1st dim of antiquant should be %u instead of the current %ld",
-                                batchSize_, inputParaShape.GetDim(PER_TOKEN_B)),
-                    return ge::GRAPH_FAILED);
-            OPS_ERR_IF(
-                (inputParaShape.GetDim(PER_TOKEN_Split_S) < seqSize_),
+        OPS_ERR_IF((inputParaShape.GetDim(PER_TOKEN_Split_B) != batchSize_),
                 OPS_LOG_E(context_->opName,
-                        "The 2nd dim of antiquant should be greater than or equal to %u instead of the current %ld",
-                        seqSize_, inputParaShape.GetDim(PER_TOKEN_S)),
+                            "The 1st dim of antiquant should be %u instead of the current %ld",
+                            batchSize_, inputParaShape.GetDim(PER_TOKEN_B)),
                 return ge::GRAPH_FAILED);
-        }
+        OPS_ERR_IF(
+            (inputParaShape.GetDim(PER_TOKEN_Split_S) < seqSize_),
+            OPS_LOG_E(context_->opName,
+                    "The 2nd dim of antiquant should be greater than or equal to %u instead of the current %ld",
+                    seqSize_, inputParaShape.GetDim(PER_TOKEN_S)),
+            return ge::GRAPH_FAILED);
     } else {
         OPS_LOG_E(context_->opName, "The dim of antiquant is illegal, When per_token mode.");
         return ge::GRAPH_FAILED;
@@ -716,10 +747,15 @@ ge::graphStatus IFATiling::CheckKVAntiQuantParaShapeLegal(const gert::Shape &inp
         antiquantNum_ = 1;
     }
     gert::Shape expectParamShapePerTensor = gert::Shape({antiquantNum_});
-    if (antiquantPerHeadFlag_) {
+    if (antiquantPerHeadFlag_ && !antiquantParamsInPagedAttentionFlag_) {
+        // 使用pa管理scale offset后，屏蔽原有形状校验
         return CheckKVAntiQuantPerHead(inputParaShape);
     }
     if (antiquantMode_ == PER_TOKEN_MODE) { // per-token
+        // 使用pa管理scale offset后，屏蔽原有形状校验
+        if (antiquantParamsInPagedAttentionFlag_) {
+            return ge::GRAPH_SUCCESS;
+        }
         return CheckKVAntiQuantPerToken(inputParaShape);
     } else if (inputParaShape.GetDimNum() == DIM_PER_TENSOR) { // per-tensor
         antiquantMode_ = PER_CHANNEL_MODE;
@@ -742,6 +778,48 @@ ge::graphStatus IFATiling::CheckKVAntiQuantParaShapeLegal(const gert::Shape &inp
     return ge::GRAPH_SUCCESS;
 }
 
+ge::graphStatus IFATiling::CheckAntiQuantParamKeyType(const gert::Tensor *antiquantOffsetTensor,
+                                                      const gert::CompileTimeTensorDesc *antiquantScaleDesc,
+                                                      const gert::CompileTimeTensorDesc *antiquantOffsetDesc)
+{
+    ge::DataType antiquantScaleType = antiquantScaleDesc->GetDataType();
+    if (antiquantScaleType != inputQType_) {
+        OPS_LOG_E(context_->opName, "illegal datatype of antiquant scale, it should be same with input qtype");
+        return ge::GRAPH_FAILED;
+    }
+
+    if (antiquantOffsetTensor != nullptr && antiquantOffsetDesc != nullptr) {
+        ge::DataType antiquantOffsetType = antiquantOffsetDesc->GetDataType();
+        if (antiquantScaleType != antiquantOffsetType) {
+            OPS_LOG_E(context_->opName, "datatype of antiquant scale and antiquant offset should be the same");
+            return ge::GRAPH_FAILED;
+        }
+    }
+
+    return ge::GRAPH_SUCCESS;
+}
+
+ge::graphStatus IFATiling::CheckAntiQuantParamValueType(const gert::Tensor *antiquantOffsetTensor,
+                                                        const gert::CompileTimeTensorDesc *antiquantScaleDesc,
+                                                        const gert::CompileTimeTensorDesc *antiquantOffsetDesc)
+{
+    ge::DataType antiquantScaleType = antiquantScaleDesc->GetDataType();
+    if (antiquantScaleType != ge::DT_FLOAT) {
+        OPS_LOG_E(context_->opName, "per-token mode is enabled, datatype of antiquant scale should be float32 ");
+        return ge::GRAPH_FAILED;
+    }
+
+    if (antiquantOffsetTensor != nullptr && antiquantOffsetDesc != nullptr) {
+        ge::DataType antiquantOffsetType = antiquantOffsetDesc->GetDataType();
+        if (antiquantScaleType != antiquantOffsetType) {
+            OPS_LOG_E(context_->opName, "datatype of antiquant scale and antiquant offset should be the same");
+            return ge::GRAPH_FAILED;
+        }
+    }
+
+    return ge::GRAPH_SUCCESS;
+}
+
 ge::graphStatus IFATiling::ProcessAntiQuant()
 {
     auto antiquantScaleTensor = context_->antiquantScale.tensor;
@@ -755,6 +833,7 @@ ge::graphStatus IFATiling::ProcessAntiQuant()
     auto valueAntiquantScaleTensor = context_->valueAntiquantScale.tensor;
     auto valueAntiquantOffsetTensor = context_->valueAntiquantOffset.tensor;
     auto valueAntiquantOffsetDesc = context_->valueAntiquantOffset.desc;
+    auto valueAntiquantScaleDesc = context_->valueAntiquantScale.desc;
     if (!antiQuantFlag_ && (antiquantScaleTensor != nullptr || antiquantOffsetTensor != nullptr ||
                             keyAntiquantScaleTensor != nullptr || keyAntiquantOffsetTensor != nullptr ||
                             valueAntiquantScaleTensor != nullptr || valueAntiquantOffsetTensor != nullptr)) {
@@ -786,6 +865,8 @@ ge::graphStatus IFATiling::ProcessAntiQuant()
         OPS_LOG_E(context_->opName, "keyAntiquantScaleTensor is null, but keyAntiquantOffsetTensor exist");
         return ge::GRAPH_FAILED;
     }
+    uint32_t keyAntiquantMode_kvSep = context_->keyAntiquantMode != nullptr ? *context_->keyAntiquantMode : 0;
+    uint32_t valueAntiquantMode_kvSep = context_->valueAntiquantMode != nullptr ? *context_->valueAntiquantMode : 0;
     if (keyAntiquantOffsetTensor != nullptr && valueAntiquantOffsetTensor != nullptr) {
         OPS_ERR_IF((keyAntiquantOffsetDesc == nullptr),
                    OPS_LOG_E(context_->opName, "keyAntiquantScaleTensor isn't nullptr, keyAntiquantOffsetDesc is null"),
@@ -794,21 +875,27 @@ ge::graphStatus IFATiling::ProcessAntiQuant()
             (valueAntiquantOffsetDesc == nullptr),
             OPS_LOG_E(context_->opName, "valueAntiquantScaleTensor isn't nullptr, valueAntiquantOffsetDesc is null"),
             return ge::GRAPH_FAILED);
-        OPS_ERR_IF((keyAntiquantOffsetDesc->GetDataType() != valueAntiquantOffsetDesc->GetDataType()),
-                   OPS_LOG_E(context_->opName,
-                             "valueAntiquantScaleDesc and keyAntiquantScaleDesc should have the same data type"),
-                   return ge::GRAPH_FAILED);
-        if (!ShapeEqual(keyAntiquantOffsetTensor->GetStorageShape(), valueAntiquantOffsetTensor->GetStorageShape())) {
-            OPS_LOG_E(context_->opName,
-                      "keyAntiquantOffsetTensor and valueAntiquantOffsetTensor should have the same shape");
-            return ge::GRAPH_FAILED;
+        if (keyAntiquantMode_kvSep != 0 || valueAntiquantMode_kvSep != 1) {
+            OPS_ERR_IF((keyAntiquantOffsetDesc->GetDataType() != valueAntiquantOffsetDesc->GetDataType()),
+                    OPS_LOG_E(context_->opName,
+                                "valueAntiquantScaleDesc and keyAntiquantScaleDesc should have the same data type"),
+                    return ge::GRAPH_FAILED);
+        }
+        if (keyAntiquantMode_kvSep != 0 || valueAntiquantMode_kvSep != 1) {
+            if (!ShapeEqual(keyAntiquantOffsetTensor->GetStorageShape(), valueAntiquantOffsetTensor->GetStorageShape())) {
+                OPS_LOG_E(context_->opName,
+                        "keyAntiquantOffsetTensor and valueAntiquantOffsetTensor should have the same shape");
+                return ge::GRAPH_FAILED;
+            }
         }
     }
     if (keyAntiquantScaleTensor != nullptr && valueAntiquantScaleTensor != nullptr) {
-        if (!ShapeEqual(keyAntiquantScaleTensor->GetStorageShape(), valueAntiquantScaleTensor->GetStorageShape())) {
-            OPS_LOG_E(context_->opName,
-                      "keyAntiquantScaleTensor and valueAntiquantScaleTensor should have the same shape");
-            return ge::GRAPH_FAILED;
+        if (keyAntiquantMode_kvSep != 0 || valueAntiquantMode_kvSep != 1) {
+            if (!ShapeEqual(keyAntiquantScaleTensor->GetStorageShape(), valueAntiquantScaleTensor->GetStorageShape())) {
+                OPS_LOG_E(context_->opName,
+                        "keyAntiquantScaleTensor and valueAntiquantScaleTensor should have the same shape");
+                return ge::GRAPH_FAILED;
+            }
         }
         kvAntiParamSplitFlag_ = true;
     }
@@ -817,30 +904,49 @@ ge::graphStatus IFATiling::ProcessAntiQuant()
         uint32_t keyAntiquantMode = context_->keyAntiquantMode != nullptr ? *context_->keyAntiquantMode : 0;
         uint32_t valueAntiquantMode = context_->valueAntiquantMode != nullptr ? *context_->valueAntiquantMode : 0;
         if (keyAntiquantMode != valueAntiquantMode) {
-            OPS_LOG_E(context_->opName, "keyAntiquantMode and valueAntiquantMode should be the same");
-            return ge::GRAPH_FAILED;
+            if (keyAntiquantMode != 0 || valueAntiquantMode != 1){
+                OPS_LOG_E(context_->opName, "keyAntiquantMode and valueAntiquantMode should be the same");
+                return ge::GRAPH_FAILED;
+            }
         }
-        antiquantMode_ = keyAntiquantMode;
-        OPS_LOG_D(context_->opName, "org antiquantMode value:%u", antiquantMode_);
-        if(CheckKVAntiQuantMode() != ge::GRAPH_SUCCESS) {
-            return ge::GRAPH_FAILED;
-        }
+        if (keyAntiquantMode == 0 && valueAntiquantMode == 1) {
+            antiquantMode_ = PER_CHANNEL_TOKEN_MODE;
+            if (CheckAntiQuantParamKeyType(keyAntiquantOffsetTensor, keyAntiquantScaleDesc,
+                                           keyAntiquantOffsetDesc) == ge::GRAPH_FAILED) {
+                return ge::GRAPH_FAILED;
+            }
+            if (CheckAntiQuantParamValueType(valueAntiquantOffsetTensor, valueAntiquantScaleDesc,
+                                             valueAntiquantOffsetDesc) == ge::GRAPH_FAILED) {
+                return ge::GRAPH_FAILED;
+            }
+        } else {
+            antiquantMode_ = keyAntiquantMode;
+            OPS_LOG_D(context_->opName, "org antiquantMode value:%u", antiquantMode_);
+            if(CheckKVAntiQuantMode() != ge::GRAPH_SUCCESS) {
+                return ge::GRAPH_FAILED;
+            }
 
-        if (antiquantMode_ == DEQUANT_PER_TENSOR_HEAD_MODE) { // 2:per tensor head
-          antiquantMode_ = PER_CHANNEL_MODE;
-          antiquantPerHeadFlag_ = 1;
-        }
-        if (antiquantMode_ == DEQUANT_PER_TOKEN_HEAD_MODE) { // 3:per token head
-          antiquantMode_ = PER_TOKEN_MODE;
-          antiquantPerHeadFlag_ = 1;
-        }
-        if (antiquantMode_ == DEQUANT_PER_TOKEN_PA_MODE) { // 4:per token + pageAttention scale/offset
-          antiquantMode_ = PER_TOKEN_MODE;
-          antiquantParamsInPagedAttentionFlag_ = 1;
-          OPS_ERR_IF(!pageAttentionFlag_,
-                     OPS_LOG_E(context_->opName,
-                        "keyAntiquantMode/valueAntiquantMode 4 use page attention to manage scale/offset, must be used in page attention scene"),
-                     return ge::GRAPH_FAILED);
+            if (antiquantMode_ == DEQUANT_PER_TENSOR_HEAD_MODE) { // 2:per tensor head
+                antiquantMode_ = PER_CHANNEL_MODE;
+                antiquantPerHeadFlag_ = 1;
+            }
+            if (antiquantMode_ == DEQUANT_PER_TOKEN_HEAD_MODE) { // 3:per token head
+                antiquantMode_ = PER_TOKEN_MODE;
+                antiquantPerHeadFlag_ = 1;
+            }
+            if (antiquantMode_ == DEQUANT_PER_TOKEN_PA_MODE) { // 4:per token + pageAttention scale/offset
+                antiquantMode_ = PER_TOKEN_MODE;
+                antiquantParamsInPagedAttentionFlag_ = 1;
+            }
+            if (antiquantMode_ == DEQUANT_PER_TOKEN_HEAD_PA_MODE) { // 5:per token head + pageAttention scale/offset
+                antiquantMode_ = PER_TOKEN_MODE;
+                antiquantPerHeadFlag_ = 1;
+                antiquantParamsInPagedAttentionFlag_ = 1;
+            }
+            OPS_ERR_IF(antiquantParamsInPagedAttentionFlag_ && !pageAttentionFlag_,
+                        OPS_LOG_E(context_->opName,
+                            "keyAntiquantMode/valueAntiquantMode 4 and 5 use page attention to manage scale/offset, must be used in page attention scene"),
+                        return ge::GRAPH_FAILED);
         }
         if (CheckAntiQuantParam(keyAntiquantScaleTensor, keyAntiquantOffsetTensor, keyAntiquantScaleDesc,
                                 keyAntiquantOffsetDesc) == ge::GRAPH_FAILED) {
@@ -888,7 +994,7 @@ ge::graphStatus IFATiling::ProcessBlockTable()
                          maxActualseq_, blockSize_, maxBlockNumPerBatch_),
                return ge::GRAPH_FAILED);
 
-    if ((antiquantMode_ == PER_TOKEN_MODE) && antiquantParamsInPagedAttentionFlag_) {
+    if (antiquantParamsInPagedAttentionFlag_) {
         // 在处理pa相关信息时，才能获取到totalBlockNum_用于scale/offset校验
         if (CheckKVAntiQuantParamsInPagedAttention() != ge::GRAPH_SUCCESS) {
             return ge::GRAPH_FAILED;
@@ -956,7 +1062,7 @@ uint32_t IFATiling::GetAntiquantSeqLength()
         return seqSize_;
     }
     const size_t antiquantSIdx = 2;
-    return kvAntiParamSplitFlag_ ? context_->keyAntiquantScale.tensor->GetStorageShape().GetDim(antiquantSIdx) :
+    return kvAntiParamSplitFlag_ ? context_->valueAntiquantScale.tensor->GetStorageShape().GetDim(antiquantSIdx) :
                                    context_->antiquantScale.tensor->GetStorageShape().GetDim(antiquantSIdx);
 }
 
@@ -1273,7 +1379,12 @@ ge::graphStatus IFATiling::CalcInnerSize(uint32_t seqSize)
 
     sInnerLoopTimes_ = (seqSize + sInnerSize_ - 1) / sInnerSize_;
     sInnerSizeTail_ = seqSize - (sInnerLoopTimes_ - 1) * sInnerSize_;
-    if (sInnerSize_ > seqSize) {
+    // tiling下沉 && flash decoder场景时，sInnerSize_基块大小不按照真实值修改
+    // 否则会导致 tiling下沉 && flash decoder 场景时开辟workspace空间大小小于真实运行时所需的workspace大小
+    if (context_->tilingSinkFlag != nullptr) {
+        tilingSinkFlag_ = *context_->tilingSinkFlag;
+    }
+    if (sInnerSize_ > seqSize && (!(tilingSinkFlag_ && splitKVFlag_))) {
         sInnerSize_ = seqSize;
     }
     if (inputKvType_ == ge::DT_INT4) {
@@ -1712,8 +1823,13 @@ ge::graphStatus IFATiling::GenTilingKey()
 
     uint64_t baseOffset =
         modeVal * IFA_TILINGKEYOFFSET + (static_cast<uint64_t>(perfMode_)) * IFA_PERF_MODE_TILINGKEYOFFSET;
-    context_->tilingKey = baseOffset + IFA_GET_TILINGKEY(layoutVal, inputQVal, inputKvVal, outputVal, originVal,
-                                                         (paVal + splitKvVal + antiquantModeVal));
+    if (antiquantMode_ == PER_TOKEN_MODE || antiquantMode_ == PER_CHANNEL_MODE){
+        context_->tilingKey = baseOffset + IFA_GET_TILINGKEY(layoutVal, inputQVal, inputKvVal, outputVal, originVal,
+                                                            (paVal + splitKvVal + antiquantModeVal));
+    } else {
+        context_->tilingKey = baseOffset + IFA_GET_TILINGKEY(layoutVal, inputQVal, inputKvVal, outputVal, originVal,
+                                                            (paVal + splitKvVal), antiquantMode_);
+    }
     OPS_LOG_D(context_->opName, "IFA tilingKey:%llu", context_->tilingKey);
 
     return ge::GRAPH_SUCCESS;
@@ -1971,11 +2087,10 @@ ge::graphStatus TilingIncreFlashAttentionAdapter(gert::TilingContext *context, I
     return ge::GRAPH_FAILED;
 }
 
-ge::graphStatus TilingIncreFlashAttention(gert::TilingContext *context)
+IFA_EXTERN_C ge::graphStatus TilingIncreFlashAttention(gert::TilingContext *context)
 {
     OPS_ERR_IF(context == nullptr, OPS_REPORT_VECTOR_INNER_ERR("IncreFlashAttention", "Context is nullptr."),
                return ge::GRAPH_FAILED);
-
     IncreFlashAttentionTilingDataV2 tilingData;
     IncreFlashAttentionContext ifaContext{.opName = nullptr,
                                           .platformInfo = nullptr,
@@ -2016,8 +2131,8 @@ ge::graphStatus TilingIncreFlashAttention(gert::TilingContext *context)
                                           .kCache = {nullptr},
                                           .vCache = {nullptr},
                                           .tilingKey = 0,
-                                          .blockDim = 0};
-
+                                          .blockDim = 0,
+                                          .tilingSinkFlag = nullptr};
     if (IFATiling::ConvertContext(*context, ifaContext) != ge::GRAPH_SUCCESS) {
         OPS_LOG_E(context->GetNodeName(), "Error occurred while converting tilingContext to ifa context");
         return ge::GRAPH_FAILED;

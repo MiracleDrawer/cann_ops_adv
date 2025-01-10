@@ -40,37 +40,10 @@ public:
                        ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_BF16,    ge::DT_BF16,    ge::DT_FLOAT16,
                        ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_BF16,
                        ge::DT_BF16,    ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_INT8,    ge::DT_BF16,
-                       ge::DT_BF16,    ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_BF16})
-            .Format({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
+                       ge::DT_BF16,    ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_BF16,
+                       ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,
+                       ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16})
+            .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("key")
             .ParamType(DYNAMIC)
@@ -81,44 +54,17 @@ public:
                        ge::DT_BF16,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,
                        ge::DT_INT8,    ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,
                        ge::DT_INT8,    ge::DT_FLOAT16, ge::DT_INT8,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,
-                       ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_BF16,    ge::DT_BF16,  // key datatype
+                       ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_BF16,    ge::DT_BF16, // key datatype
                        ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,
                        ge::DT_BF16,    ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_INT8,    ge::DT_INT8,
                        ge::DT_INT8,    ge::DT_INT8,    ge::DT_BF16,    ge::DT_BF16,    ge::DT_INT8,    ge::DT_INT8,
                        ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_BF16,    ge::DT_FLOAT16,
                        ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_INT8,    ge::DT_FLOAT16, ge::DT_INT8,
                        ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,
-                       ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT4,    ge::DT_INT4,    ge::DT_INT4,    ge::DT_INT4})
-            .Format({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
+                       ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT4,    ge::DT_INT4,    ge::DT_INT4,    ge::DT_INT4,
+                       ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT4,
+                       ge::DT_INT4,    ge::DT_FLOAT16, ge::DT_FLOAT16})
+            .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("value")
             .ParamType(DYNAMIC)
@@ -129,44 +75,17 @@ public:
                        ge::DT_BF16,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,
                        ge::DT_INT8,    ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,
                        ge::DT_INT8,    ge::DT_FLOAT16, ge::DT_INT8,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,
-                       ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_BF16,    ge::DT_BF16,  // value datatype
+                       ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_BF16,    ge::DT_BF16, // value datatype
                        ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,
                        ge::DT_BF16,    ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_INT8,    ge::DT_INT8,
                        ge::DT_INT8,    ge::DT_INT8,    ge::DT_BF16,    ge::DT_BF16,    ge::DT_INT8,    ge::DT_INT8,
                        ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_BF16,    ge::DT_FLOAT16,
                        ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_INT8,    ge::DT_FLOAT16, ge::DT_INT8,
                        ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,
-                       ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT4,    ge::DT_INT4,    ge::DT_INT4,    ge::DT_INT4})
-            .Format({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
+                       ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT4,    ge::DT_INT4,    ge::DT_INT4,    ge::DT_INT4,
+                       ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT4,
+                       ge::DT_INT4,    ge::DT_FLOAT16, ge::DT_FLOAT16})
+            .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("pse_shift")
             .ParamType(OPTIONAL)
@@ -184,37 +103,10 @@ public:
                        ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16,
                        ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,
                        ge::DT_BF16,    ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,
-                       ge::DT_BF16,    ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_BF16})
-            .Format({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
+                       ge::DT_BF16,    ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_BF16,
+                       ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,
+                       ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16})
+            .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("atten_mask")
             .ParamType(OPTIONAL)
@@ -232,135 +124,22 @@ public:
                        ge::DT_BOOL,    ge::DT_BOOL,  ge::DT_BOOL,    ge::DT_BOOL,    ge::DT_BOOL,  ge::DT_UINT8,
                        ge::DT_BOOL,    ge::DT_BOOL,  ge::DT_BOOL,    ge::DT_BOOL,    ge::DT_INT8,  ge::DT_BOOL,
                        ge::DT_BOOL,    ge::DT_BOOL,  ge::DT_BOOL,    ge::DT_BOOL,    ge::DT_INT8,  ge::DT_INT8,
-                       ge::DT_BOOL,    ge::DT_UINT8, ge::DT_BOOL,    ge::DT_BOOL,  ge::DT_BOOL,    ge::DT_BOOL})
-            .Format({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
+                       ge::DT_BOOL,    ge::DT_UINT8, ge::DT_BOOL,    ge::DT_BOOL,    ge::DT_BOOL,  ge::DT_BOOL,
+                       ge::DT_BOOL,    ge::DT_INT8,  ge::DT_UINT8,   ge::DT_BOOL,    ge::DT_BOOL,  ge::DT_BOOL,
+                       ge::DT_BOOL,    ge::DT_INT8,  ge::DT_UINT8})
+            .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("actual_seq_lengths")
             .ParamType(OPTIONAL)
             .ValueDepend(OPTIONAL)
-            .DataType({ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64})
-            .Format({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
+            .DataTypeList({ge::DT_INT64})
+            .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("actual_seq_lengths_kv")
             .ParamType(OPTIONAL)
             .ValueDepend(OPTIONAL)
-            .DataType({ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64})
-            .Format({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
+            .DataTypeList({ge::DT_INT64})
+            .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("dequant_scale1")
             .ParamType(OPTIONAL)
@@ -371,92 +150,22 @@ public:
                        ge::DT_UINT64, ge::DT_UINT64, ge::DT_UINT64, ge::DT_UINT64, ge::DT_UINT64, ge::DT_UINT64,
                        ge::DT_UINT64, ge::DT_UINT64, ge::DT_UINT64, ge::DT_UINT64, ge::DT_UINT64, ge::DT_UINT64,
                        ge::DT_UINT64, ge::DT_UINT64, ge::DT_UINT64, ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
-                       ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  // dequant scale1 datatype
+                       ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT, // dequant scale1 datatype
                        ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
                        ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
                        ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
                        ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
                        ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
                        ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_UINT64,
-                       ge::DT_UINT64, ge::DT_UINT64, ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT})
-            .Format({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
+                       ge::DT_UINT64, ge::DT_UINT64, ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
+                       ge::DT_UINT64, ge::DT_UINT64, ge::DT_UINT64, ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
+                       ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT})
+            .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("quant_scale1")
             .ParamType(OPTIONAL)
-            .DataType({ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
-                       ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
-                       ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
-                       ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
-                       ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
-                       ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
-                       ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
-                       ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
-                       ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
-                       ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
-                       ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
-                       ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
-                       ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
-                       ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
-                       ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT})
-            .Format({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
+            .DataTypeList({ge::DT_FLOAT})
+            .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("dequant_scale2")
             .ParamType(OPTIONAL)
@@ -467,44 +176,17 @@ public:
                        ge::DT_UINT64, ge::DT_UINT64, ge::DT_UINT64, ge::DT_UINT64, ge::DT_UINT64, ge::DT_UINT64,
                        ge::DT_UINT64, ge::DT_UINT64, ge::DT_UINT64, ge::DT_UINT64, ge::DT_UINT64, ge::DT_UINT64,
                        ge::DT_UINT64, ge::DT_UINT64, ge::DT_UINT64, ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
-                       ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  // dequant scale2 datatype
+                       ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT, // dequant scale2 datatype
                        ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
                        ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
                        ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
                        ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
                        ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
                        ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_UINT64,
-                       ge::DT_UINT64, ge::DT_UINT64, ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT})
-            .Format({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
+                       ge::DT_UINT64, ge::DT_UINT64, ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
+                       ge::DT_UINT64, ge::DT_UINT64, ge::DT_UINT64, ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
+                       ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT})
+            .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("quant_scale2")
             .ParamType(OPTIONAL)
@@ -515,42 +197,15 @@ public:
                        ge::DT_FLOAT, ge::DT_BF16,  ge::DT_BF16,  ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,
                        ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_BF16,  ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,
                        ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_BF16,  ge::DT_FLOAT,
-                       ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_BF16,  // quant scale2 datatype
+                       ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_BF16, // quant scale2 datatype
                        ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,
                        ge::DT_BF16,  ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_BF16,  ge::DT_BF16,
                        ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,
                        ge::DT_BF16,  ge::DT_BF16,  ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,
-                       ge::DT_FLOAT, ge::DT_BF16,  ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT})
-            .Format({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
+                       ge::DT_FLOAT, ge::DT_BF16,  ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,
+                       ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT,
+                       ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT})
+            .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("quant_offset2")
             .ParamType(OPTIONAL)
@@ -561,42 +216,15 @@ public:
                        ge::DT_FLOAT, ge::DT_BF16,  ge::DT_BF16,  ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,
                        ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_BF16,  ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,
                        ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_BF16,  ge::DT_FLOAT,
-                       ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_BF16,  // quant offset2 datatype
+                       ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_BF16, // quant offset2 datatype
                        ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,
                        ge::DT_BF16,  ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_BF16,  ge::DT_BF16,
                        ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,
                        ge::DT_BF16,  ge::DT_BF16,  ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,
-                       ge::DT_FLOAT, ge::DT_BF16,  ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT})
-            .Format({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
+                       ge::DT_FLOAT, ge::DT_BF16,  ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT,
+                       ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT,
+                       ge::DT_FLOAT, ge::DT_FLOAT, ge::DT_FLOAT})
+            .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("antiquant_scale")
             .ParamType(OPTIONAL)
@@ -607,44 +235,17 @@ public:
                        ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_BF16,    ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
                        ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
                        ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,
-                       ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,  // antiquant scale datatype
+                       ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, // antiquant scale datatype
                        ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,
                        ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16,
                        ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_BF16,
                        ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
                        ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_BF16,
                        ge::DT_FLOAT,   ge::DT_BF16,    ge::DT_FLOAT,   ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,
-                       ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT,   ge::DT_FLOAT})
-            .Format({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
+                       ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT,   ge::DT_FLOAT,
+                       ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,
+                       ge::DT_BF16,    ge::DT_FLOAT,   ge::DT_FLOAT16})
+            .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("antiquant_offset")
             .ParamType(OPTIONAL)
@@ -655,188 +256,32 @@ public:
                        ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_BF16,    ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
                        ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
                        ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,
-                       ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,  // antiquant offset datatype
+                       ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, // antiquant offset datatype
                        ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,
                        ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16,
                        ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_BF16,
                        ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
                        ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_BF16,
                        ge::DT_FLOAT,   ge::DT_BF16,    ge::DT_FLOAT,   ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,
-                       ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT,   ge::DT_FLOAT})
-            .Format({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
+                       ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT,   ge::DT_FLOAT,
+                       ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,
+                       ge::DT_BF16,    ge::DT_FLOAT,   ge::DT_FLOAT16})
+            .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("block_table")
             .ParamType(OPTIONAL)
-            .DataType({ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,
-                       ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,
-                       ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,
-                       ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,
-                       ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,
-                       ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,
-                       ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,
-                       ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,
-                       ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,
-                       ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,
-                       ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,
-                       ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,
-                       ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,
-                       ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,
-                       ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32,  ge::DT_INT32})
-            .Format({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
+            .DataTypeList({ge::DT_INT32})
+            .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("query_padding_size")
             .ParamType(OPTIONAL)
-            .DataType({ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64})
-            .Format({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
+            .DataTypeList({ge::DT_INT64})
+            .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("kv_padding_size")
             .ParamType(OPTIONAL)
-            .DataType({ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64})
-            .Format({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
+            .DataTypeList({ge::DT_INT64})
+            .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("key_antiquant_scale")
             .ParamType(OPTIONAL)
@@ -847,44 +292,17 @@ public:
                        ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_BF16,    ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
                        ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
                        ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,
-                       ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,  // key antiquant scale datatype
+                       ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, // key antiquant scale datatype
                        ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,
                        ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16,
                        ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_BF16,
                        ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
                        ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_BF16,
                        ge::DT_BF16,    ge::DT_FLOAT,   ge::DT_FLOAT16, ge::DT_FLOAT,   ge::DT_FLOAT16, ge::DT_FLOAT,
-                       ge::DT_FLOAT,   ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT,   ge::DT_FLOAT})
-            .Format({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
+                       ge::DT_FLOAT,   ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT,   ge::DT_FLOAT,
+                       ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT16,
+                       ge::DT_BF16,    ge::DT_FLOAT,   ge::DT_FLOAT16})
+            .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("key_antiquant_offset")
             .ParamType(OPTIONAL)
@@ -895,44 +313,17 @@ public:
                        ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_BF16,    ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
                        ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
                        ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,
-                       ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,  // key antiquant offset datatype
+                       ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, // key antiquant offset datatype
                        ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,
                        ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16,
                        ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_BF16,
                        ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
                        ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_BF16,
                        ge::DT_BF16,    ge::DT_FLOAT,   ge::DT_FLOAT16, ge::DT_FLOAT,   ge::DT_FLOAT16, ge::DT_FLOAT,
-                       ge::DT_FLOAT,   ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT,   ge::DT_FLOAT})
-            .Format({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
+                       ge::DT_FLOAT,   ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT,   ge::DT_FLOAT,
+                       ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT16,
+                       ge::DT_BF16,    ge::DT_FLOAT,   ge::DT_FLOAT16})
+            .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("value_antiquant_scale")
             .ParamType(OPTIONAL)
@@ -943,44 +334,17 @@ public:
                        ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_BF16,    ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
                        ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
                        ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,
-                       ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,  // value antiquant scale datatype
+                       ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, // value antiquant scale datatype
                        ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,
                        ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16,
                        ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_BF16,
                        ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
                        ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_BF16,
                        ge::DT_BF16,    ge::DT_FLOAT,   ge::DT_FLOAT16, ge::DT_FLOAT,   ge::DT_FLOAT16, ge::DT_FLOAT,
-                       ge::DT_FLOAT,   ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT,   ge::DT_FLOAT})
-            .Format({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
+                       ge::DT_FLOAT,   ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT,   ge::DT_FLOAT,
+                       ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
+                       ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT16})
+            .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("value_antiquant_offset")
             .ParamType(OPTIONAL)
@@ -991,44 +355,17 @@ public:
                        ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_BF16,    ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
                        ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
                        ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,
-                       ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,  // value antiquant offset datatype
+                       ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, // value antiquant offset datatype
                        ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,
                        ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16,
                        ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_BF16,
                        ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
                        ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_BF16,
                        ge::DT_BF16,    ge::DT_FLOAT,   ge::DT_FLOAT16, ge::DT_FLOAT,   ge::DT_FLOAT16, ge::DT_FLOAT,
-                       ge::DT_FLOAT,   ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT,   ge::DT_FLOAT})
-            .Format({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
+                       ge::DT_FLOAT,   ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT,   ge::DT_FLOAT,
+                       ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT,
+                       ge::DT_FLOAT,   ge::DT_FLOAT,   ge::DT_FLOAT16})
+            .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("key_shared_prefix")
             .ParamType(OPTIONAL)
@@ -1039,44 +376,17 @@ public:
                        ge::DT_BF16,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,
                        ge::DT_INT8,    ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,
                        ge::DT_INT8,    ge::DT_FLOAT16, ge::DT_INT8,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,
-                       ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_BF16,    ge::DT_BF16,  // key shared prefix datatype
+                       ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_BF16,    ge::DT_BF16, // key shared prefix datatype
                        ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,
                        ge::DT_BF16,    ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_INT8,    ge::DT_INT8,
                        ge::DT_INT8,    ge::DT_INT8,    ge::DT_BF16,    ge::DT_BF16,    ge::DT_INT8,    ge::DT_INT8,
                        ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_BF16,    ge::DT_FLOAT16,
                        ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_INT8,    ge::DT_FLOAT16, ge::DT_INT8,
                        ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_FLOAT16,
-                       ge::DT_FLOAT,   ge::DT_FLOAT16, ge::DT_INT4,    ge::DT_INT4,    ge::DT_INT4,    ge::DT_INT4})
-            .Format({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
+                       ge::DT_FLOAT,   ge::DT_FLOAT16, ge::DT_INT4,    ge::DT_INT4,    ge::DT_INT4,    ge::DT_INT4,
+                       ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT4,
+                       ge::DT_INT4,    ge::DT_FLOAT16, ge::DT_FLOAT16})
+            .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("value_shared_prefix")
             .ParamType(OPTIONAL)
@@ -1087,93 +397,23 @@ public:
                        ge::DT_BF16,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,
                        ge::DT_INT8,    ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16,
                        ge::DT_INT8,    ge::DT_FLOAT16, ge::DT_INT8,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_BF16,
-                       ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_BF16,    ge::DT_BF16,  // value shared prefix datatype
+                       ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_BF16,    ge::DT_BF16, // value shared prefix datatype
                        ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,
                        ge::DT_BF16,    ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_INT8,    ge::DT_INT8,
                        ge::DT_INT8,    ge::DT_INT8,    ge::DT_BF16,    ge::DT_BF16,    ge::DT_INT8,    ge::DT_INT8,
                        ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_BF16,    ge::DT_FLOAT16,
                        ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_INT8,    ge::DT_FLOAT16, ge::DT_INT8,
                        ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_FLOAT16,
-                       ge::DT_FLOAT,   ge::DT_FLOAT16, ge::DT_INT4,    ge::DT_INT4,    ge::DT_INT4,    ge::DT_INT4})
-            .Format({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
+                       ge::DT_FLOAT,   ge::DT_FLOAT16, ge::DT_INT4,    ge::DT_INT4,    ge::DT_INT4,    ge::DT_INT4,
+                       ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT4,
+                       ge::DT_INT4,    ge::DT_FLOAT16, ge::DT_FLOAT16})
+            .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Input("actual_shared_prefix_len")
             .ParamType(OPTIONAL)
             .ValueDepend(OPTIONAL)
-            .DataType({ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,
-                       ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64,  ge::DT_INT64})
-            .Format({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
+            .DataTypeList({ge::DT_INT64})
+            .FormatList({ge::FORMAT_ND})
             .AutoContiguous();
         this->Output("attention_out")
             .ParamType(REQUIRED)
@@ -1191,84 +431,11 @@ public:
                        ge::DT_FLOAT16, ge::DT_INT8,    ge::DT_BF16,    ge::DT_INT8,    ge::DT_BF16,    ge::DT_FLOAT16,
                        ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,    ge::DT_INT8,
                        ge::DT_BF16,    ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_INT8,    ge::DT_INT8,
-                       ge::DT_INT8,    ge::DT_INT8,    ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_BF16})
-            .Format({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND});
-        this->Output("softmax_lse")
-            .ParamType(REQUIRED)
-            .DataType({ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
-                       ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
-                       ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
-                       ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
-                       ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
-                       ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
-                       ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
-                       ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
-                       ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
-                       ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
-                       ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
-                       ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
-                       ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
-                       ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,
-                       ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT,  ge::DT_FLOAT})
-            .Format({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                     ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND})
-            .UnknownShapeFormat({ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,
-                                 ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND,  ge::FORMAT_ND});
+                       ge::DT_INT8,    ge::DT_INT8,    ge::DT_FLOAT16, ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_BF16,
+                       ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_FLOAT16, ge::DT_INT8,    ge::DT_FLOAT16, ge::DT_FLOAT16,
+                       ge::DT_BF16,    ge::DT_FLOAT16, ge::DT_INT8})
+            .FormatList({ge::FORMAT_ND});
+        this->Output("softmax_lse").ParamType(REQUIRED).DataTypeList({ge::DT_FLOAT}).FormatList({ge::FORMAT_ND});
         this->Attr("num_heads").AttrType(REQUIRED).Int(1);
         this->Attr("scale").AttrType(OPTIONAL).Float(1.0);
         this->Attr("pre_tokens").AttrType(OPTIONAL).Int(2147483647); // 2147483647: Maximum value of int32_t.
@@ -1291,7 +458,7 @@ public:
             .PrecisionReduceFlag(true)
             .ExtendCfgInfo("aclnnSupport.value", "support_aclnn")
             .ExtendCfgInfo("jitCompile.flag", "static_false,dynamic_false");
-        this->AICore().AddConfig("ascend910b", aicore_config);
+        this->AICore().AddConfig("ascend910b", aicore_config); // use 910B
     }
 };
 OP_ADD(FusedInferAttentionScore, optiling::FusedInferAttentionScoreCompileInfo);

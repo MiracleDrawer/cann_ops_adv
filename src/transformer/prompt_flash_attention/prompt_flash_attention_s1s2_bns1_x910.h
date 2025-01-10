@@ -31,8 +31,7 @@ public:
     using pseShiftType = typename PromptFlashAttentionTypeTraits<T,PFAT::calcMode>::pseShiftType;
     using pseShiftCastType = typename PromptFlashAttentionTypeTraits<T,PFAT::calcMode>::pseShiftCastType;
 
-    static constexpr bool MsdOn = (IsSameType<T, bfloat16_t>::value && IsSameType<KV_T, int8_t>::value) and PFAT::msdMode == MsdMode::MSD_ON;
-    using mmOutputType = typename AscendC::Conditional<MsdOn, int32_t, mmOutputTypeTmp>::type;
+    using mmOutputType = typename AscendC::Conditional<PFAT::msdMode == MsdMode::MSD_ON, int32_t, mmOutputTypeTmp>::type;
 
     __aicore__ inline PromptFlashAttentionS1s2Bns1X910() {};
     __aicore__ inline void Process();
@@ -148,8 +147,19 @@ protected:
 
     __aicore__ inline void VecAddMat(LocalTensor<FT> dstUb, LocalTensor<FT> src0Ub, LocalTensor<FT> src1Ub, uint32_t dealRowCount, uint32_t columnCount, uint32_t actualColumnCount);
 
-    __aicore__ inline void MsdSoftmaxResPreProcess(GlobalTensor<KV_T> dstGm, LocalTensor<FT> srcUb, LocalTensor<FT> tmpAFloorUb, uint32_t startRow,
+    __aicore__ inline void MsdSoftmaxResPreProcess(PFAComputeParam *params, GlobalTensor<KV_T> dstGm, LocalTensor<FT> srcUb, LocalTensor<FT> tmpAFloorUb, uint32_t startRow,
                                                    uint32_t dealRowCount, uint32_t columnCount, uint32_t actualColumnCount, int gmPingpong);
+
+    __aicore__ inline void Bmm1MsdExpandPerchannel(PFAComputeParam *params);
+
+    __aicore__ inline void Bmm1MsdSqueezePerchannel(PFAComputeParam *params, LocalTensor<FT> &bmm1ResUb, uint32_t startRow, uint32_t dealRowCount, int gmPingpong);
+
+    __aicore__ inline void Bmm2MsdExpandPerchannel(PFAComputeParam *params, LocalTensor<FT> &bmm1ResUb, GlobalTensor<KV_T> &bmm1ExpandGm, uint32_t startRow, uint32_t dealRowCount, int gmPingpong);
+
+    __aicore__ inline void Bmm2MsdSqueezePerchannel(PFAComputeParam *params, LocalTensor<FT> &bmm2ResUb, GlobalTensor<mmOutputType> &srcGM, int gmPingpong);
+
+    __aicore__ inline void Bmm2UpdateDivPerchannel(LocalTensor<FT> &bmm2ResLastUb);
+
     __aicore__ inline void Bmm2Antiquant(PFAComputeParam *params) {
         int step = this->tilingData->promptAttentionSingleCoreParams.kvAntiquantSInnerSize;
         int kvAntiquantLoopTimes = (params->singleProcessSInnerBmmTail + step -1) / step;
@@ -311,6 +321,7 @@ protected:
         SetFlag<HardEvent::MTE3_MTE2>(bmmWaitAntiEvt);
         WaitFlag<HardEvent::MTE3_MTE2>(bmmWaitAntiEvt);
     }
+
     __aicore__ inline void Bmm1ComputeIterate(PFAComputeParam *params) {
        if (this->mm1SingleCoreNPrev != params->mm1SingleCoreN) {
             // Reduce the number of SetOrgShape calls to reduce the frequency of CV communications.
@@ -425,6 +436,12 @@ protected:
             LocalTensor<T> tmpSoftmaxResUb = mmResUb.template ReinterpretCast<T>();
             DataCopy(tmpBmm1ResGmDb, tmpSoftmaxResUb, this->mm1GmUbCopyParam[ubPingpong]);
         } else {
+            if constexpr (PFAT::MM_TYPE == MatMulType::MM_IBSHARE_NORM && PFAT::calcMode == Mode::HighPerformance) {
+                PFAComputeParam *params = this->headParams;
+                if (params->isLastInnerIter && params->singleProcessSInnerBmmTail <= SINGLE_PROCESS_SINNER_BMMTAIL_LIMIT) {
+                    this->mm1GmUbCopyParam[ubPingpong].dstStride = (params->mm2SingleKAlign - params->mm1SingleCoreN) * sizeof(T) / MM2_SINGLE_K_ALIGN_SIZE;
+                }
+            }
             DataCopy(this->bmm1ResGmDb[pingpong][gmOffset], mmResUb, this->mm1GmUbCopyParam[ubPingpong]);
         }
 
@@ -604,16 +621,23 @@ protected:
 
     __aicore__ inline void Bmm2ComputeIterate(const uint32_t BIdx, const uint32_t NIdx, const uint32_t sInnerOffsetDataSize) {
         PFAComputeParam *params = this->headParams;
+
+        uint32_t mm2KaStride = params->mm1SingleCoreN;
+        if constexpr (PFAT::MM_TYPE == MatMulType::MM_IBSHARE_NORM && (IsSameType<T, half>::value && PFAT::calcMode == Mode::HighPerformance)) {
+            mm2KaStride = params->isLastInnerIter && params->singleProcessSInnerBmmTail <= SINGLE_PROCESS_SINNER_BMMTAIL_LIMIT 
+                        ? params->mm2SingleKAlign 
+                        : params->mm1SingleCoreN;
+        }
         if ((this->mm2MStridePrev != params->singleProcessSOuterSize)
-            || (this->mm2KaStridePrev != params->mm1SingleCoreN)) {
-              // Reducing the number of SetOrgShape calls can decrease the frequency of CV communication.
-             this->bmm2.SetOrgShape(params->singleProcessSOuterSize * this->msdIterNum,  // M stride for trans a
-                 this->tilingData->bmm2TilingDataRect.N,   // N stride for b
-                 params->mm1SingleCoreN,  // Ka stride for a
-                 this->tilingData->bmm2TilingDataRect.Kb,   // Kb stride for trans b
-                 this->tilingData->promptAttentionBaseParams.headSize);  // Kc
-             this->mm2MStridePrev = params->singleProcessSOuterSize * this->msdIterNum;
-             this->mm2KaStridePrev = params->mm1SingleCoreN;
+            || (this->mm2KaStridePrev != mm2KaStride)) {
+            // Reducing the number of SetOrgShape calls can decrease the frequency of CV communication.
+            this->bmm2.SetOrgShape(params->singleProcessSOuterSize * this->msdIterNum,  // M stride for trans a
+                this->tilingData->bmm2TilingDataRect.N,   // N stride for b
+                mm2KaStride,  // Ka stride for a
+                this->tilingData->bmm2TilingDataRect.Kb,   // Kb stride for trans b
+                this->tilingData->promptAttentionBaseParams.headSize);  // Kc
+            this->mm2MStridePrev = params->singleProcessSOuterSize * this->msdIterNum;
+            this->mm2KaStridePrev = mm2KaStride;
         }
         if constexpr (PFAT::MM_TYPE == MatMulType::MM_PA) {
             this->bmm2LocalInfo = this->PABmm2UB.template Get<uint32_t>();
@@ -700,6 +724,7 @@ protected:
         resShapeSize = neededSouterSize * this->tilingData->promptAttentionBaseParams.headSize;
         return bmm2ResUb;
     }
+
     __aicore__ inline void CopyParamsAttrOutOfInnerLoop(PFAComputeParam *dst, PFAComputeParam *src) {
         dst->isFirstInnerIter = src->isFirstInnerIter;
         dst->isSecondInnerIter = src->isSecondInnerIter;
@@ -784,7 +809,11 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Process() {
     AllocGlobalResources();
 
     if constexpr (PFAT::MM_TYPE == MatMulType::MM_IBSHARE_NORM) {
-        ComputeEachCoreSplitSeqOneN(this->tmp_block_idx);
+        if (this->tilingData->promptAttentionInitOutputParams.isOneN) {
+            ComputeEachCoreSplitSeqOneN(this->tmp_block_idx);
+        } else {
+            ComputeEachCore(this->tmp_block_idx);
+        }
     } else {
         if (this->headNumRatio != 1 || this->tilingData->promptAttentionInitOutputParams.needInit ||
             this->tilingData->promptAttentionBaseParams.batchSize != 1) {
@@ -1405,7 +1434,9 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1MsdExpandPert
 
 template<typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1MsdExpand(PFAComputeParam *params) {
-    if (this->tilingData->promptAttentionBaseParams.keyAntiquantMode == 1) {
+    if (this->tilingData->promptAttentionBaseParams.keyAntiquantMode == 0) {
+        Bmm1MsdExpandPerchannel(params);
+    } else if (this->tilingData->promptAttentionBaseParams.keyAntiquantMode == 1) {
         Bmm1MsdExpandPertoken(params);
     }
 }
@@ -1537,7 +1568,9 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1MsdSqueezePer
 
 template<typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1MsdSqueeze(PFAComputeParam *params, LocalTensor<FT>& bmm1ResUb, uint32_t startRow, uint32_t dealRowCount, int ubPingpong, int gmPingpong) {
-    if (this->tilingData->promptAttentionBaseParams.keyAntiquantMode == 1){
+    if (this->tilingData->promptAttentionBaseParams.keyAntiquantMode == 0) {
+        Bmm1MsdSqueezePerchannel(params, bmm1ResUb, startRow, dealRowCount, gmPingpong);
+    } else if (this->tilingData->promptAttentionBaseParams.keyAntiquantMode == 1){
         Bmm1MsdSqueezePerToken(params, bmm1ResUb, startRow, dealRowCount, gmPingpong);
     }
     SetFlag<HardEvent::MTE2_V>(this->bmm1ResCopyInEvent[ubPingpong]);
@@ -1618,7 +1651,9 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm2MsdExpandPert
 template<typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm2MsdExpand(PFAComputeParam *params, LocalTensor<FT> &mmResUb, GlobalTensor<KV_T> bmm1ExpandGm, 
                                                                              uint32_t startRow, uint32_t dealRowCount, int gmPingpong) {
-    if (this->tilingData->promptAttentionBaseParams.keyAntiquantMode == 1){
+    if (this->tilingData->promptAttentionBaseParams.keyAntiquantMode == 0) {
+        Bmm2MsdExpandPerchannel(params, mmResUb, bmm1ExpandGm, startRow, dealRowCount, gmPingpong);
+    } else if (this->tilingData->promptAttentionBaseParams.keyAntiquantMode == 1) {
         Bmm2MsdExpandPertoken(params, mmResUb, bmm1ExpandGm, startRow, dealRowCount, gmPingpong);
     }
 }
@@ -1656,8 +1691,9 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm2MsdSqueezePer
 
 template<typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm2MsdSqueeze(PFAComputeParam *params, LocalTensor<computeType>& bmm2ResUb, GlobalTensor<mmOutputType> bmm2ResGmDb, int gmPingpong) {
-
-    if (this->tilingData->promptAttentionBaseParams.keyAntiquantMode == 1){
+    if (this->tilingData->promptAttentionBaseParams.keyAntiquantMode == 0) {
+        Bmm2MsdSqueezePerchannel(params, bmm2ResUb, bmm2ResGmDb, gmPingpong);
+    } else if (this->tilingData->promptAttentionBaseParams.keyAntiquantMode == 1) {
         Bmm2MsdSqueezePertoken(params, bmm2ResUb, bmm2ResGmDb, gmPingpong);
     }
 }
@@ -1721,14 +1757,10 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::VecAddMat(
 
 template <typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::MsdSoftmaxResPreProcess(
-    GlobalTensor<KV_T> dstGm, LocalTensor<FT> srcUb, LocalTensor<FT> tmpAFloorUb, uint32_t startRow,
+    PFAComputeParam *params, GlobalTensor<KV_T> dstGm, LocalTensor<FT> srcUb, LocalTensor<FT> tmpAFloorUb, uint32_t startRow,
     uint32_t dealRowCount, uint32_t columnCount, uint32_t actualColumnCount, int gmPingpong) {
-        
-    int64_t actualSeqLength = this->isActualLenDimsNull ?
-        this->tilingData->promptAttentionBaseParams.seqSize : this->actualSeqLengthsGm.GetValue(0);
-
-    uint32_t gSize = actualSeqLength;
-    uint32_t step = gSize * columnCount;
+    int64_t actualSeqLength = params->actualSeqLengthPerBatch;
+    int64_t step = actualSeqLength * columnCount;
     int64_t baseOffset = startRow * columnCount; 
     uint32_t calcSize = dealRowCount * columnCount;
     /**
@@ -1737,18 +1769,134 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::MsdSoftmaxResPreP
      * A2=round(254*(127/Amax * A - A1))
      * A3=round(254*254*(127/Amax * A - A1 - A2 / 254))
      */
-    constexpr FT antiqCoeff1 = 127;
-
-    Muls(srcUb, srcUb, antiqCoeff1, calcSize);
+    Muls(srcUb, srcUb, this->msdAntiqCoeff1, calcSize);
     pipe_barrier(PIPE_V);
 
-    uint32_t msdIterNum = 2;
-    if constexpr (PFAT::calcMode == Mode::HighPrecision) {
-        msdIterNum = 3;
-    }
-    for (uint32_t i = 0; i < msdIterNum; i++) {
+    for (uint32_t i = 0; i < this->msdIterNum; i++) {
         MsdAIterExpand(dstGm, srcUb, tmpAFloorUb, calcSize, (i == 0 ? true : false), step * i + baseOffset, gmPingpong);
     }
+}
+
+template<typename PFAT>
+__aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1MsdExpandPerchannel(PFAComputeParam *params) {
+    // copy scale
+    int headSize = this->tilingData->promptAttentionBaseParams.alignedHeadSize;
+    int64_t offset = params->batchNOffset / this->headNumRatio * headSize;
+    LocalTensor<FT> scaleUbFloat = this->msdScaleBuff.template Get<FT>();
+    CopyAntiquantScale(scaleUbFloat, this->keyAntiquantScaleGm, offset);
+    pipe_barrier(PIPE_V);
+
+    uint32_t startRow = 0;
+    int64_t actualSeqLength = params->actualSeqLengthPerBatch;
+    int64_t qOffset = params->tensorAOffset;
+    uint32_t dealRowCount = actualSeqLength;
+    uint32_t actualColumnCount = this->tilingData->promptAttentionBaseParams.headSize;
+    uint32_t columnCount = headSize;
+
+    LocalTensor<FT> queryCastUb = this->msdTmpMm1Buff.template Get<FT>();
+    Bmm1MsdCopyQueryGm2Ub(queryCastUb, qOffset, dealRowCount, columnCount, actualColumnCount);
+    pipe_barrier(PIPE_V);
+
+    MsdVecMulMat(queryCastUb, scaleUbFloat, queryCastUb, dealRowCount, columnCount, actualColumnCount);
+    pipe_barrier(PIPE_V);
+
+    if (this->tilingData->promptAttentionBaseParams.isSoftMaxLseEnable && this->msdIsKOffsetExist) {
+        LocalTensor<FT> tmpRowSumUb = this->msdTmpMm2Buff.template Get<FT>();
+        LocalTensor<FT> offsetUbFloat = this->msdOffsetBuff.template Get<FT>();
+        CopyAntiquantScale(offsetUbFloat, this->keyAntiquantOffsetGm, offset);
+        pipe_barrier(PIPE_V);
+
+        MsdVecMulMat(tmpRowSumUb, offsetUbFloat, queryCastUb, dealRowCount, columnCount, actualColumnCount);
+        pipe_barrier(PIPE_V);
+        Bmm1MsdCalcQueryRowSum(tmpRowSumUb, startRow, dealRowCount, columnCount, actualColumnCount, params->gmPingpong);
+        pipe_barrier(PIPE_V);
+    }
+
+    LocalTensor<FT> aMaxBmm1Ub = this->msdAMaxResBuff[params->gmPingpong].template Get<FT>();
+
+    LocalTensor<FT> aFloorUb = this->msdTmpMm2Buff.template Get<FT>();
+
+    /**
+     * Amax = rowmax(|A|)
+     * A1 = round(127/Amax * A)
+     * A2 = round(254*(127/Amax * A - A1))
+     * A3 = round(254*254*(127/Amax * A - A1 - A2 / 254))
+     */
+    MsdMatmulPreProcess(params, this->queryMsdExpandGm, aMaxBmm1Ub, queryCastUb, aFloorUb,
+                        startRow, dealRowCount, columnCount, actualColumnCount, params->gmPingpong);
+}
+
+template<typename PFAT>
+__aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm1MsdSqueezePerchannel(
+        PFAComputeParam *params, LocalTensor<FT> &bmm1ResUb, uint32_t startRow, uint32_t dealRowCount, int gmPingpong) {
+    uint32_t expandLineCnt = params->singleProcessSOuterSize;
+    uint32_t columnCount = params->singleProcessSInnerSizeNow;
+    uint32_t actualColumnCount = params->isInnerTail ? params->singleProcessSInnerBmmTail : params->singleProcessSInnerSizeNow;
+
+    constexpr uint32_t BLOCK_ELEMENT_NUM = BYTE_BLOCK_PFA / sizeof(FT);
+    LocalTensor<FT> aMaxBmm1Ub = this->msdMaxBmm1Ub[gmPingpong][startRow * this->MSD_BLOCK_ELEMENT_NUM];
+
+    MsdMatmulResCombine(bmm1ResUb, this->bmm1ResGmDb[params->gmPingpong], expandLineCnt, startRow, dealRowCount,
+                        columnCount, actualColumnCount, gmPingpong);
+    pipe_barrier(PIPE_V);
+    MsdRowMuls(bmm1ResUb, bmm1ResUb, aMaxBmm1Ub, dealRowCount, columnCount, actualColumnCount);
+    pipe_barrier(PIPE_V);
+}
+
+template<typename PFAT>
+__aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm2MsdExpandPerchannel(
+        PFAComputeParam *params, LocalTensor<FT> &bmm1ResUb, GlobalTensor<KV_T> &bmm1ExpandGm,
+        uint32_t startRow, uint32_t dealRowCount, int gmPingpong) {
+    LocalTensor<FT> aFloorUb = this->msdTmpMm2Buff.template Get<FT>();
+
+    uint32_t columnCount = params->singleProcessSInnerSizeNow;
+    uint32_t actualColumnCount = params->isInnerTail ? params->singleProcessSInnerBmmTail : params->singleProcessSInnerSizeNow;
+
+    MsdSoftmaxResPreProcess(params, bmm1ExpandGm, bmm1ResUb, aFloorUb,
+                            startRow, dealRowCount, columnCount, actualColumnCount, gmPingpong);
+}
+
+template<typename PFAT>
+__aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm2MsdSqueezePerchannel(
+        PFAComputeParam *params, LocalTensor<FT> &bmm2ResUb, GlobalTensor<mmOutputType> &srcGM, int gmPingpong) {
+    // S1 * D
+    uint32_t startRow = 0;
+    uint32_t columnCount = this->tilingData->promptAttentionBaseParams.alignedHeadSize;
+    uint32_t actualColumnCount = columnCount;
+    uint32_t dealRowCount = params->actualSeqLengthPerBatch;
+    MsdMatmulResCombine(bmm2ResUb, srcGM, params->singleProcessSOuterSize, startRow, dealRowCount, columnCount, actualColumnCount, gmPingpong);
+    pipe_barrier(PIPE_V);
+}
+
+template<typename PFAT>
+__aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::Bmm2UpdateDivPerchannel(LocalTensor<FT> &bmm2ResLastUb) {
+    PFAComputeParam *params = this->preHeadParams;
+    uint32_t dealRowCount = params->singleProcessSOuterSize;
+    uint32_t columnCount = this->tilingData->promptAttentionBaseParams.headSize;
+    uint32_t actualColumnCount = columnCount;
+    int headSize = columnCount;
+    int64_t offset = params->batchNOffset / this->headNumRatio * headSize;
+
+    if (this->msdIsVOffsetExist) {
+        // copy value offset
+        // offset shape [N, D], [H], [N, 1, D]
+        LocalTensor<FT> offsetUbFloat = this->msdOffsetBuff.template Get<FT>();
+        CopyAntiquantScale(offsetUbFloat, this->valueAntiquantOffsetGm, offset);
+        pipe_barrier(PIPE_V);
+
+        // update + offset
+        VecAddMat(bmm2ResLastUb, offsetUbFloat, bmm2ResLastUb, dealRowCount, columnCount, actualColumnCount);
+        pipe_barrier(PIPE_V);
+    }
+
+    // copy value scale
+    LocalTensor<FT> scaleUbFloat = this->msdScaleBuff.template Get<FT>();
+    CopyAntiquantScale(scaleUbFloat, this->valueAntiquantScaleGm, offset);
+    pipe_barrier(PIPE_V);
+
+    // scale * update
+    MsdVecMulMat(bmm2ResLastUb, scaleUbFloat, bmm2ResLastUb, dealRowCount, columnCount, actualColumnCount);
+    pipe_barrier(PIPE_V);
 }
 
 template<typename PFAT>
@@ -1945,6 +2093,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::SInnerLoopFunc(in
                 params->pseShiftCopyInCol -= lastInnerMargin;
             }
         }
+        params->mm2SingleKAlign = (params->mm1SingleCoreN + MM2_SINGLE_K_ALIGN_SIZE - 1) / MM2_SINGLE_K_ALIGN_SIZE * MM2_SINGLE_K_ALIGN_SIZE;
         if (params->isFirstInnerIter) {
             if constexpr (PFAT::enablePrefix) {
                 firstInnerMargin = 0;
@@ -2062,26 +2211,30 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::ComputeEachCoreSI
 template<typename PFAT>
 __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::ComputeEachCore(uint32_t coreIdx) {
     int64_t blockNum = GetBlockNum() * GetTaskRation();
-
     InitEachCoreWorkspace(coreIdx, blockNum);
-
     int actualCoreNums = this->tilingData->promptAttentionSingleCoreParams.actualCoreNums;
     if (g_coreType == AIV && coreIdx >= actualCoreNums) {
         return;
     }
     int sNum = this->tilingData->promptAttentionBaseParams.dimNumOfseq;
-
+    uint32_t sOuterCoreIdx = coreIdx;
+    uint32_t sOuterSize = this->tilingData->promptAttentionSingleCoreParams.singleProcessSOuterSize;
+    if constexpr (PFAT::MM_TYPE == MatMulType::MM_IBSHARE_NORM) {
+        // If enable cube split, the coreIdx should be cube index and sOuterSize should be the sum of two vecters.
+        sOuterCoreIdx = coreIdx / 2;  // C : V = 1 : 2, so need to divide 2 to get cube index.
+        sOuterSize = sOuterSize * 2;  // 2 : Multiply by 2 to get the cube sOuterSize.
+    }
     // Temporary reuse
     // CoreHeadNumTail to coreNStart
     // actualS1 to coreNEnd
     // actualCoreNums to coreSidStart
     // singleCoreHeadNumSize to coreSidEnd
-    int sIdStart = this->tilingData->promptAttentionSeqParams.actualCoreNums[coreIdx];
-    int sIdEnd = this->tilingData->promptAttentionSeqParams.singleCoreHeadNumSize[coreIdx];
-    int outerLoopStart = this->tilingData->promptAttentionSeqParams.coreSeqPosStart[coreIdx];
-    int outerLoopEnd = this->tilingData->promptAttentionSeqParams.coreSeqPosEnd[coreIdx];
-    int nLoopStart = this->tilingData->promptAttentionSeqParams.CoreHeadNumTail[coreIdx];
-    int nLoopEnd = this->tilingData->promptAttentionSeqParams.actualS1[coreIdx];
+    int sIdStart = this->tilingData->promptAttentionSeqParams.actualCoreNums[sOuterCoreIdx];
+    int sIdEnd = this->tilingData->promptAttentionSeqParams.singleCoreHeadNumSize[sOuterCoreIdx];
+    int outerLoopStart = this->tilingData->promptAttentionSeqParams.coreSeqPosStart[sOuterCoreIdx];
+    int outerLoopEnd = this->tilingData->promptAttentionSeqParams.coreSeqPosEnd[sOuterCoreIdx];
+    int nLoopStart = this->tilingData->promptAttentionSeqParams.CoreHeadNumTail[sOuterCoreIdx];
+    int nLoopEnd = this->tilingData->promptAttentionSeqParams.actualS1[sOuterCoreIdx];
     int64_t preTokens = (int32_t)(this->tilingData->promptAttentionBaseParams.preTokens);
     int64_t nextTokens = (int32_t)(this->tilingData->promptAttentionBaseParams.nextTokens);
 
@@ -2097,7 +2250,6 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::ComputeEachCore(u
     } else {
         this->actualKVPrefixLen = 0;
     }
-
     for (uint32_t loopNIdx = nLoopStart; loopNIdx < nLoopEnd; loopNIdx++) {
         params->batchNOffset = loopNIdx;
         this->CalPrefixCoreOffset(params);
@@ -2123,8 +2275,7 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::ComputeEachCore(u
             this->GetSingleCoreParam(sIdx);
             this->GetSparseParam(&preTokens, &nextTokens, sIdx, params);
 
-            int sOuterBlockNum = (params->actualSeqLengthPerBatch + this->tilingData->promptAttentionSingleCoreParams.singleProcessSOuterSize - 1) /
-                                  this->tilingData->promptAttentionSingleCoreParams.singleProcessSOuterSize;
+            int sOuterBlockNum = (params->actualSeqLengthPerBatch + sOuterSize - 1) / sOuterSize;
 
             if (this->tilingData->promptAttentionBaseParams.isLayoutSH) {    // SH format offset
                 params->multiSeqOffset = 0;
@@ -2142,18 +2293,38 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::ComputeEachCore(u
                 tmpOuterLoopEnd = sOuterBlockNum;
             }
             for (uint32_t sOuterLoopIdx = outerLoopStart; sOuterLoopIdx < tmpOuterLoopEnd; sOuterLoopIdx++) {
-                if (sOuterLoopIdx == sOuterBlockNum - 1) {
-                    params->singleProcessSOuterSize = this->singleProcessSOuterSizeTail;
+                int64_t sInnerFirstToken;
+                int64_t sInnerLastToken;
+                if constexpr (PFAT::MM_TYPE == MatMulType::MM_IBSHARE_NORM) {  // Processing from the perspective of cube to enable L1 reuse.
+                    int64_t sOuterOffsetByCube = (int64_t)sOuterLoopIdx * (int64_t)sOuterSize;
+                    if (unlikely(sOuterLoopIdx == sOuterBlockNum - 1)) {
+                        uint32_t singleProcessSOuterSizeTailByCube = (params->actualSeqLengthPerBatch % sOuterSize != 0) ?
+                                                                    params->actualSeqLengthPerBatch % sOuterSize : sOuterSize;
+                        uint32_t singleProcessSOuterSizeTailV0 = (singleProcessSOuterSizeTailByCube + 1) / 2;  // Tail is divided into two vectors.
+                        uint32_t singleProcessSOuterSizeTailV1 = singleProcessSOuterSizeTailByCube - singleProcessSOuterSizeTailV0;
+                        params->singleProcessSOuterSize = (coreIdx % 2 == 0) ? singleProcessSOuterSizeTailV0 : singleProcessSOuterSizeTailV1;  // 2 : Get whether the vector is odd or even.
+                        params->sOuterOffset = sOuterOffsetByCube + ((coreIdx % 2 == 0) ? 0 : (int64_t)singleProcessSOuterSizeTailV0);  // 2 : Get whether the vector is odd or even.
+                    } else {
+                        params->singleProcessSOuterSize = this->singleProcessSOuterSizeWhole;
+                        params->sOuterOffset = sOuterOffsetByCube + ((coreIdx % 2 == 0) ? 0 : (int64_t)this->singleProcessSOuterSizeWhole);  // 2 : Get whether the vector is odd or even.
+                    }
+                    params->fakeMsg = (params->singleProcessSOuterSize == 0);
+                    sInnerFirstToken = ClipSInnerToken(sOuterOffsetByCube - preTokens, 0, params->actualSeqLengthKVPerBatch + this->actualKVPrefixLen);
+                    sInnerLastToken = ClipSInnerToken(sOuterOffsetByCube + nextTokens + (int64_t)sOuterSize, 0, params->actualSeqLengthKVPerBatch + this->actualKVPrefixLen);
                 } else {
-                    params->singleProcessSOuterSize = this->singleProcessSOuterSizeWhole;
+                    if (sOuterLoopIdx == sOuterBlockNum - 1) {
+                        params->singleProcessSOuterSize = this->singleProcessSOuterSizeTail;
+                    } else {
+                        params->singleProcessSOuterSize = this->singleProcessSOuterSizeWhole;
+                    }
+                    params->sOuterOffset = sOuterLoopIdx * this->singleProcessSOuterSizeWhole;
+                    if (nextTokens < 0 && params->sOuterOffset < ((nextTokens * (-1)) /
+                        this->singleProcessSOuterSizeWhole * this->singleProcessSOuterSizeWhole)) {
+                            continue;
+                    }
+                    sInnerFirstToken = ClipSInnerToken(params->sOuterOffset - (int64_t)preTokens, 0, params->actualSeqLengthKVPerBatch + this->actualKVPrefixLen);
+                    sInnerLastToken = ClipSInnerToken(params->sOuterOffset + (int64_t)nextTokens + params->singleProcessSOuterSize, 0, params->actualSeqLengthKVPerBatch + this->actualKVPrefixLen);
                 }
-                params->sOuterOffset = sOuterLoopIdx * this->singleProcessSOuterSizeWhole;
-                if (nextTokens < 0 && params->sOuterOffset < ((nextTokens * (-1)) /
-                    this->singleProcessSOuterSizeWhole * this->singleProcessSOuterSizeWhole)) {
-                        continue;
-                }
-                int64_t sInnerFirstToken = ClipSInnerToken(params->sOuterOffset - (int64_t)preTokens, 0, params->actualSeqLengthKVPerBatch + this->actualKVPrefixLen);
-                int64_t sInnerLastToken = ClipSInnerToken(params->sOuterOffset + (int64_t)nextTokens + params->singleProcessSOuterSize, 0, params->actualSeqLengthKVPerBatch + this->actualKVPrefixLen);
                 if (sInnerLastToken <= sInnerFirstToken) {
                     continue;
                 }
@@ -2373,8 +2544,15 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::ComputeEachCoreSp
 
         uint32_t cubeSOuterSize = this->tilingData->promptAttentionSingleCoreParams.singleProcessSOuterSize * 2;
         int sOuterBlockNum = (params->actualSeqLengthPerBatch + cubeSOuterSize - 1) / cubeSOuterSize;
-        params->multiSeqOffset = sIdx * this->tilingData->promptAttentionBaseParams.seqSize * this->MultiHeadQ;
-
+        if (this->tilingData->promptAttentionBaseParams.isLayoutSH) {    // SH format offset
+            params->multiSeqOffset = 0;
+            for (int i = 0; i < sIdx; i++) {
+                params->multiSeqOffset += this->actualSeqLengthsGm.GetValue(i);
+            }
+            params->multiSeqOffset *= this->MultiHeadQ;
+        } else {    // no SH format offset
+            params->multiSeqOffset = this->CalMultiSeqOffset(sIdx);
+        }
         for (uint32_t loopNIdx = 0; loopNIdx < headNum; loopNIdx++) {
             params->batchNOffset = loopNIdx;
             // In order to make the amount of computation as uniform as possible on each kernel.
@@ -2384,22 +2562,21 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::ComputeEachCoreSp
             int outerLoopEnd = this->tilingData->promptAttentionSeqParams.coreSeqPosEnd[sOutPolicyIdx];
             for (uint32_t sOuterLoopIdxByCube = outerLoopStart; sOuterLoopIdxByCube < outerLoopEnd; sOuterLoopIdxByCube++) {
                 uint32_t singleProcessSOuterSizeByCube = this->singleProcessSOuterSizeWhole * 2;  // 2 : cube sOuterSize
-                uint32_t sOuterOffsetByCube = sOuterLoopIdxByCube * singleProcessSOuterSizeByCube;
+                int64_t sOuterOffsetByCube = (int64_t)sOuterLoopIdxByCube * (int64_t)singleProcessSOuterSizeByCube;
                 if (unlikely(sOuterLoopIdxByCube == sOuterBlockNum - 1)) {
                     uint32_t singleProcessSOuterSizeTailByCube = (params->actualSeqLengthPerBatch % singleProcessSOuterSizeByCube != 0) ?
                                                                   params->actualSeqLengthPerBatch % singleProcessSOuterSizeByCube : singleProcessSOuterSizeByCube;
                     uint32_t singleProcessSOuterSizeTailV0 = (singleProcessSOuterSizeTailByCube + 1) / 2;
                     uint32_t singleProcessSOuterSizeTailV1 = singleProcessSOuterSizeTailByCube - singleProcessSOuterSizeTailV0;
                     params->singleProcessSOuterSize = (coreIdx % 2 == 0) ? singleProcessSOuterSizeTailV0 : singleProcessSOuterSizeTailV1;
-                    params->fakeMsg = (coreIdx % 2 == 0) ? false : (singleProcessSOuterSizeTailV1 == 0);
-                    params->sOuterOffset = sOuterOffsetByCube + ((coreIdx % 2 == 0) ? 0 : singleProcessSOuterSizeTailV0);
+                    params->sOuterOffset = sOuterOffsetByCube + ((coreIdx % 2 == 0) ? 0 : (int64_t)singleProcessSOuterSizeTailV0);
                 } else {
                     params->singleProcessSOuterSize = this->singleProcessSOuterSizeWhole;
-                    params->sOuterOffset = sOuterOffsetByCube + ((coreIdx % 2 == 0) ? 0 : this->singleProcessSOuterSizeWhole);
-                    params->fakeMsg = false;
+                    params->sOuterOffset = sOuterOffsetByCube + ((coreIdx % 2 == 0) ? 0 : (int64_t)this->singleProcessSOuterSizeWhole);
                 }
+                params->fakeMsg = (params->singleProcessSOuterSize == 0);
                 int64_t sInnerFirstToken = ClipSInnerToken(sOuterOffsetByCube - preTokens, 0, params->actualSeqLengthKVPerBatch + this->actualKVPrefixLen);
-                int64_t sInnerLastToken = ClipSInnerToken(sOuterOffsetByCube + nextTokens + singleProcessSOuterSizeByCube, 0, params->actualSeqLengthKVPerBatch + this->actualKVPrefixLen);
+                int64_t sInnerLastToken = ClipSInnerToken(sOuterOffsetByCube + nextTokens + (int64_t)singleProcessSOuterSizeByCube, 0, params->actualSeqLengthKVPerBatch + this->actualKVPrefixLen);
                 if (sInnerLastToken <= sInnerFirstToken) {
                     continue;
                 }
@@ -2445,6 +2622,11 @@ __aicore__ inline void PromptFlashAttentionS1s2Bns1X910<PFAT>::ProcessLastSouter
         }
 
         this->Bmm2UpdateDivNoTail(bmm2ResPreUb, softmaxSumTmp);
+        if constexpr (PFAT::msdMode == MsdMode::MSD_ON) {
+            if (this->tilingData->promptAttentionBaseParams.keyAntiquantMode == 0) {
+                this->Bmm2UpdateDivPerchannel(bmm2ResPreUb);
+            }
+        }
         if ((PFAT::layout == PFALayout::BSH) ||
             (PFAT::layout == PFALayout::BNSD && this->tilingData->promptAttentionBaseParams.isBSNDOut == 1)) {
             this->DataCopyTransposeOutBSH(FinalResUb);

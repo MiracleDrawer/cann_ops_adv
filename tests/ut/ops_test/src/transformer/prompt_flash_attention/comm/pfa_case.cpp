@@ -55,6 +55,23 @@ bool RunPromptFlashAttention(void *func, uint64_t tilingKey, int64_t blockDim, s
     return true;
 }
 
+extern "C" ge::graphStatus TilingPromptFlashAttentionStub(gert::TilingContext* context)
+{
+    auto* pfaCase = static_cast<PfaCase*>(Case::GetCurrentCase());
+    if (pfaCase != nullptr) {
+        PfaCase::DoTilingParam p;
+        p.ctx = context;
+        p.ret = ge::GRAPH_SUCCESS;
+        p.actualSeqLengthsTensor = const_cast<gert::Tensor*>(context->GetOptionalInputTensor(5)); // 5: the index of actual seqlength
+        p.actualSeqLengthsKVTensor = const_cast<gert::Tensor*>(context->GetOptionalInputTensor(6)); // 6: the index of actual kvseqlength
+        if (!pfaCase->DoOpTiling(p)) {
+            return p.ret;
+        }
+        return pfaCase->pfaTilingFunc(context);
+    }
+    return ge::GRAPH_FAILED;
+}
+
 bool PfaCase::InitParam()
 {
     h = mParam.n * mParam.d;
@@ -64,22 +81,22 @@ bool PfaCase::InitParam()
     }
     int64_t kvH = kvNum * mParam.d;
     if (mParam.layout == "BSH") {
-        query = Tensor("query", {mParam.b, 1, h}, "BSH", mParam.qDataType, ge::FORMAT_ND);
+        query = Tensor("query", {mParam.b, mParam.s, h}, "BSH", mParam.qDataType, ge::FORMAT_ND);
         key = Tensor("key", {mParam.b, mParam.s, kvH}, "BSH", mParam.kvDataType, ge::FORMAT_ND);
         value = Tensor("value", {mParam.b, mParam.s, kvH}, "BSH", mParam.kvDataType, ge::FORMAT_ND);
-        attentionOut = Tensor("attentionOut", {mParam.b, 1, h}, "BSH", mParam.outDataType, ge::FORMAT_ND);
+        attentionOut = Tensor("attentionOut", {mParam.b, mParam.s, h}, "BSH", mParam.outDataType, ge::FORMAT_ND);
     } else if (mParam.layout == "BNSD") {
-        query = Tensor("query", {mParam.b, mParam.n, 1, mParam.d}, "BNSD", mParam.qDataType, ge::FORMAT_ND);
+        query = Tensor("query", {mParam.b, mParam.n, mParam.s, mParam.d}, "BNSD", mParam.qDataType, ge::FORMAT_ND);
         key = Tensor("key", {mParam.b, kvNum, mParam.s, mParam.d}, "BNSD", mParam.kvDataType, ge::FORMAT_ND);
         value = Tensor("value", {mParam.b, kvNum, mParam.s, mParam.d}, "BNSD", mParam.kvDataType, ge::FORMAT_ND);
         attentionOut =
-            Tensor("attentionOut", {mParam.b, mParam.n, 1, mParam.d}, "BNSD", mParam.outDataType, ge::FORMAT_ND);
+            Tensor("attentionOut", {mParam.b, mParam.n, mParam.s, mParam.d}, "BNSD", mParam.outDataType, ge::FORMAT_ND);
     } else if (mParam.layout == "BSND") {
-        query = Tensor("query", {mParam.b, 1, mParam.n, mParam.d}, "BSND", mParam.qDataType, ge::FORMAT_ND);
+        query = Tensor("query", {mParam.b, mParam.s, mParam.n, mParam.d}, "BSND", mParam.qDataType, ge::FORMAT_ND);
         key = Tensor("key", {mParam.b, mParam.s, kvNum, mParam.d}, "BSND", mParam.kvDataType, ge::FORMAT_ND);
         value = Tensor("value", {mParam.b, mParam.s, kvNum, mParam.d}, "BSND", mParam.kvDataType, ge::FORMAT_ND);
         attentionOut =
-            Tensor("attentionOut", {mParam.b, 1, mParam.n, mParam.d}, "BSND", mParam.outDataType, ge::FORMAT_ND);
+            Tensor("attentionOut", {mParam.b, mParam.s, mParam.n, mParam.d}, "BSND", mParam.outDataType, ge::FORMAT_ND);
     }
     if (mParam.attenMaskType == AttenMaskShapeType::B_N_1_S) {
         attenMask =
@@ -132,6 +149,17 @@ bool PfaCase::InitOpInfo()
     rst = rst && mCtx.SetKernelRunCbf(RunPromptFlashAttention);
     rst = rst && mCtx.SetKernelMainFunc((void *)prompt_flash_attention);
     rst = rst && mOpInfo.SetContext(&mCtx);
+    auto* platform = Platform::GetGlobalPlatform();
+    if (platform == nullptr) {
+        LOG_ERR("Global Platform is null");
+        return false;
+    }
+    pfaTilingFunc = (gert::OpImplRegisterV2::TilingKernelFunc)platform->LoadOpTilingSoSym("TilingPromptFlashAttention");
+    if(pfaTilingFunc == nullptr) {
+        LOG_ERR("Can't get origin tiling func, pfa(%p)",pfaTilingFunc);
+        return false;
+    }
+    IMPL_OP(PromptFlashAttention).Tiling(TilingPromptFlashAttentionStub);
     return rst;
 }
 
@@ -176,4 +204,17 @@ PfaCase::Param::Param(int64_t pB, int64_t pN, int64_t pS, int64_t pD, std::strin
       scaleValue(pScaleValue), blockSize(pBlockSize), innerPrecise(pInnerPrecise), sparseMode(pSparseMode),
       preTokens(pPreTokens), nextTokens(pNextTokens)
 {
+}
+
+bool PfaCase::DoOpTiling(DoTilingParam &tilingParam) {
+    if (tilingParam.ctx == nullptr) {
+        return false;
+    }
+    if (tilingParam.actualSeqLengthsTensor != nullptr && mParam.actualSeqLength.size() != 0) {
+        tilingParam.actualSeqLengthsTensor->SetData(gert::TensorData{mParam.actualSeqLength.data()});
+    }
+    if (tilingParam.actualSeqLengthsKVTensor != nullptr && mParam.actualSeqLengthKV.size() != 0) {
+        tilingParam.actualSeqLengthsKVTensor->SetData(gert::TensorData{mParam.actualSeqLengthKV.data()});
+    }
+    return true;
 }

@@ -24,6 +24,11 @@
 #include "tiling/tiling_api.h"
 #include "error/ops_error.h"
 #include "register/op_def_registry.h"
+#ifdef ASCENDC_OP_TEST
+#define PFA_EXTERN_C extern "C"
+#else
+#define PFA_EXTERN_C
+#endif
 
 #include "prompt_flash_attention_tiling_compile_info.h"
 #include "prompt_flash_attention_tiling_const.h"
@@ -89,6 +94,7 @@ BEGIN_TILING_DATA_DEF(PromptAttentionBaseParams)
   TILING_DATA_FIELD_DEF(int64_t, valueAntiquantMode);
   TILING_DATA_FIELD_DEF(uint32_t, hasKeyAntiquantOffset);
   TILING_DATA_FIELD_DEF(uint32_t, isMsd);
+  TILING_DATA_FIELD_DEF(uint32_t, isQuant2FP16);
 
 END_TILING_DATA_DEF;
 REGISTER_TILING_DATA_CLASS(PromptAttentionBaseParamsOp, PromptAttentionBaseParams)
@@ -158,6 +164,7 @@ BEGIN_TILING_DATA_DEF(PromptAttentionInitOutputParams)
   TILING_DATA_FIELD_DEF(int64_t, totalOutputSize);
   TILING_DATA_FIELD_DEF(int64_t, totalSoftMaxLseOutputSize);
   TILING_DATA_FIELD_DEF(uint32_t, needInit);
+  TILING_DATA_FIELD_DEF(uint32_t, isOneN);
 END_TILING_DATA_DEF;
 REGISTER_TILING_DATA_CLASS(PromptAttentionInitOutputParamsOp, PromptAttentionInitOutputParams)
 
@@ -178,6 +185,7 @@ END_TILING_DATA_DEF;
 
 REGISTER_TILING_DATA_CLASS(PromptFlashAttention, PromptFlashAttentionTilingData)
 
+
 class PromptFlashAttentionTiling {
 public:
     PromptFlashAttentionTiling(fe::PlatFormInfos* platFormInfo): ascendcPlatform(platFormInfo) {}
@@ -196,7 +204,7 @@ protected:
     void PromptFlashAttentionSplitNSNew(ContextParamsForPFATiling& contextKeyParams, PromptFlashAttentionTilingData& tilingData, uint32_t curCoreNum, std::vector<int64_t>& actualSeqLengths,
                                                     std::vector<int64_t>& actualSeqLengthsKV, int64_t actualSharedPrefixLen, bool useBalanceTiling);
     void GetPreNextTokensLeftUp(PromptFlashAttentionTilingData& tilingData, uint32_t actualSeqLength, uint32_t actualSeqLengthKV, int64_t& preTokensLeftUp, int64_t& nextTokensLeftUp);
-    bool EnableSplitSeqOneN(PromptFlashAttentionTilingData& tilingData, const ContextParamsForPFATiling& contextKeyParams, uint32_t hDivN);
+    void SetSplitCoreMode(PromptFlashAttentionTilingData& tilingData, uint32_t sOuterFactor);
     void PromptFlashAttentionSplitSeqOneN(PromptFlashAttentionTilingData& tilingData, uint32_t curCoreNum, bool isVectorCore);
     bool EnableMTE2BmmPipe(PromptFlashAttentionTilingData& tilingData, matmul_tiling::MatmulApiTiling& bmm,
                            TCubeTiling& bmmTilingData, uint32_t sOuterFactor, uint32_t sInnerFactor);
@@ -286,7 +294,7 @@ protected:
     ge::graphStatus CheckShape(ContextParamsForPFATiling& contextKeyParams, const gert::StorageShape* queryShape, const gert::StorageShape* keyShape, 
                                const gert::StorageShape* valueShape, const gert::StorageShape* outShape, const gert::StorageShape* pseShiftShape,
                                const gert::StorageShape* attenMaskShape);
-                               
+
     protected:
         ContextParamsForPFATiling* contextKeyParamsPtr = nullptr;
         int64_t ubSizeRemain = 1;
@@ -298,7 +306,6 @@ protected:
         bool enableQuantBF16 = false;
         bool enableMatmulNorm = false;
         bool enablePA = false;
-        bool enableSplitSeqOneN = false;
         bool isKVHasPrefix = false;
         InputLayout inputLayout = InputLayout::BSH;
         ge::DataType inputType{ge::DT_FLOAT16};
@@ -332,6 +339,7 @@ protected:
         uint32_t PAlayoutType = 0;
         platform_ascendc::PlatformAscendC ascendcPlatform;
         TilingMod tilingMod = TilingMod::CVSAME;
+        SplitCoreMode splitCoreMode = SplitCoreMode::SPLIT_NBS_VECTOR;
         uint32_t splitD = 0;
         uint32_t splitS2 = 1; // It can only be 0 when the D axis is split
         uint64_t innerPrecise = HIGH_PERFORMANCE;
@@ -339,7 +347,7 @@ protected:
         matmul_tiling::PlatformInfo ascendPlatformInfo;
     };
     // end of class PromptFlashAttention
-  ge::graphStatus TilingPromptFlashAttention(gert::TilingContext* context);
+  PFA_EXTERN_C ge::graphStatus TilingPromptFlashAttention(gert::TilingContext* context);
 }
 
 #endif  // AIR_CXX_RUNTIME_V2_OP_IMPL_PROMPTFLASHATTENTION_H_

@@ -573,7 +573,8 @@ ge::graphStatus DoOpTilingFusedInferAttentionScore(gert::TilingContext *context)
                                               .kCache = {nullptr},
                                               .vCache = {nullptr},
                                               .tilingKey = 0,
-                                              .blockDim = 0};
+                                              .blockDim = 0,
+                                              .tilingSinkFlag = nullptr};
         auto ret = ConvertContextToParamsIFA(*context, ifaContext);
         if (ret != ge::GRAPH_SUCCESS) {
             OPS_LOG_E(context->GetNodeName(), "Error occored while convert tilingContext to ifa context");

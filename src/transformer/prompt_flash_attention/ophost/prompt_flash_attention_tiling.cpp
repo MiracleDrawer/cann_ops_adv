@@ -128,6 +128,7 @@ constexpr uint32_t COMPUTELINE_FOR_BIG_D = 1;
 constexpr uint32_t MAX_COMPUTELINES = 16;
 constexpr uint32_t UB_SIZE_FOR_1_K = 1024;
 constexpr uint32_t MSD_BIG_D = 256;
+constexpr uint32_t CV_RATIO = 2;
 
 static const std::unordered_map<ge::DataType, string> g_strDataTypePfa = {
     {ge::DT_FLOAT, "DT_FLOAT"},
@@ -249,7 +250,8 @@ void PromptFlashAttentionTiling::UpdateTilingKeyFlag(ContextParamsForPFATiling& 
     uint64_t binaryFlag = 0;
     auto queryDtype = contextKeyParams.inputDataType;
     auto kvDtype = contextKeyParams.kDataType;
-    if ((queryDtype == ge::DT_FLOAT16) && (kvDtype == ge::DT_INT8)) {
+
+    if ((queryDtype == ge::DT_FLOAT16) && (kvDtype == ge::DT_INT8) && !(enableMsd)) {
         binaryFlag += 8;    // 4bit flag bit, the leftmost side indicates whether to perform inverse quantization operation, with a corresponding value of 2**3 = 8, and the remaining 3bit is reserved
     }
     tilingKey += (binaryFlag * 100000000000); // If inverse quantization is performed, tilingKey should increase by 8*100000000000.
@@ -358,13 +360,13 @@ ge::graphStatus PromptFlashAttentionTiling::TilingGetTilingKeyAttentionAscendC(u
     // The KV cache inverse quantization for CV diff currently only handles the case where Q in the CV diff template is FP16.
     if ((inputDataType == ge::DT_FLOAT16 || inputDataType == ge::DT_BF16) && (tilingMod == TilingMod::CVDIFF)) {
         tilingKey = 1012;    // 1012：CV diff, +1000; new_tiling, +10; not distinguishing between tail and total, +2.
-        tilingKey += ((inputDataType == ge::DT_FLOAT16) && (innerPrecise == HIGH_PRECISION)) ? 600 : 0;  // fp16 high precision mode, regarded as a type 600.
+        tilingKey += ((inputDataType == ge::DT_FLOAT16) && (innerPrecise == HIGH_PRECISION)) || (enableMsd && contextKeyParams.inputDataType == ge::DT_FLOAT16 && contextKeyParams.kDataType == ge::DT_INT8) ? 600 : 0;  // fp16 high precision mode, regarded as a type 600.
         tilingKey += (inputDataType == ge::DT_BF16) ? 100 : 0;    // 100: bf16
         tilingKey += (outputDataType == ge::DT_BF16) ? 10000 : 0; // When the output dtype is bf16, tilingKey should increase by 10000.
         tilingKey += (outputDataType == ge::DT_INT8) ? 20000 : 0; // 20000: The situation of outputDataType == ge::DT_INT8
         tilingKey += ((inputLayout == InputLayout::BSH) || (inputLayout == InputLayout::SH) || (inputLayout == InputLayout::BSND)) ? 100000 : 0;   // When the inputLayout is BSH, SH or BSND, plus 100000.
-        tilingKey += (!enableSplitSeqOneN && enableMatmulNorm ? 1000000 : 0);  // Only enable matmul tiling optimization, do not enable l1reuse, add 1000000, mutually exclusive with the following situation of 2000000.
-        tilingKey += (enableSplitSeqOneN ? 2000000 : 0);   // l1reuse defaults to enabling matmul tiling optimization, with an additional 2000000, which is mutually exclusive from the 1000000 situation mentioned above.
+        tilingKey += ((splitCoreMode != SplitCoreMode::SPLIT_NBS_CUBE && splitCoreMode != SplitCoreMode::SPLIT_ONEN_CUBE) && enableMatmulNorm ? 1000000 : 0);  // Only enable matmul tiling optimization, do not enable l1reuse, add 1000000, mutually exclusive with the following situation of 2000000.
+        tilingKey += ((splitCoreMode == SplitCoreMode::SPLIT_NBS_CUBE || splitCoreMode == SplitCoreMode::SPLIT_ONEN_CUBE) ? 2000000 : 0);   // l1reuse defaults to enabling matmul tiling optimization, with an additional 2000000, which is mutually exclusive from the 1000000 situation mentioned above.
         UpdateTilingKeyFlag(contextKeyParams, tilingKey);         // Determine whether to perform inverse quantization and generate a binary number by combining it with the remaining reserved bits, and take its decimal representation.
     }
 
@@ -486,6 +488,12 @@ void PromptFlashAttentionTiling::PromptFlashAttentionSplitNSNew(
     PromptAttentionSeqParams* seqParams = &tilingData.promptAttentionSeqParams;
 
     uint32_t arrayLen = baseParams->get_dimNumOfseq();
+    uint32_t sOuterSize = singleCoreParams->get_singleProcessSOuterSize();
+    uint32_t sInnerSize = singleCoreParams->get_singleProcessSInnerSize();
+    if (splitCoreMode == SplitCoreMode::SPLIT_NBS_CUBE) {
+        sOuterSize = sOuterSize * CV_RATIO;
+        curCoreNum = curCoreNum / CV_RATIO;
+    }
 
     std::vector<uint32_t> accumSOuterTilingNums(static_cast<size_t>(arrayLen), 0U);
     std::vector<uint32_t> sInnerLoopTimes(static_cast<size_t>(arrayLen), 0U);
@@ -507,15 +515,12 @@ void PromptFlashAttentionTiling::PromptFlashAttentionSplitNSNew(
     uint32_t preAccumSOuterNum = 0U;
     uint32_t multiSmaxsInnerLoopTimes = 0U;
     int nextTokensPerBatch = 0;
-    uint32_t sInnerPrefixLoopTimes = (actualSharedPrefixLen + singleCoreParams->get_singleProcessSInnerSize() - 1)
-                                     / (singleCoreParams->get_singleProcessSInnerSize());
+    uint32_t sInnerPrefixLoopTimes = (actualSharedPrefixLen + sInnerSize - 1) / sInnerSize;
     for (uint32_t i = LOOP_BEGIN_NUM; i < arrayLen; i++) {
         int seqLen = actualSeqLengths[i];
         int subSeqInnerLen = actualSeqLengthsKV[i];
-        sOuterBlockNums[i] = (seqLen + singleCoreParams->get_singleProcessSOuterSize() - 1)
-                                / (singleCoreParams->get_singleProcessSOuterSize());
-        sInnerLoopTimes[i] = (subSeqInnerLen + singleCoreParams->get_singleProcessSInnerSize() - 1)
-                                / (singleCoreParams->get_singleProcessSInnerSize()) + sInnerPrefixLoopTimes;
+        sOuterBlockNums[i] = (seqLen + sOuterSize - 1) / sOuterSize;
+        sInnerLoopTimes[i] = (subSeqInnerLen + sInnerSize - 1) / sInnerSize + sInnerPrefixLoopTimes;
         accumSOuterTilingNums[i] = (sOuterBlockNums[i] * baseParams->get_headNumSize()) + preAccumSOuterNum;
         preAccumSOuterNum = accumSOuterTilingNums[i];
 
@@ -527,10 +532,10 @@ void PromptFlashAttentionTiling::PromptFlashAttentionSplitNSNew(
             nextTokensPerBatch = baseParams->get_nextTokens();
         }
 
-        if (seqLen % singleCoreParams->get_singleProcessSOuterSize() != 0) {
+        if (seqLen % sOuterSize != 0) {
             isSOuterNoTail = false;
         }
-        if (subSeqInnerLen % singleCoreParams->get_singleProcessSInnerSize() != 0) {
+        if (subSeqInnerLen % sInnerSize != 0) {
             isSInnerNoTail = false;
         }
         totalOuterBlockNum += sOuterBlockNums[i];
@@ -605,7 +610,11 @@ void PromptFlashAttentionTiling::PromptFlashAttentionSplitNSNew(
     seqParams->set_coreSeqPosEnd(coreSposEnd.data());
 
     singleCoreParams->set_multiSmaxsInnerLoopTimes(multiSmaxsInnerLoopTimes);
-    singleCoreParams->set_actualCoreNums(curCore + 1);
+    uint32_t actualCoreNums = curCore + 1;
+    if (splitCoreMode == SplitCoreMode::SPLIT_NBS_CUBE) {
+        actualCoreNums = actualCoreNums * CV_RATIO;
+    }
+    singleCoreParams->set_actualCoreNums(actualCoreNums);
 }
 
 void PromptFlashAttentionTiling::GetPreNextTokensLeftUp(PromptFlashAttentionTilingData& tilingData,
@@ -625,32 +634,48 @@ void PromptFlashAttentionTiling::GetPreNextTokensLeftUp(PromptFlashAttentionTili
     }
 }
 
-bool PromptFlashAttentionTiling::EnableSplitSeqOneN(PromptFlashAttentionTilingData& tilingData, const ContextParamsForPFATiling& contextKeyParams, uint32_t hDivN) {
+void PromptFlashAttentionTiling::SetSplitCoreMode(PromptFlashAttentionTilingData& tilingData, uint32_t sOuterFactor) {
     PromptAttentionBaseParams* baseParams = &tilingData.promptAttentionBaseParams;
+
     uint32_t actualSeqLength = baseParams->get_seqSize();
     uint32_t actualSeqLengthKV = baseParams->get_seqInnerSize();
     uint32_t b = baseParams->get_dimNumOfseq();
     uint32_t n = baseParams->get_headNumSize();
-    const int64_t seq8K = 8 * 1024;
-    const int64_t seq16K = 16 * 1024;
+    uint32_t d = baseParams->get_headSize();
+    uint32_t sOuterSizeByCube = sOuterFactor * CV_RATIO;
+    uint32_t sOuterLoopByCube = (actualSeqLength + sOuterSizeByCube - 1) / sOuterSizeByCube;
+    const int64_t seq3K = 3 * 1024;   // 3 * 1024 : 3K.
+    const int64_t seq8K = 8 * 1024;   // 8 * 1024 : 8K.
+    const int64_t seq16K = 16 * 1024;  // 16 * 1024 : 16K.
     int64_t preTokensLeftUp = 0;
     int64_t nextTokensLeftUp = 0;
 
-    bool enableLeftPadding = ((contextKeyParams.queryPaddingSize != nullptr) || (contextKeyParams.kvPaddingSize != nullptr));
-    bool enableRingAttention = (contextKeyParams.isSoftMaxLseEnable == true);
+    bool enableLeftPadding = ((contextKeyParamsPtr->queryPaddingSize != nullptr) || (contextKeyParamsPtr->kvPaddingSize != nullptr));
+    bool enableRingAttention = (contextKeyParamsPtr->isSoftMaxLseEnable == true);
 
     GetPreNextTokensLeftUp(tilingData, actualSeqLength, actualSeqLengthKV, preTokensLeftUp, nextTokensLeftUp);
-    bool baseCond = (hDivN == MATMUL_NORM_MIN_HEADSIZE) && (inputType == ge::DT_FLOAT16) && (contextKeyParams.kDataType == ge::DT_FLOAT16) &&
-                    (outputType == ge::DT_FLOAT16) && (usePseShift == 0) && (inputLayout == InputLayout::BNSD);
-    bool seqMode0 = (baseParams->get_sparseMode() == SPARSE_MODE_BAND) && (contextKeyParams.maskDataType == ge::DT_BOOL) && (nextTokensLeftUp == 0) && actualSeqLength >= seq16K && (b * n >= 12);
-    bool seqMode1 = (baseParams->get_sparseMode() == SPARSE_MODE_NO_MASK && contextKeyParams.attentionMask == nullptr) && actualSeqLength >= seq8K;
-    if (baseCond && !isKVHasPrefix && !enableLeftPadding && !enableRingAttention && (seqMode0 || seqMode1) &&
-        (baseParams->get_isActualSeqLengthsNull() == 1) && (baseParams->get_isActualSeqLengthsKVNull() == 1) &&
-        (contextKeyParams.isKvContinuous == 1) && (actualSeqLength == actualSeqLengthKV)) {
-        enableSplitSeqOneN = true;
+    bool inputTypeFp16 = (inputType == ge::DT_FLOAT16) && (contextKeyParamsPtr->kDataType == ge::DT_FLOAT16) && (outputType == ge::DT_FLOAT16);
+    bool inputTypeBf16 = (inputType == ge::DT_BF16) && (contextKeyParamsPtr->kDataType == ge::DT_BF16) && (outputType == ge::DT_BF16);
+    bool baseCond = (d == MATMUL_NORM_MIN_HEADSIZE) && (inputTypeFp16 || inputTypeBf16) && (usePseShift == 0) && !isKVHasPrefix &&
+        !enableLeftPadding && !enableRingAttention && (baseParams->get_isActualSeqLengthsNull() == 1) && (baseParams->get_isActualSeqLengthsKVNull() == 1) && 
+        (contextKeyParamsPtr->isKvContinuous == 1) && (actualSeqLength == actualSeqLengthKV) && (tilingMod == TilingMod::CVDIFF);
+    bool enableOneNByCubeToken = true;
+    bool enableNBSByCubeToken = true;
+    if (contextKeyParamsPtr->attentionMask != nullptr) {
+        enableOneNByCubeToken = (preTokensLeftUp >= actualSeqLength && nextTokensLeftUp >= actualSeqLengthKV) ||
+                                (nextTokensLeftUp == 0);  // When mask exists, only support nextTokens is 0 or all data are calculated.
+        enableNBSByCubeToken = ((preTokensLeftUp >= actualSeqLength) &&
+                                (nextTokensLeftUp >= actualSeqLengthKV || nextTokensLeftUp == 0));  // When mask exists, only support the triangle scene or all data are calculated.
     }
-
-    return enableSplitSeqOneN;
+    bool enableOneNByCubeSeqMode = actualSeqLength >= seq16K && (b * n >= 12);  // 12 : b * n should be more than 12.
+    bool enableNBSByCubeSeqMode = actualSeqLength >= seq3K && (b * n * sOuterLoopByCube >= coreNum);
+    bool noBalance = (baseParams->get_headNumRatio() != 1 || b != 1 || tilingData.promptAttentionInitOutputParams.get_needInit()) || 
+                     (actualSeqLength >= seq8K && contextKeyParamsPtr->attentionMask == nullptr);
+    if (baseCond && enableOneNByCubeToken && enableOneNByCubeSeqMode) {
+        splitCoreMode = SplitCoreMode::SPLIT_ONEN_CUBE;
+    } else if (baseCond && enableNBSByCubeToken && enableNBSByCubeSeqMode && noBalance) {
+        splitCoreMode = SplitCoreMode::SPLIT_NBS_CUBE;
+    }
 }
 
 void PromptFlashAttentionTiling::PromptFlashAttentionSplitSeqOneN(PromptFlashAttentionTilingData& tilingData,
@@ -805,7 +830,7 @@ ge::graphStatus PromptFlashAttentionTiling::CheckKeyValueParamsConsistency(const
         OPS_ERR_IF(tmpKeyDim != tmpValueDim,
                         OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
                         "tensor key shape (%u) do not equal to tensor value shape(%u) in dim %u", tmpKeyDim, tmpValueDim, i),
-                        return ge::GRAPH_FAILED);
+                        return ge::GRAPH_FAILED); 
     }
     return ge::GRAPH_SUCCESS;
 }
@@ -883,7 +908,7 @@ bool PromptFlashAttentionTiling::PromptFlashAttentionCheckBmm1(PromptFlashAttent
 
     ret = bmm1.GetTiling(bmm1TilingData);
     if (autoBaseMNK) {
-        if (enableMatmulNorm || enableSplitSeqOneN) {
+        if (enableMatmulNorm || splitCoreMode == SplitCoreMode::SPLIT_NBS_CUBE || splitCoreMode == SplitCoreMode::SPLIT_ONEN_CUBE) {
             uint32_t baseM = std::min(uint32_t(128), sOuterFactor);
             uint32_t baseN = std::min(uint32_t(128), sInnerFactor);
             uint32_t baseK = 128U;
@@ -1022,7 +1047,7 @@ bool PromptFlashAttentionTiling::PromptFlashAttentionCheckBmm2(PromptFlashAttent
     }
 
     if (autoBaseMNK) {
-        if (enableMatmulNorm || enableSplitSeqOneN) {
+        if (enableMatmulNorm || splitCoreMode == SplitCoreMode::SPLIT_NBS_CUBE || splitCoreMode == SplitCoreMode::SPLIT_ONEN_CUBE) {
             uint32_t baseM = std::min(uint32_t(128), sOuterFactor);
             uint32_t baseN = std::min(uint32_t(128), tilingData.promptAttentionBaseParams.get_headSize());
             uint32_t baseK = 128U;
@@ -1034,9 +1059,9 @@ bool PromptFlashAttentionTiling::PromptFlashAttentionCheckBmm2(PromptFlashAttent
         ret = bmm2.GetTiling(bmm2TilingData);
     } else {
         if ((isDNoTail) || (splitS2 == 0) || (splitD == 1)) {
-             ret = bmm2.SetFixSplit(sOuterFactor, dSplitFactor);
+            ret = bmm2.SetFixSplit(sOuterFactor, dSplitFactor);
         } else {
-             ret = bmm2.SetFixSplit(sOuterFactor, tilingData.promptAttentionBaseParams.get_alignedHeadSize());
+            ret = bmm2.SetFixSplit(sOuterFactor, tilingData.promptAttentionBaseParams.get_alignedHeadSize());
         }
         OPS_ERR_IF(ret != 0,
                    OPS_REPORT_VECTOR_INNER_ERR("PromptFlashAttention", "bmm2 SetFixSplit failed, ret = %d!", ret),
@@ -1222,6 +1247,7 @@ bool PromptFlashAttentionTiling::PromptFlashAttentionCheckArgsLegal(PromptFlashA
         l1SizeRemain, l0CSize, sOuterFactor, sInnerFactor)) &&
         (PromptFlashAttentionCheckBmm2(tilingData, tilingData.bmm2TilingDataRect,
         l1SizeRemain, l0CSize, sOuterFactor, sInnerFactor, dSplitFactor));
+
     OPS_ERR_IF(res == false,
                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParamsPtr->opName, "PromptFlashAttentionCheckBmm1 or PromptFlashAttentionCheckBmm2 failed."),
                return false);
@@ -1947,8 +1973,8 @@ ge::graphStatus PromptFlashAttentionTiling::CheckPostQuantParams(const ContextPa
         }
 
         // dtype verification
-        OPS_ERR_IF((quantScale2Type != ge::DT_BF16) && (quantScale2Type != ge::DT_FLOAT),
-                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "post quant scale dtype(%s) only support bf16 and fp32.",
+        OPS_ERR_IF((quantScale2Type != ge::DT_BF16) && (quantScale2Type != ge::DT_FLOAT) && (quantScale2Type != ge::DT_FLOAT16),
+                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "post quant scale dtype(%s) only support bf16, fp16 and fp32 .",
                 g_strDataTypePfa.at(ValidPfaDataType(quantScale2Type)).c_str()),
                 return ge::GRAPH_FAILED);
         OPS_ERR_IF((quantOffset2Shape != nullptr) && (quantScale2Type != quantOffset2Type),
@@ -1957,6 +1983,10 @@ ge::graphStatus PromptFlashAttentionTiling::CheckPostQuantParams(const ContextPa
                 return ge::GRAPH_FAILED);
         OPS_ERR_IF((inputType != ge::DT_BF16) && (quantScale2Type == ge::DT_BF16),
                 OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "post quant scale and offset support bf16 only if input dtype(%s) is bf16.",
+                g_strDataTypePfa.at(ValidPfaDataType(inputType)).c_str()),
+                return ge::GRAPH_FAILED);
+        OPS_ERR_IF((inputType != ge::DT_FLOAT16) && (quantScale2Type == ge::DT_FLOAT16),
+                OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "post quant scale and offset support fp16 only if input dtype(%s) is fp16.",
                 g_strDataTypePfa.at(ValidPfaDataType(inputType)).c_str()),
                 return ge::GRAPH_FAILED);
 
@@ -2362,8 +2392,11 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
                    return ge::GRAPH_FAILED);
         PromptFlashAttentionInitOutputSplit(outShape->GetStorageShape().GetShapeSize(), tilingData, coreNum);
         tilingData.promptAttentionInitOutputParams.set_needInit(1);
-
-        blockDimToBeSet = ascendcPlatform.CalcTschBlockDim(coreNum, aicNum, coreNum);
+        // core need to be full
+        PromptAttentionInitOutputParams *initParams = &tilingData.promptAttentionInitOutputParams;
+        uint32_t singleCoreSize = initParams->get_singleCoreSize();
+        uint32_t actualCore = (singleCoreSize > 0) ? (outShape->GetStorageShape().GetShapeSize() + singleCoreSize - 1) / singleCoreSize : coreNum;
+        blockDimToBeSet = ascendcPlatform.CalcTschBlockDim(actualCore, aicNum, coreNum);
 
         size_t* workspace = contextKeyParams.workspaceSize;
         const size_t sysWorkspaceSize = 16 * 1024 * 1024;  // workspace needs at least this much
@@ -2394,8 +2427,8 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
     const float* scaleValue = contextKeyParams.scaleValue;
     const int32_t* blockSize = contextKeyParams.blockSize;
 
-    int32_t sparsePreTokens;
-    int32_t sparseNextTokens;
+    int64_t sparsePreTokens;
+    int64_t sparseNextTokens;
     int32_t sparseModeVal = 0;
     // KV consistency check.
     OPS_ERR_IF(CheckKeyValueParamsConsistency(contextKeyParams) != ge::GRAPH_SUCCESS,
@@ -2613,17 +2646,8 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
         }
     }
 
-    if (*preTokens > SPARSE_MODE_INT_MAX) {
-        sparsePreTokens = static_cast<int32_t>(SPARSE_MODE_INT_MAX);
-    } else {
-        sparsePreTokens = static_cast<int32_t>(*preTokens);
-    }
-
-    if (*nextTokens > SPARSE_MODE_INT_MAX) {
-        sparseNextTokens = static_cast<int32_t>(SPARSE_MODE_INT_MAX);
-    } else {
-        sparseNextTokens = static_cast<int32_t>(*nextTokens);
-    }
+    sparsePreTokens = static_cast<int64_t>(*preTokens);
+    sparseNextTokens = static_cast<int64_t>(*nextTokens);
 
     uint32_t attenMaskBatch = 1U;
     bool isBandMode = false;
@@ -2690,7 +2714,7 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
     }
     OPS_ERR_IF((sparsePreTokens < 0) && (sparseNextTokens < 0),
                     OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                    "preTokens and nextokens cannot neither be negative number, preTokens = %d, nextTokens = %d.", sparsePreTokens, sparseNextTokens),
+                    "preTokens and nextokens cannot neither be negative number, preTokens = %ld, nextTokens = %ld.", sparsePreTokens, sparseNextTokens),
 		            return ge::GRAPH_FAILED);
 
     OPS_ERR_IF((sparseNextTokens * (-1)) > sparsePreTokens,
@@ -2700,15 +2724,21 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
 
     OPS_ERR_IF(isDefaultMode && (sparseNextTokens < 0) && (sparseNextTokens * (-1)) >= (int32_t)s,
                     OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                    "nextTokens absolute value should be smaller than length of q, nextTokens = %d, length of q = %u.", sparseNextTokens, s),
+                    "nextTokens absolute value should be smaller than length of q, nextTokens = %ld, length of q = %u.", sparseNextTokens, s),
                     return ge::GRAPH_FAILED);
 
     OPS_ERR_IF(isDefaultMode && (sparsePreTokens < 0) && (sparsePreTokens * (-1) >= ((int32_t)tmpS2 + (int32_t)actualSharedPrefixLen)),
                     OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
                     "preToken absolute value should be smaller than length of k and v (length of k and v + length of prefix when enable prefix), "
-                    "preTokens = %d, seqLengthKV = %u, actualSharedPrefixLen = %u", sparsePreTokens, tmpS2, actualSharedPrefixLen),
+                    "preTokens = %ld, seqLengthKV = %u, actualSharedPrefixLen = %u", sparsePreTokens, tmpS2, actualSharedPrefixLen),
                     return ge::GRAPH_FAILED);
 
+    if (sparsePreTokens > SPARSE_MODE_INT_MAX) {
+        sparsePreTokens = static_cast<int32_t>(SPARSE_MODE_INT_MAX);
+    }
+    if (sparseNextTokens > SPARSE_MODE_INT_MAX) {
+        sparseNextTokens = static_cast<int32_t>(SPARSE_MODE_INT_MAX);
+    }
     size_t lenDims = b; // The current length of the actSeqLen array is equal to batch size b.
     uint32_t isLayoutSH = (inputLayout == InputLayout::SH) ? 1U : 0U;
 
@@ -2728,7 +2758,7 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
 
     OPS_ERR_IF((outputType == ge::DT_INT8 && isBandMode && ((sparsePreTokens < 0) || sparseNextTokens < 0)),
                         OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                        "When output type is int8, sparse mode = 4, preTokens (%d) or nextTokens (%d) cannot be negative.",  sparsePreTokens, sparseNextTokens),
+                        "When output type is int8, sparse mode = 4, preTokens (%ld) or nextTokens (%ld) cannot be negative.",  sparsePreTokens, sparseNextTokens),
                         return ge::GRAPH_FAILED);
     if (contextKeyParams.fromTilingSink == 0) {
         for (size_t i = LOOP_BEGIN_NUM; i < lenDims; i++) {
@@ -2743,7 +2773,7 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
                     OPS_ERR_IF(isDefaultMode && sparseNextTokens < 0 && sparseNextTokens * (-1) >= (int32_t)actualSeqLengths[i],
                                     OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
                                     "nexttoken absolute value should be smaller than actual length of q, "
-                                    "nextTokens = %d, actualSeqLengthsQ = %ld", sparseNextTokens, actualSeqLengths[i]),
+                                    "nextTokens = %ld, actualSeqLengthsQ = %ld", sparseNextTokens, actualSeqLengths[i]),
                                     return ge::GRAPH_FAILED);
                 }
                 middleActualSeqLengths += actualSeqLengths[i];
@@ -2768,7 +2798,7 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
             OPS_ERR_IF(isDefaultMode && sparsePreTokens < 0 && \
                         (sparsePreTokens * (-1) >= (actualSeqLengthsKV[i] + (int64_t)actualSharedPrefixLen)),
                         OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "preToken absolute value should be smaller than actual length of k and v "
-                        "(actual length of k and v + length of prefix when enable prefix), preToken = %d, actual length of k and v = %ld, actual prefix len = %u.",
+                        "(actual length of k and v + length of prefix when enable prefix), preToken = %ld, actual length of k and v = %ld, actual prefix len = %u.",
                         sparsePreTokens, actualSeqLengthsKV[i], actualSharedPrefixLen),
                         return ge::GRAPH_FAILED);
             if (sparseModeVal == SPARSE_MODE_RIGHT_DOWN) {
@@ -2801,16 +2831,16 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
                 actualSeqLengths[i] = actualSeqLengthsKV[i] + (int64_t)actualSharedPrefixLen + (int64_t)sparsePreTokens;
             }
 
-            OPS_ERR_IF((isBandMode && (sparseNextTokens < 0) && (sparseNextTokens * (-1) >= actualSeqLengthsKV[i] + (int64_t)actualSharedPrefixLen)),
+            OPS_ERR_IF((isBandMode && (*nextTokens < 0) && (*nextTokens * (-1) >= actualSeqLengthsKV[i] + (int64_t)actualSharedPrefixLen)),
                         OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
                         "nextTokens absolute value should be smaller than actual length of k and v in band mode (actual length of k and v + length of "
-                        "prefix when enable prefix), nextTokens = %d, actual length of k and v = %ld, prefix length = %u",
-                        sparseNextTokens, actualSeqLengthsKV[i], actualSharedPrefixLen),
+                        "prefix when enable prefix), nextTokens = %ld, actual length of k and v = %ld, prefix length = %u",
+                        *nextTokens, actualSeqLengthsKV[i], actualSharedPrefixLen),
                         return ge::GRAPH_FAILED);
 
-            OPS_ERR_IF((isBandMode && (sparsePreTokens < 0) && (sparsePreTokens * (-1) >= actualSeqLengths[i])),
+            OPS_ERR_IF((isBandMode && (*preTokens < 0) && (*preTokens * (-1) >= actualSeqLengths[i])),
                             OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName,
-                            "preTokens absolute value should be smaller than actual length of q in band mode, preTokens = %d, actual length of q = %ld", sparsePreTokens, actualSeqLengths[i]),
+                            "preTokens absolute value should be smaller than actual length of q in band mode, preTokens = %ld, actual length of q = %ld", *preTokens, actualSeqLengths[i]),
                             return ge::GRAPH_FAILED);
 
             if(isBandMode && actualSeqLengths[i] > actualSeqLengthsKV[i] + (int64_t)actualSharedPrefixLen + preTokensPerbatch){
@@ -2821,7 +2851,6 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
                     i, actualSeqLengths[i], i, actualSeqLengthsKV[i], actualSharedPrefixLen, needInit);
         }
     }
-
     uint32_t hDivN = h / *n; // dims: d = h / n
     // Intercepting high-precision mode does not support shape currently.
     const uint32_t precisionBlockEleCut = BYTE_BLOCK / FLOAT16SIZE; // High-precision currently only supports FP16, aligned at 32/2=16.
@@ -2865,12 +2894,16 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
     // Perchannel judgment to be adapted, maintain the existing logic firstly.
     tilingData.promptAttentionBaseParams.set_isQuant2Perchannel(0);
     tilingData.promptAttentionBaseParams.set_isQuant2BF16(0);
+    tilingData.promptAttentionBaseParams.set_isQuant2FP16(0);
     if (outputType == ge::DT_INT8) {
         if (quantScale2Shape->GetStorageShape().GetShapeSize() > 1) {
             tilingData.promptAttentionBaseParams.set_isQuant2Perchannel(1);
         }
         if (contextKeyParams.quantScale2Type == ge::DT_BF16) {
             tilingData.promptAttentionBaseParams.set_isQuant2BF16(1);
+        }
+        if (contextKeyParams.quantScale2Type == ge::DT_FLOAT16 && contextKeyParams.hasKeyAntiquantScale && contextKeyParams.hasValueAntiquantScale){
+            tilingData.promptAttentionBaseParams.set_isQuant2FP16(1);
         }
     }
 
@@ -2950,11 +2983,10 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
               inputLayout, innerPrecise, *scaleValue, *preTokens, *nextTokens);
     // Infering whether the tiling mode is D-axis split, S2 full load, CV diff, and whether to use the matmul norm template.
     InferTilingMod(contextKeyParams, actualSeqLengths, actualSeqLengthsKV, lenDims, hDivN, tmpS2, sparseModeVal);
-    EnableSplitSeqOneN(tilingData, contextKeyParams, hDivN);
 
     if (enableMsd) {
         if (s > CVDIFF_SMALL_QS_THRESHOLDS) {
-            OPS_LOG_E("PromptFlashAttention", "S of query(%u) is larger than 16, when keyAntiquantScale or valueAntiquantScale is enabled", s);
+            OPS_LOG_E("PromptFlashAttention", "S of query(%u) is larger than 16, when keyAntiquantScale or valueAntiquantScale is enabled.", s);
             return ge::GRAPH_FAILED;
         }
     }
@@ -3007,9 +3039,11 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
     tilingData.promptAttentionBaseParams.set_isSoftMaxLseEnable(contextKeyParams.isSoftMaxLseEnable);
 
     // Compute tiling data.
-    if (enableSplitSeqOneN && (tilingMod == TilingMod::CVDIFF)) {
+    if (splitCoreMode == SplitCoreMode::SPLIT_ONEN_CUBE) {  // Enable N split kernel mode from the perspective of cube in long sequence scenes.
+        tilingData.promptAttentionInitOutputParams.set_isOneN(1);
         PromptFlashAttentionSplitSeqOneN(tilingData, coreNum, false);
     } else {
+        tilingData.promptAttentionInitOutputParams.set_isOneN(0);
         if (useNewTiling) {
             PromptFlashAttentionSplitNSNew(contextKeyParams, tilingData, coreNum, actualSeqLengths, actualSeqLengthsKV, actualSharedPrefixLen, useBalanceTiling);
         } else {
@@ -3036,11 +3070,7 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
         }
         bool isLeftPadding = ((contextKeyParams.queryPaddingSize != nullptr) || (contextKeyParams.kvPaddingSize != nullptr));
         OPS_ERR_IF(((keyAntiquantModeMsd != 0 && keyAntiquantModeMsd != 1 && keyAntiquantModeMsd == valueAntiquantModeMsd) || keyAntiquantModeMsd != valueAntiquantModeMsd),
-                         OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "keyAntiquantMode(%ld) or valueAntiquantMode(%ld) is not correct, keyAntiquantMode and valueAntiquantMode only support per-token when keyAntiquantScale or valueAntiquantScale is enabled", 
-                        keyAntiquantModeMsd, valueAntiquantModeMsd),
-                        return ge::GRAPH_FAILED);
-        OPS_ERR_IF((keyAntiquantModeMsd == 0 || valueAntiquantModeMsd == 0),
-                        OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "keyAntiquantMode(%ld) or valueAntiquantMode(%ld) is not correct, per-tensor and per-channel is not supported when keyAntiquantScale or valueAntiquantScale is enabled", 
+                         OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "keyAntiquantMode(%ld) or valueAntiquantMode(%ld) is not correct, keyAntiquantMode and valueAntiquantMode only support per-token and per-channel when keyAntiquantScale or valueAntiquantScale is enabled", 
                         keyAntiquantModeMsd, valueAntiquantModeMsd),
                         return ge::GRAPH_FAILED);
         OPS_ERR_IF((contextKeyParams.kDataType == ge::DT_INT4 || contextKeyParams.vDataType == ge::DT_INT4),
@@ -3053,8 +3083,8 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
                          OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "LeftPadding is not supported when keyAntiquantScale or valueAntiquantScale is enabled"),
                          return ge::GRAPH_FAILED);
 
-        OPS_ERR_IF(contextKeyParams.inputDataType != ge::DT_BF16,
-                         OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "inputDataType is not bf16"),
+        OPS_ERR_IF((contextKeyParams.inputDataType != ge::DT_BF16) && (contextKeyParams.inputDataType != ge::DT_FLOAT16),
+                         OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "inputDataType is not bf16 or fp16"),
                          return ge::GRAPH_FAILED);
         OPS_ERR_IF((contextKeyParams.kDataType != contextKeyParams.vDataType),
                          OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "DataType of key(%d) not equal datatype of value(%d)", contextKeyParams.kDataType, contextKeyParams.vDataType),
@@ -3062,8 +3092,8 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
         OPS_ERR_IF((contextKeyParams.kDataType != ge::DT_INT8) || (contextKeyParams.vDataType != ge::DT_INT8),
                          OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "DataType of key(%d) or datatype of value(%d) is not bf16", contextKeyParams.kDataType, contextKeyParams.vDataType),
                          return ge::GRAPH_FAILED);
-        OPS_ERR_IF((contextKeyParams.outputDataType != ge::DT_BF16) && (contextKeyParams.outputDataType != ge::DT_INT8),
-                         OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "DataType of output(%d) is not bf16 or int8", contextKeyParams.outputDataType),
+        OPS_ERR_IF((contextKeyParams.outputDataType != ge::DT_BF16) && (contextKeyParams.outputDataType != ge::DT_INT8) && (contextKeyParams.inputDataType != ge::DT_FLOAT16),
+                         OPS_REPORT_VECTOR_INNER_ERR(contextKeyParams.opName, "DataType of output(%d) is not bf16 or int8 or fp16", contextKeyParams.outputDataType),
                          return ge::GRAPH_FAILED);
 
         OPS_ERR_IF((contextKeyParams.KeyAntiquantScaleShape == nullptr) || (contextKeyParams.valueAntiquantScaleShape == nullptr) ,
@@ -3275,7 +3305,7 @@ ge::graphStatus PromptFlashAttentionTiling::RunBigKernelTilingWithParams(Context
 }
 
 ge::graphStatus PromptFlashAttentionTiling::CheckIOType(ContextParamsForPFATiling& contextKeyParams, PromptFlashAttentionTilingData& tilingData, int32_t& outputDataTypeSize) {
-    outputType = contextKeyParams.outputDataType;
+        outputType = contextKeyParams.outputDataType;
     inputType = contextKeyParams.inputDataType;
     if (inputType == ge::DT_FLOAT16 && contextKeyParams.kDataType == ge::DT_INT8) {
         enableKvAntiquant = true;
@@ -3310,7 +3340,7 @@ ge::graphStatus PromptFlashAttentionTiling::CheckIOType(ContextParamsForPFATilin
     } else if (outputType == ge::DT_INT8) {
         outputDataTypeSize = INT8SIZE;
     }
-    return ge::GRAPH_SUCCESS; 
+    return ge::GRAPH_SUCCESS;
 }
 
 ge::graphStatus PromptFlashAttentionTiling::CheckMaskType(ContextParamsForPFATiling& contextKeyParams, 
@@ -3601,6 +3631,7 @@ bool PromptFlashAttentionTiling::PromptFlashAttentionComputeCVDiffParams(PromptF
     }
 
     const uint32_t dSplitFactorBmm2 = 128U;
+    SetSplitCoreMode(tilingData, sOuterFactor);
     res = PromptFlashAttentionCheckBmm1(tilingData, tilingData.bmm1TilingDataRect,
             l1SizeRemain, l0CSize, sOuterFactor, sInnerFactor, true, true);
     OPS_ERR_IF(res == false,
@@ -3751,7 +3782,7 @@ bool PromptFlashAttentionTiling::FindOptimalTilingBasicBLock(PromptFlashAttentio
         uint32_t floatSize = 4;
         uint32_t bf16Size = 2;
         postQuantUbSize = 2 * floatSize * tilingData.promptAttentionBaseParams.get_headSize();     // 2: scale2, offset2
-        if (tilingData.promptAttentionBaseParams.get_isQuant2BF16() == 1) {
+        if (tilingData.promptAttentionBaseParams.get_isQuant2BF16() == 1 || tilingData.promptAttentionBaseParams.get_isQuant2FP16() == 1) {
             postQuantUbSize += 2 * bf16Size * tilingData.promptAttentionBaseParams.get_headSize(); // 2: scale2, offset2
         }
     }
@@ -3854,13 +3885,13 @@ ge::graphStatus PromptFlashAttentionTiling::AdjustCVTilingCVDiff(int64_t ubSize,
             rectangleFactor = 512;     // 512: Adjust the size of the basic block Sinner to 512.
             softmaxSOuterFactor = 8;   // 8:   Adjust softmaxSOuter to 8
         } else if (tilingData.promptAttentionBaseParams.get_alignedHeadSize() >= 32) {     // D: [32, 128)
-            minFactor = 128;           // 128: Adjust the size of the basic block Souter to 128
-            rectangleFactor = 512;     // 512: Adjust the size of the basic block Sinner to 512
-            softmaxSOuterFactor = 16;  // 16:  Adjust softmaxSOuter to 16
-        } else {                                                                           // D: (0, 32)
             minFactor = 128;           // 128: Adjust the size of the basic block Souter to 128.
             rectangleFactor = 512;     // 512: Adjust the size of the basic block Sinner to 512.
-            softmaxSOuterFactor = 32;  // 32:  Adjust softmaxSOuter to 32.
+            softmaxSOuterFactor = 16;  // 16:  Adjust softmaxSOuter to 16.
+        } else {                                                                           // D: (0, 32)
+            minFactor = 128;           // 128: Adjust the size of the basic block Souter to 128
+            rectangleFactor = 512;     // 512: Adjust the size of the basic block Sinner to 512
+            softmaxSOuterFactor = 32;  // 32:  Adjust softmaxSOuter to 32
         }
     }
     if (enablePA) {
@@ -3903,7 +3934,7 @@ ge::graphStatus PromptFlashAttentionTiling::AdjustCVTilingCVDiff(int64_t ubSize,
     return ge::GRAPH_SUCCESS;
 }
 
-ge::graphStatus TilingPromptFlashAttention(gert::TilingContext* context) {
+PFA_EXTERN_C ge::graphStatus TilingPromptFlashAttention(gert::TilingContext* context) {
     if (context == nullptr) {
         OPS_LOG_E("PromptFlashAttention", "tiling context is nullptr!");
         return ge::GRAPH_FAILED;

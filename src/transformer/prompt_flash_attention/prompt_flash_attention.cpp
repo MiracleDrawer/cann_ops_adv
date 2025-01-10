@@ -184,6 +184,9 @@ extern "C" __global__ __aicore__ void prompt_flash_attention_FIAS(__gm__ uint8_t
             } else if (TILING_KEY_IS(1000000000100101612)) {
                 // Prefix BSH layout HighPrecision
                 INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, half, half, Mode::HighPrecision, MatMulType::MM_MDL, true>);
+            } else if (TILING_KEY_IS(1000000000002101612)) {
+                // BSH layout HighPrecision, enable L1 reuse
+                INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, half, half, Mode::HighPrecision, MatMulType::MM_IBSHARE_NORM>);
             } else if (TILING_KEY_IS(1000000000000001612)) {
                 // BNSD layout HighPrecision
                 INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, half, half, Mode::HighPrecision>);
@@ -217,6 +220,9 @@ extern "C" __global__ __aicore__ void prompt_flash_attention_FIAS(__gm__ uint8_t
             } else if (TILING_KEY_IS(1000000000010101012)) {
                 // no anti-quant path for CVDIFF-BSH, half in half out, enable PA
                 INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, half, half, Mode::HighPerformance, MatMulType::MM_PA>);
+            } else if (TILING_KEY_IS(1000000000002101012)) {
+                // no anti-quant path for CVDIFF-BSH, half in half out, enable L1 reuse
+                INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, uint8_t, half, half, Mode::HighPerformance, MatMulType::MM_IBSHARE_NORM>);
             } else if (TILING_KEY_IS(1000000000100101012)) {
                 // Prefix no anti-quant path for CVDIFF-BSH, half in half out
                 if (maskByteNum == FLOAT16BYTENUM) {
@@ -252,7 +258,19 @@ extern "C" __global__ __aicore__ void prompt_flash_attention_FIAS(__gm__ uint8_t
             } else if (TILING_KEY_IS(1000000800100001012)) {
                 // Prefix anti-quant path for CVDIFF-BNSD, half in half out
                 INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, half, int8_t, Mode::HighPerformance, MatMulType::MM_MDL, true>);
-            } 
+            } else if(TILING_KEY_IS(1000000400300101612)) {  // enable prefix, enable MSD
+                // BSH layout fp16 cvdiff
+                INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, half, int8_t, Mode::HighPrecision, MatMulType::MM_MDL, true, MsdMode::MSD_ON>);
+            } else if (TILING_KEY_IS(1000000400300001612)) { 
+                // BNSD layout fp16 cvdiff
+                INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, half, int8_t, Mode::HighPrecision, MatMulType::MM_MDL, true, MsdMode::MSD_ON>);
+            } else if (TILING_KEY_IS(1000000400200101612)) {
+                // BSH layout fp16 cvdiff
+                INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, half, int8_t, Mode::HighPrecision, MatMulType::MM_MDL, false, MsdMode::MSD_ON>);
+            } else if (TILING_KEY_IS(1000000400200001612)) {
+                // BNSD layout fp16 cvdiff
+                INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, half, int8_t, Mode::HighPrecision, MatMulType::MM_MDL, false, MsdMode::MSD_ON>);
+            }
         #endif
 
         #if (ORIG_DTYPE_QUERY == DT_FLOAT16) && (ORIG_DTYPE_KEY != DT_INT4) && (ORIG_DTYPE_ATTENTION_OUT == DT_INT8)
@@ -316,7 +334,19 @@ extern "C" __global__ __aicore__ void prompt_flash_attention_FIAS(__gm__ uint8_t
             } else if (TILING_KEY_IS(1000000800100021612)) {
                 // Prefix anti-quant path for CVDIFF-BNSD, half in int8 out
                 INVOKE_PFA_KVANTIQUANT_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, int8_t, int8_t, Mode::HighPrecision, MatMulType::MM_MDL, true>);
-            }
+            } else if(TILING_KEY_IS(1000000400300121612)) {  // enable prefix, enable MSD
+                // BSH layout fp16 in int8 out cvdiff
+                INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, int8_t, int8_t, Mode::HighPrecision, MatMulType::MM_MDL, true, MsdMode::MSD_ON>);
+            } else if (TILING_KEY_IS(1000000400300021612)) {
+                // BNSD layout fp16 in int8 out cvdiff
+                INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, int8_t, int8_t, Mode::HighPrecision, MatMulType::MM_MDL, true, MsdMode::MSD_ON>);
+            } else if (TILING_KEY_IS(1000000400200121612)) {
+                // BSH layout fp16 in int8 out cvdiff, enable MSD
+                INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, half, bool, int8_t, int8_t, Mode::HighPrecision, MatMulType::MM_MDL, false, MsdMode::MSD_ON>);
+            } else if (TILING_KEY_IS(1000000400200021612)) {
+                // BNSD layout fp16 in int8 out cvdiff, enable MSD
+                INVOKE_PFA_INT8_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, half, bool, int8_t, int8_t, Mode::HighPrecision, MatMulType::MM_MDL, false, MsdMode::MSD_ON>);
+            } 
         #endif
     #endif
     #if (ORIG_DTYPE_QUERY == DT_BF16) && (ORIG_DTYPE_KEY != DT_INT4)
@@ -346,6 +376,9 @@ extern "C" __global__ __aicore__ void prompt_flash_attention_FIAS(__gm__ uint8_t
             } else if (TILING_KEY_IS(1000000000010111112)) {
                 // BSH layout bf16 cvdiff, enable PA
                 INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, bfloat16_t, bool, bfloat16_t, bfloat16_t, Mode::HighPerformance, MatMulType::MM_PA>);
+            } else if (TILING_KEY_IS(1000000000002111112)) {
+                // BSH layout bf16 cvdiff, enable L1 reuse
+                INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, bfloat16_t, bool, bfloat16_t, bfloat16_t, Mode::HighPerformance, MatMulType::MM_IBSHARE_NORM>);
             } else if (TILING_KEY_IS(1000000000100111112)) {  // enable prefix
                 // BSH layout bf16 cvdiff
                 INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, bfloat16_t, bool, bfloat16_t, bfloat16_t, Mode::HighPerformance, MatMulType::MM_MDL, true>);
@@ -355,23 +388,22 @@ extern "C" __global__ __aicore__ void prompt_flash_attention_FIAS(__gm__ uint8_t
             } else if (TILING_KEY_IS(1000000000010011112)) {
                 // BNSD layout bf16 cvdiff, enable PA
                 INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, bfloat16_t, bool, bfloat16_t, bfloat16_t, Mode::HighPerformance, MatMulType::MM_PA>);
+            } else if (TILING_KEY_IS(1000000000002011112)) {
+                // BNSD layout bf16 cvdiff, enable L1 reuse
+                INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, bfloat16_t, bool, bfloat16_t, bfloat16_t, Mode::HighPerformance, MatMulType::MM_IBSHARE_NORM>);
             } else if (TILING_KEY_IS(1000000000100011112)) {  // enable prefix
                 // BNSD layout bf16 cvdiff
                 INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, bfloat16_t, bool, bfloat16_t, bfloat16_t, Mode::HighPerformance, MatMulType::MM_MDL, true>);
-            } 
-            else if (TILING_KEY_IS(1000000400300111112)) {  // enable prefix, enable MSD
+            } else if (TILING_KEY_IS(1000000400300111112)) {  // enable prefix, enable MSD
                 // BSH layout bf16 cvdiff
                 INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, bfloat16_t, bool, bfloat16_t, int8_t, Mode::HighPerformance, MatMulType::MM_MDL, true, MsdMode::MSD_ON>);
-            }       
-            else if (TILING_KEY_IS(1000000400300011112)) {  // enable prefix, enable MSD
+            } else if (TILING_KEY_IS(1000000400300011112)) {  // enable prefix, enable MSD
                 // BNSD layout bf16 cvdiff
                 INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, bfloat16_t, bool, bfloat16_t, int8_t, Mode::HighPerformance, MatMulType::MM_MDL, true, MsdMode::MSD_ON>);
-            } 
-            else if (TILING_KEY_IS(1000000400200111112)) {
+            } else if (TILING_KEY_IS(1000000400200111112)) {
                 // BSH layout bf16 cvdiff
                 INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BSH, bfloat16_t, bool, bfloat16_t, int8_t, Mode::HighPerformance, MatMulType::MM_MDL, false, MsdMode::MSD_ON>);
-            }
-            else if (TILING_KEY_IS(1000000400200011112)) {
+            } else if (TILING_KEY_IS(1000000400200011112)) {
                 // BNSD layout bf16 cvdiff
                 INVOKE_PFA_GENERAL_OP_IMPL(PromptFlashAttentionS1s2Bns1X910, PFAType<PFALayout::BNSD, bfloat16_t, bool, bfloat16_t, int8_t, Mode::HighPerformance, MatMulType::MM_MDL, false, MsdMode::MSD_ON>);
             }
