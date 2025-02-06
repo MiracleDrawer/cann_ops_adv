@@ -21,7 +21,8 @@ approvers:
 - jiang-lirui
 - monologue815
 - zhangtj0209
-- turingcomplete
+- GodantShen
+- fzzach
 
 reviewers:
 - li-xulong
@@ -46,7 +47,6 @@ reviewers:
 - realmadrid1016
 - monologue815
 - zhangtj0209
-- turingcomplete
 - GodantShen
 - Liexss
 - fzzach
