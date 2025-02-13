@@ -23,6 +23,7 @@ cmake-build-release
 
 # build & output tempalte dirs
 build/
+build_example/
 build_out/
 output/
 
